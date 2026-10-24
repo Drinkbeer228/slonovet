@@ -1,0 +1,227 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b1217;
+  --color-surface: #131d24;
+  --color-surface2: #1a2730;
+  --color-line: #22313b;
+  --color-ink: #eef3f5;
+  --color-ink2: #c9d6dd;
+  --color-muted: #93a6b1;
+  --color-faint: #7f939e;
+  --color-teal: #2dd4bf;
+  --color-teal-ink: #04201c;
+  --color-amber: #f5b547;
+  --color-coral: #ff8a7a;
+  --color-nav: #0e161c;
+  --color-tick: #5b717d;
+  --color-track: #3a4b57;
+  --color-dot0: #1f4a45;
+  --color-dot1: #f5b547;
+  --color-dot2: #ff8a7a;
+  --color-toast-ok: #0e2a27;
+  --color-toast-err: #2a1614;
+  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Светлая тема: для улицы днём */
+:root[data-theme='light'] {
+  --color-bg: #f3f6f7;
+  --color-surface: #ffffff;
+  --color-surface2: #e6edf0;
+  --color-line: #c9d5db;
+  --color-ink: #0f1b22;
+  --color-ink2: #2b3f4d;
+  --color-muted: #4d6270;
+  --color-faint: #5d717e;
+  --color-teal: #07796b;
+  --color-teal-ink: #ffffff;
+  --color-amber: #8f5a00;
+  --color-coral: #c22e1d;
+  --color-nav: #ffffff;
+  --color-tick: #7b8f9b;
+  --color-track: #9fb0ba;
+  --color-dot0: #9bd6cc;
+  --color-dot1: #f0a81a;
+  --color-dot2: #e5483a;
+  --color-toast-ok: #dff5f0;
+  --color-toast-err: #fde6e2;
+}
+
+/* Скин «Пиксель»: яркий, как в старых платформерах */
+:root[data-theme='pixel'] {
+  --color-bg: #5c94fc;
+  --color-surface: #fffdf2;
+  --color-surface2: #ffe9a8;
+  --color-line: #1a1a1a;
+  --color-ink: #1a1a1a;
+  --color-ink2: #2b2b2b;
+  --color-muted: #2b2418;
+  --color-faint: #3d3528;
+  --color-teal: #0a7a26;
+  --color-teal-ink: #ffffff;
+  --color-amber: #8a5200;
+  --color-coral: #d01c14;
+  --color-nav: #c84c0c;
+  --color-tick: #1a1a1a;
+  --color-track: #1a1a1a;
+  --color-dot0: #43b047;
+  --color-dot1: #f8b800;
+  --color-dot2: #d01c14;
+  --color-toast-ok: #d7f5d0;
+  --color-toast-err: #ffd9d4;
+  --font-pixel: 'Press Start 2P', 'Manrope', monospace;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+}
+
+html {
+  background: var(--color-bg);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+}
+
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.animate-sheet {
+  animation: sheet-up 0.18s ease-out;
+}
+
+/* Пиксель: острые углы, чёрная обводка и твёрдая тень */
+:root[data-theme='pixel'] [class*='rounded-['],
+:root[data-theme='pixel'] .rounded-full:not(.keep-round),
+:root[data-theme='pixel'] .rounded-sm,
+:root[data-theme='pixel'] .rounded-md,
+:root[data-theme='pixel'] .rounded-lg {
+  border-radius: 0 !important;
+}
+
+:root[data-theme='pixel'] h1,
+:root[data-theme='pixel'] h2 {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+:root[data-theme='pixel'] h1 {
+  font-size: 18px !important;
+}
+
+:root[data-theme='pixel'] h2 {
+  font-size: 12px !important;
+}
+
+:root[data-theme='pixel'] .bg-surface:not(button),
+:root[data-theme='pixel'] .bg-surface2:not(button) {
+  border: 2px solid #1a1a1a;
+}
+
+:root[data-theme='pixel'] .bg-surface:not(button):not(input):not(textarea) {
+  box-shadow: 3px 3px 0 #1a1a1a;
+}
+
+:root[data-theme='pixel'] button.bg-ink {
+  color: #fff;
+}
+
+:root[data-theme='pixel'] button.bg-teal,
+:root[data-theme='pixel'] button.bg-ink {
+  border: 2px solid #1a1a1a;
+  box-shadow: 0 3px 0 #1a1a1a;
+}
+
+:root[data-theme='pixel'] header.sticky {
+  background: #c84c0c;
+  border-bottom: 3px solid #1a1a1a;
+  color: #fff;
+}
+
+:root[data-theme='pixel'] header.sticky .bg-surface,
+:root[data-theme='pixel'] header.sticky .bg-surface2 {
+  color: #1a1a1a;
+}
+
+:root[data-theme='pixel'] nav[aria-label='Разделы'].fixed {
+  background: #c84c0c;
+  border-top: 3px solid #1a1a1a;
+}
+
+:root[data-theme='pixel'] nav[aria-label='Разделы'].fixed button {
+  color: #ffe9a8;
+}
+
+:root[data-theme='pixel'] nav[aria-label='Разделы'].fixed button[aria-current='page'] {
+  color: #fff;
+}
+
+:root[data-theme='pixel'] h1,
+:root[data-theme='pixel'] main > div > header h1,
+:root[data-theme='pixel'] main h1 {
+  color: #fff;
+  text-shadow: 2px 2px 0 #1a1a1a;
+}
+
+:root[data-theme='pixel'] main section > div:first-child > h2 {
+  color: #fff;
+  text-shadow: 2px 2px 0 #1a1a1a;
+}
+
+:root[data-theme='pixel'] main section > div:first-child > div,
+:root[data-theme='pixel'] main > div > header span {
+  color: #fff;
+}
+
+/* Пиксель: шторки светлые, чтобы текст и кнопки читались */
+:root[data-theme='pixel'] [role='dialog'] {
+  background: #fffdf2;
+  border: 3px solid #1a1a1a;
+  border-bottom: 0;
+}
+
+:root[data-theme='pixel'] [role='dialog'] .bg-surface:not(button):not(input):not(textarea) {
+  box-shadow: none;
+  background: #fff;
+}
+
+/* переход из полоски дежурства: заголовок блока не прячется под шапкой и полоской */
+[id^='sec-'] {
+  scroll-margin-top: 8rem;
+}

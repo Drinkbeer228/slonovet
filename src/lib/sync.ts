@@ -1,0 +1,141 @@
+import { useSyncExternalStore } from 'react';
+import { TABLES, type TableMap, type TableName } from '../domain/types';
+import { idbGet, idbPut } from './idb';
+import { applyRemote, dropOutbox, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
+import { getClient } from './supabase';
+import { uploadPendingPhotos } from './photos';
+
+export interface SyncStatus {
+  state: 'demo' | 'idle' | 'syncing' | 'offline' | 'error';
+  pending: number;
+  lastSync: string | null;
+  error: string | null;
+}
+
+let status: SyncStatus = { state: 'idle', pending: 0, lastSync: null, error: null };
+const listeners = new Set<() => void>();
+let enabled = false;
+let running = false;
+let again = false;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let interval: ReturnType<typeof setInterval> | null = null;
+
+function setStatus(patch: Partial<SyncStatus>) {
+  status = { ...status, ...patch, pending: pendingCount() };
+  listeners.forEach((l) => l());
+}
+
+subscribeStore(() => {
+  if (status.pending !== pendingCount()) setStatus({});
+});
+
+export function useSyncStatus() {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => status,
+  );
+}
+
+const onOnline = () => syncNow();
+const onFocus = () => {
+  if (document.visibilityState === 'visible') syncNow();
+};
+
+export function startSync() {
+  enabled = true;
+  setLocalChangeHandler(() => scheduleSync());
+  window.addEventListener('online', onOnline);
+  window.addEventListener('offline', () => setStatus({ state: 'offline' }));
+  document.addEventListener('visibilitychange', onFocus);
+  if (interval) clearInterval(interval);
+  interval = setInterval(() => syncNow(), 60_000);
+  syncNow();
+}
+
+export function stopSync(demo: boolean) {
+  enabled = false;
+  if (interval) clearInterval(interval);
+  interval = null;
+  window.removeEventListener('online', onOnline);
+  document.removeEventListener('visibilitychange', onFocus);
+  setStatus({ state: demo ? 'demo' : 'idle', error: null });
+}
+
+export function scheduleSync(delay = 1500) {
+  if (!enabled) return;
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => syncNow(), delay);
+}
+
+function describe(e: unknown): string {
+  if (e && typeof e === 'object' && 'message' in e) return String((e as { message: string }).message);
+  return String(e);
+}
+
+export async function syncNow(): Promise<void> {
+  if (!enabled) return;
+  if (running) {
+    again = true;
+    return;
+  }
+  const client = getClient();
+  if (!client) return;
+  if (!navigator.onLine) {
+    setStatus({ state: 'offline' });
+    return;
+  }
+  running = true;
+  setStatus({ state: 'syncing' });
+  try {
+    await uploadPendingPhotos();
+
+    let failed: string | null = null;
+    for (const entry of getOutbox()) {
+      const { deleted, ...row } = entry.row as TableMap[TableName] & { deleted?: boolean };
+      const { error } = await client.from(entry.table).upsert({ ...row, deleted: Boolean(deleted) });
+      if (error) {
+        failed = error.message;
+        // сеть пропала — дальше не пытаемся
+        if (!navigator.onLine) break;
+        continue;
+      }
+      await dropOutbox(entry.key, entry.ts);
+    }
+
+    for (const t of TABLES) {
+      const cursorKey = `cursor:${t}`;
+      const cur = (await idbGet<{ key: string; value: string }>('meta', cursorKey))?.value ?? '1970-01-01T00:00:00Z';
+      let cursor = cur;
+      for (;;) {
+        const { data, error } = await client.from(t).select('*').gt('updated_at', cursor).order('updated_at').limit(500);
+        if (error) {
+          // одной таблицы может не быть на сервере (новая, миграцию ещё не применили) — остальные синхронизируем
+          failed = `${t}: ${error.message}`;
+          break;
+        }
+        if (!data?.length) break;
+        await applyRemote(t, data as TableMap[typeof t][]);
+        cursor = (data[data.length - 1] as { updated_at: string }).updated_at;
+        if (data.length < 500) break;
+      }
+      if (cursor !== cur) await idbPut('meta', { key: cursorKey, value: cursor });
+    }
+
+    setStatus({
+      state: failed ? 'error' : 'idle',
+      error: failed,
+      lastSync: new Date().toISOString(),
+    });
+  } catch (e) {
+    setStatus({ state: navigator.onLine ? 'error' : 'offline', error: describe(e) });
+  } finally {
+    running = false;
+    if (again) {
+      again = false;
+      scheduleSync(500);
+    }
+  }
+}

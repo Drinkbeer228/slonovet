@@ -1,0 +1,16 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+# адрес и публичный ключ Supabase для сборки на GitHub (ключ и так виден в любом браузере, данные защищены правами в базе)
+!.env.production
+
+# архивы, демо-файл, локальные настройки Claude
+*.zip
+demo/
+.claude/
+.mcp.json

@@ -1,0 +1,220 @@
+import { ELEPHANTS } from '../../domain/elephants';
+import { cycleEaten, setFeedDone, setFeedKg, setHay } from '../../domain/actions';
+import { weighedItem } from '../../domain/stock';
+import { FEED_TIMES } from '../../domain/shift';
+import type { CurrentUser, Diet, Eaten, ElephantName, Shift } from '../../domain/types';
+import { useState } from 'react';
+import { useRows } from '../../lib/store';
+import { Card, DecimalInput, Section, Segmented, Sheet, Stepper, Tick } from '../../ui/kit';
+import { Icon } from '../../ui/Icon';
+import { qtyText } from '../DietScreen';
+
+const EATEN_LABEL: Record<Eaten, string> = { all: 'всё', half: '½', none: 'отказ' };
+const EATEN_CLS: Record<Eaten, string> = {
+  all: 'border-line bg-surface2 text-ink2',
+  half: 'border-amber bg-amber/15 text-amber',
+  none: 'border-coral bg-coral/15 text-coral',
+};
+
+/** «запарить за 20 мин» → «запарить в 12:40» */
+function prepHint(time: string, prep: string): string {
+  const m = prep.match(/запарить за (\d+)/);
+  if (!m) return prep;
+  const [h, mm] = time.split(':').map(Number);
+  const t = h * 60 + mm - Number(m[1]);
+  const at = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+  return prep.replace(/запарить за \d+ мин/, `запарить в ${at}`);
+}
+
+export function mealTitle(diets: Diet[], time: string) {
+  const meal = diets.find((d) => d.id === 'Претти')?.meals.find((m) => m.time === time) ?? diets[0]?.meals.find((m) => m.time === time);
+  return { title: meal?.title ?? 'Кормление', prep: meal ? prepHint(time, meal.prep) : '' };
+}
+
+export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
+  const diets = useRows('diets');
+  const items = useRows('stock_items');
+  const doneCount = FEED_TIMES.filter((t) => shift.feeds[t]?.done).length;
+  const [recipe, setRecipe] = useState<string | null>(null);
+  return (
+    <Section
+      id="sec-feeding"
+      title="Кормление"
+      aside={
+        <button type="button" className="-my-3 px-1 py-3 font-bold text-teal" onClick={() => setRecipe(FEED_TIMES.find((t) => !shift.feeds[t]?.done) ?? FEED_TIMES[0])}>
+          рецепты
+        </button>
+      }
+    >
+      <Card className="overflow-hidden">
+        {FEED_TIMES.map((t) => {
+          const f = shift.feeds[t];
+          const done = Boolean(f?.done);
+          const { title, prep } = mealTitle(diets, t);
+          return (
+            <div key={t} className="border-b border-surface2">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={done}
+                onClick={() => setFeedDone(shift, t, !done, user)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left"
+              >
+                <span className={`w-12 text-[15px] font-extrabold ${done ? 'text-faint' : ''}`}>{t}</span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className={`text-[15px] font-bold ${done ? 'text-faint' : ''}`}>{title}</span>
+                  <span className="text-[12px] font-semibold text-muted">{done ? 'выдано' : prep}</span>
+                </span>
+                <Tick on={done} />
+              </button>
+              {done && (
+                <div className="flex gap-2 px-4 pb-3">
+                  {ELEPHANTS.map((el) => {
+                    const e = f?.eaten?.[el] ?? 'all';
+                    return (
+                      <button
+                        key={el}
+                        type="button"
+                        onClick={() => cycleEaten(shift, t, el)}
+                        aria-label={`${el} съела: ${EATEN_LABEL[e]}. Нажми, чтобы изменить`}
+                        className={`h-11 flex-1 rounded-[10px] border px-1 text-[13px] font-bold ${EATEN_CLS[e]}`}
+                      >
+                        {el} · {EATEN_LABEL[e]}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {done && weighedItem(diets, t) && (
+                <WeighRow
+                  kg={f?.kg ?? 0}
+                  fill={f?.fill}
+                  perBowl={items.find((i) => i.id === weighedItem(diets, t))?.kg_per_garets ?? null}
+                  onSave={(kg, fill) => setFeedKg(shift, t, weighedItem(diets, t)!, kg, user, fill)}
+                />
+              )}
+            </div>
+          );
+        })}
+        <div className="flex items-center gap-3 px-4 py-3">
+          <span className="flex flex-1 flex-col gap-0.5">
+            <span className="text-[15px] font-bold">Сено, тюков</span>
+            <span className="text-[12px] font-semibold text-muted">списывается само</span>
+          </span>
+          <Stepper label="Сено" value={shift.hay_bales} onChange={(v) => setHay(shift, v, user)} />
+        </div>
+      </Card>
+      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда ставишь галочку. Овощи — по наполнению тазов.</p>}
+      <RecipeSheet time={recipe} onTime={setRecipe} diets={diets} />
+    </Section>
+  );
+}
+
+/** Рецепт кормления шторкой снизу — посмотрел, смахнул, остался на месте. */
+function RecipeSheet({ time, onTime, diets }: { time: string | null; onTime: (t: string | null) => void; diets: Diet[] }) {
+  const { title, prep } = time ? mealTitle(diets, time) : { title: '', prep: '' };
+  return (
+    <Sheet open={time != null} onClose={() => onTime(null)} title="Рецепты">
+      {time && (
+        <div className="flex flex-col gap-4">
+          <Segmented label="Кормление" value={time} onChange={onTime} options={FEED_TIMES.map((t) => ({ value: t, label: t }))} />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[17px] font-extrabold">{title}</span>
+            {prep && (
+              <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber/15 px-2.5 py-1 text-[13px] font-bold text-amber">
+                <Icon name="clock" size={14} />
+                {prep}
+              </span>
+            )}
+          </div>
+          {ELEPHANTS.map((el) => {
+            const meal = diets.find((d) => d.id === el)?.meals.find((m) => m.time === time);
+            return (
+              <Card key={el} className="flex flex-col px-4 py-3">
+                <span className="pb-1 text-[15px] font-extrabold text-teal">{el}</span>
+                {meal?.items.length ? (
+                  meal.items.map((it, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 border-t border-surface2 py-2">
+                      <span className="text-[15px] text-ink2">{it.name}</span>
+                      <span className={`whitespace-nowrap text-[15px] font-extrabold ${it.qty == null ? 'text-muted' : ''}`}>{qtyText(it.qty, it.unit)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-[14px] text-muted">В рационе нет</span>
+                )}
+              </Card>
+            );
+          })}
+          <p className="m-0 text-[12px] font-semibold text-muted">1 гарец — мерный совок. Рацион меняет врач в разделе «Рацион».</p>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+const FILL_STEPS = [1, 0.75, 0.5, 0.25];
+const FILL_LABEL: Record<number, string> = { 1: 'полный', 0.75: '¾', 0.5: '½', 0.25: '¼' };
+
+/** Овощи: по образцу — наполнение таза у каждой (вес таза задаёт админ), или точным весом. */
+function WeighRow({
+  kg,
+  fill,
+  perBowl,
+  onSave,
+}: {
+  kg: number;
+  fill?: Partial<Record<ElephantName, number>>;
+  perBowl: number | null;
+  onSave: (kg: number, fill?: Partial<Record<ElephantName, number>>) => void;
+}) {
+  const [exact, setExact] = useState(false);
+  if (perBowl && !exact && (fill || !kg)) {
+    const cur = (el: ElephantName) => fill?.[el] ?? 1;
+    const next = (el: ElephantName) => {
+      const v = FILL_STEPS[(FILL_STEPS.indexOf(cur(el)) + 1) % FILL_STEPS.length];
+      const nf = { ...Object.fromEntries(ELEPHANTS.map((e) => [e, cur(e)])), [el]: v } as Record<ElephantName, number>;
+      onSave(ELEPHANTS.reduce((sum, e) => sum + nf[e], 0) * perBowl, nf);
+    };
+    return (
+      <div className="flex flex-col gap-1.5 px-4 pb-3">
+        <span className="text-[12px] font-bold text-muted">Тазы — нажми, если не полный</span>
+        <div className="flex gap-2">
+          {ELEPHANTS.map((el) => (
+            <button
+              key={el}
+              type="button"
+              onClick={() => next(el)}
+              aria-label={`${el}: таз ${FILL_LABEL[cur(el)]}. Нажми, чтобы изменить`}
+              className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border px-1 text-[13px] font-bold ${
+                cur(el) === 1 ? 'border-line bg-surface2 text-ink2' : 'border-amber bg-amber/15 text-amber'
+              }`}
+            >
+              <span className="relative h-4 w-3 overflow-hidden rounded-[3px] border border-current">
+                <span className="absolute inset-x-0 bottom-0 bg-current opacity-60" style={{ height: `${cur(el) * 100}%` }} />
+              </span>
+              {el} · {FILL_LABEL[cur(el)]}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={() => setExact(true)} className="self-start py-2 text-[13px] font-bold text-teal">
+          взвесил — вписать кг
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 px-4 pb-3">
+      <span className="flex flex-1 flex-col">
+        <span className="text-[14px] font-bold">Выдано овощей, кг</span>
+        <span className={`text-[12px] font-semibold ${kg ? 'text-muted' : 'text-amber'}`}>{kg ? 'списано из запаса' : 'взвесь тазы и впиши сумму'}</span>
+      </span>
+      <DecimalInput
+        label="Выдано овощей, кг"
+        value={kg || null}
+        placeholder="0"
+        onCommit={(v) => onSave(Math.max(0, v ?? 0))}
+        className="w-24 py-2 text-right text-[18px] font-extrabold"
+      />
+    </div>
+  );
+}
