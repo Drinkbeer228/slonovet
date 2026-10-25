@@ -43,6 +43,9 @@ export function UsersScreen({ session }: { session: Session }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const demo = session.mode === 'demo';
+  // директор ведёт людей, но администраторов не назначает и не меняет
+  const isAdmin = session.user.role === 'admin';
+  const roles = isAdmin ? ROLES : ROLES.filter((r) => r.value !== 'admin');
 
   return (
     <div className="flex flex-col gap-6">
@@ -59,7 +62,13 @@ export function UsersScreen({ session }: { session: Session }) {
           <Section key={r.value} title={r.label}>
             <Card className="divide-y divide-surface2 overflow-hidden">
               {list.map((p) => (
-                <button key={p.id} type="button" onClick={() => setEditing(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={!isAdmin && p.role === 'admin'}
+                  onClick={() => setEditing(p)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-60"
+                >
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface2 text-[14px] font-extrabold">{p.full_name.slice(0, 1)}</span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className={`text-[15px] font-bold ${p.active ? '' : 'text-faint line-through'}`}>{p.full_name}</span>
@@ -79,13 +88,13 @@ export function UsersScreen({ session }: { session: Session }) {
       <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
         Почта не нужна: человек входит по логину и паролю, которые вы ему передадите. Забыл пароль — задайте новый здесь.
       </p>
-      <AddSheet open={adding} demo={demo} onClose={() => setAdding(false)} />
-      <EditSheet profile={editing} demo={demo} selfId={session.user.id} onClose={() => setEditing(null)} />
+      <AddSheet open={adding} demo={demo} roles={roles} onClose={() => setAdding(false)} />
+      <EditSheet profile={editing} demo={demo} roles={roles} selfId={session.user.id} onClose={() => setEditing(null)} />
     </div>
   );
 }
 
-function AddSheet({ open, demo, onClose }: { open: boolean; demo: boolean; onClose: () => void }) {
+function AddSheet({ open, demo, roles, onClose }: { open: boolean; demo: boolean; roles: typeof ROLES; onClose: () => void }) {
   const [name, setName] = useState('');
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState(genPassword());
@@ -177,7 +186,7 @@ function AddSheet({ open, demo, onClose }: { open: boolean; demo: boolean; onClo
           <div className="flex flex-col gap-2">
             <span className="px-1 text-[14px] font-bold text-muted">Роль</span>
             <div className="flex flex-wrap gap-2">
-              {ROLES.map((r) => (
+              {roles.map((r) => (
                 <Chip key={r.value} on={role === r.value} onClick={() => setRole(r.value)}>
                   {r.label}
                 </Chip>
@@ -191,7 +200,19 @@ function AddSheet({ open, demo, onClose }: { open: boolean; demo: boolean; onClo
   );
 }
 
-function EditSheet({ profile, demo, selfId, onClose }: { profile: Profile | null; demo: boolean; selfId: string; onClose: () => void }) {
+function EditSheet({
+  profile,
+  demo,
+  roles,
+  selfId,
+  onClose,
+}: {
+  profile: Profile | null;
+  demo: boolean;
+  roles: typeof ROLES;
+  selfId: string;
+  onClose: () => void;
+}) {
   const [role, setRole] = useState<Role>('keeper');
   const [active, setActive] = useState(true);
   const [password, setPassword] = useState('');
@@ -252,7 +273,7 @@ function EditSheet({ profile, demo, selfId, onClose }: { profile: Profile | null
         <div className="flex flex-col gap-2">
           <span className="px-1 text-[14px] font-bold text-muted">Роль</span>
           <div className="flex flex-wrap gap-2">
-            {ROLES.map((r) => (
+            {roles.map((r) => (
               <Chip key={r.value} on={role === r.value} onClick={() => !self && setRole(r.value)}>
                 {r.label}
               </Chip>

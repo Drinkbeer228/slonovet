@@ -33,7 +33,7 @@ export const TABS_BY_ROLE: Record<Role, Tab[]> = {
 export const MENU_TABS: Record<Role, Tab[]> = {
   keeper: ['move', 'rating', 'guide'],
   vet: ['move', 'rating', 'guide'],
-  director: ['diet', 'move', 'rating', 'guide'],
+  director: ['diet', 'users', 'move', 'rating', 'guide'],
   admin: ['diet', 'users', 'move', 'rating', 'guide'],
 };
 
