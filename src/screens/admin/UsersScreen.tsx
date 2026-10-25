@@ -272,6 +272,8 @@ function EditSheet({
     try {
       if (demo) await put('profiles', { ...profile, deleted: true });
       else {
+        // галочку «Отключить» могли поставить без «Сохранить» — сервер удаляет только отключённых
+        if (profile.active) await callAdmin({ action: 'update', id: profile.id, active: 'false' });
         await callAdmin({ action: 'delete', id: profile.id });
         await syncNow();
       }
@@ -319,11 +321,19 @@ function EditSheet({
         )}
         {!self && (
           <Card className="overflow-hidden">
-            <Check on={!active} label="Отключить доступ" sub="человек не сможет войти, его записи останутся" onChange={(v) => setActive(!v)} />
+            <Check
+              on={!active}
+              label="Отключить доступ"
+              sub="человек не сможет войти, его записи останутся"
+              onChange={(v) => {
+                setActive(!v);
+                if (v === false) setConfirmDelete(false);
+              }}
+            />
           </Card>
         )}
-        {!self && !profile.active && (
-          // удалить можно только уже отключённого: случайно стереть работающего человека нельзя
+        {!self && !active && (
+          // удалить можно только отключённого: случайно стереть работающего человека нельзя
           <div className="flex flex-col gap-2">
             {confirmDelete ? (
               <>
