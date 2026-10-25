@@ -49,11 +49,8 @@ export function AcceptShift({ user }: { user: CurrentUser }) {
   const openReqs = prev ? requestTodos(requests, marks, { ...prev, date: isoDate(), id: '__new__' }).filter((t) => !t.done) : [];
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <header className="flex flex-col gap-0.5 px-1">
-        <span className="text-[13px] font-semibold text-muted">{longDate(isoDate())}</span>
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Принять дежурство</h1>
-      </header>
+    <div className="flex flex-col gap-6">
+      <span className="-mt-2 px-1 text-[13px] font-semibold text-muted">{longDate(isoDate())}</span>
 
       {prev && (
         <Section title="От прошлого дежурства" aside={`${prev.keeper_name} · ${relDate(prev.handed_at?.slice(0, 10) ?? prev.date)} ${timeOf(prev.handed_at)}`}>

@@ -24,9 +24,10 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
 
 export const TABS_BY_ROLE: Record<Role, Tab[]> = {
   keeper: ['shift', 'diet', 'stock', 'journal'],
-  vet: ['overview', 'requests', 'diet', 'journal'],
-  director: ['overview', 'requests', 'stock', 'journal'],
-  manager: ['overview', 'stock', 'journal'],
+  // дежурство видят все: не кипер — только смотрит
+  vet: ['overview', 'shift', 'requests', 'diet', 'journal'],
+  director: ['overview', 'shift', 'requests', 'stock', 'journal'],
+  manager: ['stock', 'shift', 'overview', 'journal'],
   admin: ['shift', 'overview', 'requests', 'stock', 'journal'],
 };
 

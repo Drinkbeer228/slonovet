@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, updateShift } from '../../domain/actions';
 import { FEED_TIMES, acceptedBy, currentShift, lastHanded, requestTodos, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
@@ -15,36 +15,64 @@ import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
 
+/** Ведут дежурство киперы (и админ). Остальные смотрят его как есть, ничего не меняя. */
+const canWork = (u: CurrentUser) => u.role === 'keeper' || u.role === 'admin';
+
 export function ShiftScreen({ user }: { user: CurrentUser }) {
   const shifts = useRows('shifts');
   const shift = currentShift(shifts);
   const [acceptOwn, setAcceptOwn] = useState(false);
-  if (!shift) {
-    // только что сдал сам — показываем код, пока сменщик не принял
-    const last = lastHanded(shifts);
-    if (!acceptOwn && last?.keeper_id === user.id && last.handover_code && !acceptedBy(shifts, last)) {
-      return <HandedShift shift={last} onAcceptOwn={() => setAcceptOwn(true)} />;
-    }
-    return <AcceptShift user={user} />;
+  const [accepting, setAccepting] = useState(false);
+  if (shift) return <OpenShift shift={shift} user={user} readOnly={!canWork(user)} />;
+
+  const last = lastHanded(shifts);
+  // только что сдал сам — показываем код, пока сменщик не принял
+  if (!acceptOwn && last?.keeper_id === user.id && last.handover_code && !acceptedBy(shifts, last)) {
+    return <HandedShift shift={last} onAcceptOwn={() => setAcceptOwn(true)} />;
   }
-  return <OpenShift shift={shift} user={user} />;
+  // никто не дежурит: видно последнее дежурство, проверка при приёме — в шторке
+  const accept = canWork(user) && (
+    <>
+      <Button kind="primary" big full icon="shield" onClick={() => setAccepting(true)}>
+        Принять дежурство
+      </Button>
+      <Sheet open={accepting} onClose={() => setAccepting(false)} title="Принять дежурство">
+        <AcceptShift user={user} />
+      </Sheet>
+    </>
+  );
+  if (!last) {
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Дежурство</h1>
+        <Card className="p-4 text-[15px] text-muted">Дежурств ещё не было.</Card>
+        {accept}
+      </div>
+    );
+  }
+  return <OpenShift shift={last} user={user} readOnly accept={accept} />;
 }
 
-function OpenShift({ shift, user }: { shift: Shift; user: CurrentUser }) {
+function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: CurrentUser; readOnly: boolean; accept?: ReactNode }) {
   const notes = useRows('notes').filter((n) => n.shift_id === shift.id);
   const from = useRows('shifts').find((s) => s.id === shift.accepted_from);
   const someoneElses = user.role === 'keeper' && shift.keeper_id !== user.id && from?.keeper_id !== user.id;
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
-  const stale = shift.date < isoDate();
+  const handed = shift.status !== 'open';
+  const stale = !handed && shift.date < isoDate();
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-0.5 px-1">
         <span className="text-[13px] font-semibold text-muted">
           {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
+          {handed && ` · сдано ${relDate(shift.handed_at?.slice(0, 10) ?? shift.date)} в ${timeOf(shift.handed_at)}`}
         </span>
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Дежурство · {shift.keeper_name}</h1>
+        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">
+          {handed ? 'Прошлое дежурство' : 'Дежурство'} · {shift.keeper_name}
+        </h1>
+        {readOnly && !accept && <span className="text-[13px] font-semibold text-muted">Только просмотр — отмечает дежурный кипер</span>}
         {stale && (
           <span className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-bold text-amber">
             <Icon name="alert" size={16} />
@@ -53,29 +81,51 @@ function OpenShift({ shift, user }: { shift: Shift; user: CurrentUser }) {
         )}
       </header>
 
-      <JumpBar shift={shift} />
+      {accept && (
+        <div className="flex flex-col gap-2">
+          <p className="m-0 px-1 text-[14px] font-semibold text-ink2">Сейчас никто не дежурит.</p>
+          {accept}
+        </div>
+      )}
 
-      {someoneElses && <NotHandedHint shift={shift} />}
+      <JumpBar shift={shift} readOnly={readOnly} />
+
+      {someoneElses && !readOnly && <NotHandedHint shift={shift} />}
       <HandoverBanner shift={shift} from={from} myId={user.id} />
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        <div className="flex flex-col gap-6">
+        {/* inert — смотреть можно, нажимать нельзя */}
+        <div className="flex flex-col gap-6" inert={readOnly}>
           <RequestsBlock shift={shift} user={user} />
           <StateMatrix shift={shift} onNote={setNoteDraft} />
         </div>
         <div className="flex flex-col gap-6">
-          <FeedingBlock shift={shift} user={user} />
-          <QuestsBlock shift={shift} user={user} />
+          <div className="flex flex-col gap-6" inert={readOnly}>
+            <FeedingBlock shift={shift} user={user} />
+            <QuestsBlock shift={shift} user={user} />
+          </div>
           <Section title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
             {notes.length > 0 && <NotesList notes={[...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} />}
-            <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: 'observation' })}>
-              Запись или фото
-            </Button>
+            {/* наблюдение может оставить любой — врач, директор, администратор */}
+            {!handed && (
+              <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: 'observation' })}>
+                Запись или фото
+              </Button>
+            )}
+            {handed && !notes.length && <Card className="px-4 py-3 text-[15px] text-muted">Записей нет</Card>}
           </Section>
-          <HandoverNote shift={shift} />
-          <Button kind="primary" big full onClick={() => setHandoverOpen(true)}>
-            Сдать дежурство
-          </Button>
+          {readOnly ? (
+            <Section id="sec-note" title="Следующему дежурному">
+              <Card className="px-4 py-3 text-[15px] leading-snug">{shift.note.trim() || <span className="text-muted">Без заметки</span>}</Card>
+            </Section>
+          ) : (
+            <>
+              <HandoverNote shift={shift} />
+              <Button kind="primary" big full onClick={() => setHandoverOpen(true)}>
+                Сдать дежурство
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -86,7 +136,7 @@ function OpenShift({ shift, user }: { shift: Shift; user: CurrentUser }) {
 }
 
 /** Строка-сводка вверху: сколько осталось и тап — прокрутка к нужному блоку. */
-function JumpBar({ shift }: { shift: Shift }) {
+function JumpBar({ shift, readOnly }: { shift: Shift; readOnly: boolean }) {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
   const left = requestTodos(requests, marks, shift).filter((t) => !t.done).length;
@@ -98,7 +148,7 @@ function JumpBar({ shift }: { shift: Shift }) {
     { id: 'sec-state', label: 'Состояние', val: flags ? String(flags) : '✓', warn: flags > 0 },
     { id: 'sec-feeding', label: 'Кормление', val: `${feeds}/${FEED_TIMES.length}`, warn: feeds < FEED_TIMES.length },
     { id: 'sec-quests', label: 'За дежурство', val: '', warn: false },
-    { id: 'sec-note', label: 'Сдать', val: '', warn: false },
+    { id: 'sec-note', label: readOnly ? 'Заметка' : 'Сдать', val: '', warn: false },
   ];
   return (
     // прилипает под шапкой: посреди длинного дежурства переходы под рукой
