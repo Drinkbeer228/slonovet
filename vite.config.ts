@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  // на GitHub Pages сайт живёт в подпапке /slonovet/ — путь задаёт сборка (BASE_PATH), локально — корень
+  // сайт в корне домена slonovet.ru; BASE_PATH — если когда-нибудь снова понадобится подпапка
   base: process.env.BASE_PATH ?? '/',
   plugins: [
     react(),
