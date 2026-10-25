@@ -103,7 +103,7 @@ export function JournalScreen() {
                       onClick={() => setDay(d)}
                       aria-label={`${shortDate(d)}${list ? `, дежурный ${list.map((x) => x.keeper_name).join(', ')}` : ', дежурства нет'}`}
                       className={`aspect-square w-full rounded-[3px] ${
-                        list ? DAY_CLS[worst(list)] : future ? 'bg-transparent' : 'bg-surface2'
+                        list ? DAY_CLS[worst(list)] : future ? 'bg-transparent' : 'bg-empty'
                       } ${d === selected ? 'ring-2 ring-ink' : ''} ${list?.some((x) => x.status === 'open') ? 'opacity-60' : ''}`}
                     />
                   );
@@ -114,7 +114,7 @@ export function JournalScreen() {
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] font-semibold text-muted">
           <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-surface2" />
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-empty" />
             нет дежурства
           </span>
           <span className="inline-flex items-center gap-1">

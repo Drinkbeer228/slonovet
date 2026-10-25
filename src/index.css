@@ -19,6 +19,8 @@
   --color-dot0: #1f4a45;
   --color-dot1: #f5b547;
   --color-dot2: #ff8a7a;
+  /* день без дежурства в журнале — нейтральный, не путать с «внимание» */
+  --color-empty: #1a2730;
   --color-toast-ok: #0e2a27;
   --color-toast-err: #2a1614;
   --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -44,6 +46,7 @@
   --color-dot0: #9bd6cc;
   --color-dot1: #f0a81a;
   --color-dot2: #e5483a;
+  --color-empty: #e6edf0;
   --color-toast-ok: #dff5f0;
   --color-toast-err: #fde6e2;
 }
@@ -68,6 +71,7 @@
   --color-dot0: #43b047;
   --color-dot1: #f8b800;
   --color-dot2: #d01c14;
+  --color-empty: #d6d0c0;
   --color-toast-ok: #d7f5d0;
   --color-toast-err: #ffd9d4;
   --font-pixel: 'Press Start 2P', 'Manrope', monospace;
