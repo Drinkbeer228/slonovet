@@ -95,11 +95,11 @@ const one = (v: number) => v.toLocaleString('ru-RU', { maximumFractionDigits: 1 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 export const BOARDS: Board[] = [
-  { key: 'urine', label: 'В бак', hint: 'мочи поймано в бак за дежурство', value: (k) => per(k.urineOk, k), format: one },
+  { key: 'urine', label: 'Баки', hint: 'баков мочи собрано за дежурство', value: (k) => per(k.urineOk, k), format: one },
   {
     key: 'aim',
     label: 'Точность',
-    hint: 'доля «в бак» среди всех походов',
+    hint: 'сколько поймано в бак из всех раз (баки + «мимо»)',
     value: (k) => (k.urineOk + k.urineMiss ? k.urineOk / (k.urineOk + k.urineMiss) : 0),
     format: pct,
   },
@@ -126,8 +126,8 @@ export const BADGES: Badge[] = [
   { key: 'first', icon: '🐘', title: 'Первое дежурство', text: 'Отдежурил первый раз', progress: (k) => [k.shifts, 1] },
   { key: 'ten', icon: '🌙', title: 'Десять ночей', text: '10 дежурств', progress: (k) => [k.shifts, 10] },
   { key: 'hundred', icon: '🏅', title: 'Сотня', text: '100 дежурств', progress: (k) => [k.shifts, 100] },
-  { key: 'catcher', icon: '🪣', title: 'Ловец', text: '100 раз поймал мочу в бак', progress: (k) => [k.urineOk, 100] },
-  { key: 'catcher2', icon: '🛢️', title: 'Повелитель бака', text: '1000 раз в бак', progress: (k) => [k.urineOk, 1000] },
+  { key: 'catcher', icon: '🪣', title: 'Ловец', text: '100 баков мочи собрано', progress: (k) => [k.urineOk, 100] },
+  { key: 'catcher2', icon: '🛢️', title: 'Повелитель бака', text: '1000 баков мочи', progress: (k) => [k.urineOk, 1000] },
   {
     key: 'sniper',
     icon: '🎯',

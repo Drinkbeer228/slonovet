@@ -43,13 +43,15 @@ export function JournalScreen() {
   const selected = day ?? shifts[0]?.date ?? isoDate();
   const days = [...byDay.keys()].sort().reverse();
   const dayIdx = days.indexOf(selected);
-  const step = (d: number) => {
-    const to = days[dayIdx + d];
-    if (!to) return;
+  /** Открыть день: календарь сам перелистывается к нему. */
+  const jump = (to: string) => {
     setDay(to);
-    // календарь листается вместе с выбранным днём
     const weeksBack = Math.floor((parseIso(isoDate()).getTime() - parseIso(to).getTime()) / 86400000 / 7);
     if (to < start || to > end) setPage(Math.max(0, Math.floor(weeksBack / WEEKS)));
+  };
+  const step = (d: number) => {
+    const to = days[dayIdx + d];
+    if (to) jump(to);
   };
 
   // последняя колонка — неделя с сегодняшним днём (или раньше, если листали)
@@ -132,7 +134,19 @@ export function JournalScreen() {
 
       <div className="flex items-center gap-2">
         <IconButton icon="back" label="Дежурство раньше" onClick={() => step(1)} className={!days[dayIdx + 1] ? 'opacity-30' : ''} />
-        <span className="flex-1 text-center text-[15px] font-extrabold">{longDate(selected)}</span>
+        {/* дата — кнопка: тап открывает выбор даты телефона, сразу переходим на день */}
+        <label className="relative flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line text-[15px] font-extrabold">
+          <Icon name="calendar" size={16} className="text-teal" />
+          {longDate(selected)}
+          <input
+            type="date"
+            aria-label="Перейти к дате"
+            value={selected}
+            max={isoDate()}
+            onChange={(e) => e.target.value && jump(e.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
         <IconButton icon="next" label="Дежурство позже" onClick={() => step(-1)} className={!days[dayIdx - 1] ? 'opacity-30' : ''} />
       </div>
 
@@ -279,7 +293,7 @@ export function ShiftDetail({ shift, onClose }: { shift: Shift | null; onClose: 
 
         <Section title="За дежурство">
           <Card className="flex flex-col gap-2.5 p-4 text-[14px]">
-            <Row label="Моча, сборов" value={urine} />
+            <Row label="Моча, баков" value={urine} />
             <Row label="Ветки" value={branchesText} />
             <Row label="Кал, раз" value={ELEPHANTS.map((e) => `${e} ${Number(q.feces?.[e] ?? 0)}`).join(' · ')} />
             <Row label="Мытьё" value={washText(q) || (care ? 'мыли' : '—')} />

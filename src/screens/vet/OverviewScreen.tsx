@@ -150,7 +150,7 @@ export function OverviewScreen({ onRequests }: { onRequests: () => void }) {
               </div>
             ))}
             <div className="grid items-center gap-[3px] pt-1" style={{ gridTemplateColumns: `76px repeat(${DAYS}, minmax(0, 1fr))` }}>
-              <span className="text-[12px] font-semibold text-muted">Моча, сб.</span>
+              <span className="text-[12px] font-semibold text-muted">Баков мочи</span>
               {urine.map((u, i) => (
                 <span key={i} className="text-center text-[11px] font-bold text-muted">
                   {u ?? ''}

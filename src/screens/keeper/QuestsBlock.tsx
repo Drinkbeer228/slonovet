@@ -82,19 +82,20 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
       <Quest
         icon="drop"
         title="Туалет"
-        progress={`моча ${urineTotal}${missTotal ? ` · мимо ${missTotal}` : ''} · кал ${fecesTotal}`}
+        progress={`баков ${urineTotal}${missTotal ? ` · мимо ${missTotal}` : ''} · кал ${fecesTotal}`}
         complete={false}
       >
         <div className="flex flex-col gap-2.5">
+          <p className="m-0 text-[12px] font-semibold text-muted">Моча — сколько баков собрали; «мимо» — сколько раз не поймали.</p>
           <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 text-[12px] font-bold text-muted">
             <span />
-            <span className="w-[116px] text-center">в бак</span>
+            <span className="w-[116px] text-center">баков мочи</span>
             <span className="w-[116px] text-center">мимо</span>
           </div>
           {ELEPHANTS.map((el) => (
             <div key={el} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2">
               <span className="text-[15px] font-bold">{el}</span>
-              <Counter tone="teal" label={`${el}, в бак`} value={q.urine?.[el]?.ok ?? 0} onPlus={() => urine(el, 'ok', 1)} onMinus={() => urine(el, 'ok', -1)} />
+              <Counter tone="teal" label={`${el}, баков мочи`} value={q.urine?.[el]?.ok ?? 0} onPlus={() => urine(el, 'ok', 1)} onMinus={() => urine(el, 'ok', -1)} />
               <Counter tone="amber" label={`${el}, мимо`} value={q.urine?.[el]?.miss ?? 0} onPlus={() => urine(el, 'miss', 1)} onMinus={() => urine(el, 'miss', -1)} />
             </div>
           ))}
