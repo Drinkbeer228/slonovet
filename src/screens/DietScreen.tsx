@@ -1,10 +1,11 @@
+import { EDITORS, canEdit as canEditSection } from '../domain/access';
 import { useEffect, useState } from 'react';
 import { ELEPHANTS } from '../domain/elephants';
 import type { CurrentUser, Diet, ElephantName, MealUnit } from '../domain/types';
 import { put, useRows } from '../lib/store';
 import { fmtNum } from '../domain/stock';
 import { plural } from '../lib/dates';
-import { Button, Card, DecimalInput, Segmented, inputCls, toast } from '../ui/kit';
+import { Button, Card, DecimalInput, ReadOnlyNote, Segmented, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 const UNITS: MealUnit[] = ['кг', 'г', 'гарец'];
@@ -23,7 +24,7 @@ export function DietScreen({ user, onGuide }: { user: CurrentUser; onGuide: () =
   const [el, setEl] = useState<ElephantName>('Претти');
   const [editing, setEditing] = useState(false);
   const diet = diets.find((d) => d.id === el);
-  const canEdit = user.role === 'vet' || user.role === 'admin';
+  const canEdit = canEditSection('diet', user.role);
   const [draft, setDraft] = useState<Diet | null>(null);
 
   useEffect(() => {
@@ -41,13 +42,16 @@ export function DietScreen({ user, onGuide }: { user: CurrentUser; onGuide: () =
 
   return (
     <div className="flex flex-col gap-5">
-      <header className="flex items-center justify-between gap-3 px-1">
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Рацион</h1>
-        {canEdit && !editing && (
-          <Button icon="edit" onClick={startEdit}>
-            Изменить
-          </Button>
-        )}
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Рацион</h1>
+          {canEdit && !editing && (
+            <Button icon="edit" onClick={startEdit}>
+              Изменить
+            </Button>
+          )}
+        </div>
+        {!canEdit && <ReadOnlyNote who={EDITORS.diet.who} />}
       </header>
 
       <Segmented label="Слониха" value={el} onChange={setEl} options={ELEPHANTS.map((e) => ({ value: e, label: e }))} />

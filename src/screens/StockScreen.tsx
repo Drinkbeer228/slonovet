@@ -1,3 +1,4 @@
+import { EDITORS, canEdit } from '../domain/access';
 import { useMemo, useState } from 'react';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
@@ -5,7 +6,7 @@ import { GRAIN_RATIO, PACK_SIZE, balances, countPerDay, countWords, dailyUsage, 
 import type { CurrentUser, StockItem } from '../domain/types';
 import { put, useRows } from '../lib/store';
 import { plural, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Field, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
+import { Button, Card, Field, ReadOnlyNote, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 const GROUPS: { title: string; ids: string[] }[] = [
@@ -107,19 +108,22 @@ export function StockScreen({ user }: { user: CurrentUser }) {
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     .slice(0, 15);
   const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
-  const canWrite = user.role === 'keeper' || user.role === 'manager' || user.role === 'admin';
+  const canWrite = canEdit('stock', user.role);
   // вес мешка, мерки, таз овощей — настраивают администратор и админ
   const canSetup = user.role === 'manager' || user.role === 'admin';
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-center justify-between gap-3 px-1">
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Фураж</h1>
-        {canWrite && (
-          <Button kind="light" icon="truck" onClick={() => setIncoming(true)}>
-            Привезли
-          </Button>
-        )}
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Фураж</h1>
+          {canWrite && (
+            <Button kind="light" icon="truck" onClick={() => setIncoming(true)}>
+              Привезли
+            </Button>
+          )}
+        </div>
+        {!canWrite && <ReadOnlyNote who={EDITORS.stock.who} />}
       </header>
 
       {low.length > 0 && (

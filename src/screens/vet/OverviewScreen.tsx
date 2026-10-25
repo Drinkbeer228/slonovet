@@ -1,3 +1,4 @@
+import { canEdit } from '../../domain/access';
 import { useMemo, useState } from 'react';
 import { ELEPHANTS, LEVEL_LABEL, METRICS } from '../../domain/elephants';
 import { FEED_TIMES, sortShifts } from '../../domain/shift';
@@ -184,9 +185,11 @@ export function OverviewScreen({ onRequests }: { onRequests: () => void }) {
             }
           >
             {elReqs.length > 0 && <RequestList list={elReqs} onOpen={() => onRequests()} />}
-            <Button kind="primary" big full icon="plus" onClick={() => setCreating(el)}>
-              Новая заявка · {el}
-            </Button>
+            {canEdit('requests', user.role) && (
+              <Button kind="primary" big full icon="plus" onClick={() => setCreating(el)}>
+                Новая заявка · {el}
+              </Button>
+            )}
           </Section>
         </div>
       </div>

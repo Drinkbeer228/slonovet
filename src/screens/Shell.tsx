@@ -31,14 +31,13 @@ export const TABS_BY_ROLE: Record<Role, Tab[]> = {
   admin: ['shift', 'overview', 'requests', 'stock', 'journal'],
 };
 
-/** Разделы, которые у роли открываются из меню, а не из нижней панели */
-export const MENU_TABS: Record<Role, Tab[]> = {
-  keeper: ['move', 'rating', 'guide'],
-  vet: ['move', 'rating', 'guide'],
-  director: ['diet', 'users', 'move', 'rating', 'guide'],
-  manager: ['users', 'move', 'diet', 'rating', 'guide'],
-  admin: ['diet', 'users', 'move', 'rating', 'guide'],
-};
+/** Порядок разделов в меню */
+const ALL_TABS: Tab[] = ['shift', 'overview', 'requests', 'diet', 'stock', 'journal', 'users', 'move', 'rating', 'guide'];
+
+/** Все видят всё: чего нет на нижней панели — открывается из меню (на чужом разделе — только просмотр). */
+export const MENU_TABS = Object.fromEntries(
+  (Object.keys(TABS_BY_ROLE) as Role[]).map((r) => [r, ALL_TABS.filter((t) => !TABS_BY_ROLE[r].includes(t))]),
+) as Record<Role, Tab[]>;
 
 const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
 

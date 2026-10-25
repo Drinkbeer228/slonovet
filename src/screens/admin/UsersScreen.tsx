@@ -4,7 +4,8 @@ import type { Session } from '../../lib/auth';
 import { getClient } from '../../lib/supabase';
 import { syncNow } from '../../lib/sync';
 import { newId, put, useRows } from '../../lib/store';
-import { Button, Card, Check, Chip, Field, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Field, ReadOnlyNote, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { EDITORS } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 
 const ROLES: { value: Role; label: string }[] = [
@@ -56,11 +57,16 @@ export function UsersScreen({ session }: { session: Session }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-center justify-between gap-3 px-1">
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Люди</h1>
-        <Button kind="primary" icon="plus" onClick={() => setAdding(true)}>
-          Добавить
-        </Button>
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Люди</h1>
+          {manages.length > 0 && (
+            <Button kind="primary" icon="plus" onClick={() => setAdding(true)}>
+              Добавить
+            </Button>
+          )}
+        </div>
+        {manages.length === 0 && <ReadOnlyNote who={EDITORS.users.who} />}
       </header>
       {ROLES.map((r) => {
         const list = profiles.filter((p) => p.role === r.value).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
@@ -92,9 +98,11 @@ export function UsersScreen({ session }: { session: Session }) {
           </Section>
         );
       })}
-      <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
-        Почта не нужна: человек входит по логину и паролю, которые вы ему передадите. Забыл пароль — задайте новый здесь.
-      </p>
+      {manages.length > 0 && (
+        <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
+          Почта не нужна: человек входит по логину и паролю, которые вы ему передадите. Забыл пароль — задайте новый здесь.
+        </p>
+      )}
       <AddSheet open={adding} demo={demo} roles={roles} onClose={() => setAdding(false)} />
       <EditSheet profile={editing} demo={demo} roles={roles} selfId={session.user.id} onClose={() => setEditing(null)} />
     </div>

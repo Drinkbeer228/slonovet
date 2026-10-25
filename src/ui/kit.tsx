@@ -81,6 +81,11 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   return <div className={`rounded-2xl bg-surface ${className}`}>{children}</div>;
 }
 
+/** Подпись под заголовком чужого раздела: смотреть можно, менять — хозяину. */
+export function ReadOnlyNote({ who }: { who: string }) {
+  return <span className="px-1 text-[13px] font-semibold text-muted">Только просмотр — меняет {who}</span>;
+}
+
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="rounded-2xl bg-surface px-4 py-5 text-center text-[14px] font-semibold text-muted">{children}</div>;
 }
