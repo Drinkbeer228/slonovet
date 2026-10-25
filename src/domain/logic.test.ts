@@ -7,8 +7,9 @@ import type { Shift, StockMove } from './types';
 describe('списание корма по рациону', () => {
   it('утренняя зерносмесь на трёх слоних: гарцы переводятся в кг', () => {
     const u = feedUsage(SEED_DIETS, '07:00', SEED_STOCK_ITEMS);
-    expect(u.get('hercules')).toBeCloseTo(4 * 1.13); // 2 + 1 + 1 гарца
-    expect(u.get('corn')).toBeCloseTo(0.5 * 2.4 + 0.3); // Претти в гарцах, Марго в граммах
+    const per = (id: string) => SEED_STOCK_ITEMS.find((i) => i.id === id)!.kg_per_garets!;
+    expect(u.get('hercules')).toBeCloseTo(4 * per('hercules')); // 2 + 1 + 1 гарца
+    expect(u.get('corn')).toBeCloseTo(0.5 * per('corn') + 0.3); // Претти в гарцах, Марго в граммах
     expect(u.get('seeds')).toBeCloseTo(0.7);
   });
 

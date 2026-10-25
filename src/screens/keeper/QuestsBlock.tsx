@@ -239,7 +239,7 @@ function WashNote({ value, onCommit }: { value: string; onCommit: (v: string) =>
       value={text}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => text !== value && onCommit(text.trim())}
-      placeholder="Если было что-то особенное (необязательно)"
+      placeholder="Если вели себя странно или что-то особенное (необязательно)"
     />
   );
 }

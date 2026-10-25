@@ -1,6 +1,7 @@
 import { getRow, getRows, newId, put } from '../lib/store';
 import { ELEPHANTS, METRICS } from './elephants';
 import { savePhoto } from '../lib/photos';
+import { logEvent } from '../lib/log';
 import { isoDate } from '../lib/dates';
 import { newHandoverCode, newShift } from './shift';
 import { feedUsage, weighedItem } from './stock';
@@ -18,6 +19,7 @@ export async function updateShift(shift: Shift, fn: (s: Shift) => void) {
 }
 
 export async function acceptShift(user: CurrentUser, safety: Record<string, boolean>, from: { id: string; remarks: string } | null = null) {
+  logEvent('shift.accept', { remarks: Boolean(from?.remarks) });
   const date = isoDate();
   let id = date;
   for (let n = 2; getRow('shifts', id); n++) id = `${date}-${n}`;
@@ -26,6 +28,7 @@ export async function acceptShift(user: CurrentUser, safety: Record<string, bool
 
 /** Сдать дежурство: появляется код, который сдающий диктует сменщику. */
 export async function handOver(shift: Shift, note: string) {
+  logEvent('shift.handover', { shift: shift.id });
   await updateShift(shift, (s) => {
     // что не трогали — норма: в журнале остаётся явная отметка
     for (const el of ELEPHANTS) {
@@ -50,6 +53,7 @@ export async function cancelHandOver(shift: Shift) {
 }
 
 export async function setCell(shift: Shift, el: ElephantName, m: MetricKey, level: Level | null) {
+  logEvent('state.set', { el, metric: m, level });
   await updateShift(shift, (s) => {
     s.state[el] = s.state[el] ?? {};
     if (level === null) delete s.state[el]![m];
@@ -79,6 +83,7 @@ export async function fillNorm(shift: Shift, els: ElephantName[], metrics: Metri
 
 /** Отметить кормление. Списываем со склада по рациону; снятие отметки возвращает. */
 export async function setFeedDone(shift: Shift, time: string, done: boolean, user: CurrentUser) {
+  logEvent('feed.toggle', { time, done });
   await updateShift(shift, (s) => {
     const prev = s.feeds[time];
     s.feeds[time] = done
@@ -160,6 +165,7 @@ export async function cycleEaten(shift: Shift, time: string, el: ElephantName) {
 }
 
 export async function setHay(shift: Shift, bales: number, user: CurrentUser) {
+  logEvent('hay.set', { bales });
   await updateShift(shift, (s) => {
     s.hay_bales = bales;
   });
@@ -197,6 +203,7 @@ export async function setBags(shift: Shift, bags: number, user: CurrentUser) {
 }
 
 export async function addMark(requestId: string, shift: Shift, user: CurrentUser, note = '', photo?: File) {
+  logEvent('request.mark', { request: requestId, photo: Boolean(photo), answer: note.slice(0, 40) });
   const id = newId();
   const photo_path = photo ? await savePhoto(photo, shift.id, id) : null;
   await put('request_marks', {
@@ -219,6 +226,7 @@ export async function addNote(input: {
   photo?: File | null;
   user: CurrentUser;
 }) {
+  logEvent('note.add', { kind: input.kind, metric: input.metric, photo: Boolean(input.photo) });
   const id = newId();
   const photo_path = input.photo ? await savePhoto(input.photo, input.shift_id, id) : null;
   const note: Omit<Note, 'updated_at'> = {
@@ -236,6 +244,7 @@ export async function addNote(input: {
 }
 
 export async function addStockMove(item_id: string, delta: number, reason: StockMove['reason'], user: CurrentUser, shift_id: string | null) {
+  logEvent('stock.move', { item: item_id, delta, reason });
   if (!delta) return;
   await put('stock_moves', {
     id: newId(),

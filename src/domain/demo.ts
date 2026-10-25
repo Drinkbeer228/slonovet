@@ -60,7 +60,7 @@ export async function seedDemo() {
       keeper_id: keeper.id,
       keeper_name: keeper.full_name,
       status: 'handed',
-      safety: { fence: true, locks: true, items: true, elephants: true, water: true, hay: true, tools: true },
+      safety: { elephants: true, bedding: true, tools: true, water: true, air: true, place: true, fence: true },
       state,
       feeds,
       quests: {

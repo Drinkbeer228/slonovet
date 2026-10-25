@@ -13,7 +13,8 @@ interface BlobEntry {
 const objectUrls = new Map<string, string>();
 const signedUrls = new Map<string, { url: string; exp: number }>();
 
-export async function compressImage(file: File, max = 1280, quality = 0.8): Promise<Blob> {
+// ~150–250 КБ на фото: в бесплатные 1 ГБ Supabase влезает несколько тысяч
+export async function compressImage(file: File, max = 1280, quality = 0.72): Promise<Blob> {
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) return file;
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));

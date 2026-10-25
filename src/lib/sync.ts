@@ -3,6 +3,7 @@ import { TABLES, type TableMap, type TableName } from '../domain/types';
 import { idbGet, idbPut } from './idb';
 import { acceptServerRow, applyRemote, dropOutbox, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
 import { diff } from './patch';
+import { flushEvents } from './log';
 import { getClient } from './supabase';
 import { uploadPendingPhotos } from './photos';
 
@@ -102,6 +103,7 @@ export async function syncNow(): Promise<void> {
   setStatus({ state: 'syncing' });
   try {
     await uploadPendingPhotos();
+    await flushEvents();
 
     let failed: string | null = null;
     for (const entry of getOutbox()) {

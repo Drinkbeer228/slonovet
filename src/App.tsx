@@ -13,6 +13,7 @@ import { RequestsScreen } from './screens/vet/RequestsScreen';
 import { UsersScreen } from './screens/admin/UsersScreen';
 import { GuideScreen } from './screens/GuideScreen';
 import { RatingScreen } from './screens/RatingScreen';
+import { logEvent } from './lib/log';
 import { MoveScreen } from './screens/MoveScreen';
 
 const TAB_KEY = 'slonovet_tab';
@@ -66,6 +67,7 @@ function Main() {
   }, [profiles]);
 
   const setTab = (t: Tab) => {
+    logEvent('screen.open', { tab: t });
     setTabState(t);
     window.scrollTo({ top: 0 });
     try {

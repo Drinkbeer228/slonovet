@@ -291,7 +291,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
         )}
         {user.role === 'admin' && it.id === 'veg' && (
           <div className="border-t border-line pt-4">
-            <Field label="Обычный таз овощей, кг" hint="Один раз взвесить обычный таз. Тогда кипер отмечает тазы, а не взвешивает каждый день.">
+            <Field label="Порция овощей на слониху, кг" hint="Обычно 70–80 кг: база 60 (картофель, морковь, свёкла по 20) + сезонное 10–15. Кипер отмечает, всю ли порцию дал.">
               <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
             </Field>
           </div>

@@ -153,7 +153,7 @@ function RecipeSheet({ time, onTime, diets }: { time: string | null; onTime: (t:
 }
 
 const FILL_STEPS = [1, 0.75, 0.5, 0.25];
-const FILL_LABEL: Record<number, string> = { 1: 'полный', 0.75: '¾', 0.5: '½', 0.25: '¼' };
+const FILL_LABEL: Record<number, string> = { 1: 'вся', 0.75: '¾', 0.5: '½', 0.25: '¼' };
 
 /** Овощи: по образцу — наполнение таза у каждой (вес таза задаёт админ), или точным весом. */
 function WeighRow({
@@ -177,7 +177,7 @@ function WeighRow({
     };
     return (
       <div className="flex flex-col gap-1.5 px-4 pb-3">
-        <span className="text-[12px] font-bold text-muted">Тазы — нажми, если не полный</span>
+        <span className="text-[12px] font-bold text-muted">Порция овощей (~75 кг) — нажми, если дали не всю</span>
         <div className="flex gap-2">
           {ELEPHANTS.map((el) => (
             <button

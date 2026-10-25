@@ -81,6 +81,10 @@ export const MOVE_SECTIONS: MoveSection[] = [
     items: [
       { id: 'leave-check', text: 'Слоновник обойдён — ничего не забыли' },
       { id: 'leave-trash', text: 'Помойка вывезена, мешки не оставлены' },
+      { id: 'leave-bedding', text: 'Подстилка вывезена на помойку' },
+      { id: 'leave-wash', text: 'Помещения помыты' },
+      { id: 'leave-bolts', text: 'Болты на цепях и балках проверены' },
+      { id: 'leave-keys', text: 'Ключи на 17 на месте' },
       { id: 'leave-elephants', text: 'Все трое осмотрены перед погрузкой' },
     ],
   },
