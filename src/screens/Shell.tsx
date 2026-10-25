@@ -26,6 +26,7 @@ export const TABS_BY_ROLE: Record<Role, Tab[]> = {
   keeper: ['shift', 'diet', 'stock', 'journal'],
   vet: ['overview', 'requests', 'diet', 'journal'],
   director: ['overview', 'requests', 'stock', 'journal'],
+  manager: ['overview', 'stock', 'journal'],
   admin: ['shift', 'overview', 'requests', 'stock', 'journal'],
 };
 
@@ -34,10 +35,11 @@ export const MENU_TABS: Record<Role, Tab[]> = {
   keeper: ['move', 'rating', 'guide'],
   vet: ['move', 'rating', 'guide'],
   director: ['diet', 'users', 'move', 'rating', 'guide'],
+  manager: ['users', 'move', 'diet', 'rating', 'guide'],
   admin: ['diet', 'users', 'move', 'rating', 'guide'],
 };
 
-const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', admin: 'Администратор' };
+const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
 
 export function Logo({ size = 32 }: { size?: number }) {
   return <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={size} height={size} className="rounded-[22%]" />;

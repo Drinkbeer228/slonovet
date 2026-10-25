@@ -142,6 +142,16 @@ export async function acceptServerRow<K extends TableName>(table: K, row: TableM
   emit([table]);
 }
 
+/** Строки, которых больше нет на сервере (удалённые люди), — убрать и с телефона. */
+export async function forgetMissing<K extends TableName>(table: K, ids: Set<string>) {
+  const gone = [...cache[table].keys()].filter((id) => !ids.has(id) && !outbox.has(`${table}:${id}`));
+  for (const id of gone) {
+    cache[table].delete(id);
+    await idbDelete(table, id);
+  }
+  if (gone.length) emit([table]);
+}
+
 /** Для демо-данных: пишем без outbox. */
 export async function seedRows<K extends TableName>(table: K, rows: TableMap[K][]) {
   for (const r of rows) cache[table].set(r.id, r);
@@ -174,6 +184,31 @@ export async function wipeAll() {
   for (const s of EXTRA_STORES) await idbClear(s);
   outbox.clear();
   emit([...TABLES]);
+}
+
+/**
+ * В облачные данные затесался пример (демо-люди, смены «Соколова»): так бывает, если выйти из примера
+ * и войти по логину. Стираем всё локальное и тянем с сервера заново; свои неотправленные правки сохраняем,
+ * а правки поверх примера (их сервер всё равно не примет) выбрасываем.
+ */
+export async function purgeDemo(): Promise<boolean> {
+  if (![...cache.profiles.keys()].some((id) => id.startsWith('demo-'))) return false;
+  const keep = [...outbox.values()].filter((e) => !JSON.stringify(e.row).includes('"demo-'));
+  for (const t of TABLES) {
+    cache[t] = new Map();
+    await idbClear(t);
+  }
+  await idbClear('outbox');
+  await idbClear('meta'); // курсоры синхронизации — чтобы забрать с сервера всё заново
+  outbox.clear();
+  for (const e of keep) {
+    cache[e.table].set(e.row.id, e.row);
+    await idbPut(e.table, e.row);
+    outbox.set(e.key, e);
+    await idbPut('outbox', e);
+  }
+  emit([...TABLES]);
+  return true;
 }
 
 export function newId() {

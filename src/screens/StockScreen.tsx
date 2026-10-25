@@ -107,7 +107,9 @@ export function StockScreen({ user }: { user: CurrentUser }) {
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     .slice(0, 15);
   const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
-  const canWrite = user.role === 'keeper' || user.role === 'admin';
+  const canWrite = user.role === 'keeper' || user.role === 'manager' || user.role === 'admin';
+  // вес мешка, мерки, таз овощей — настраивают администратор и админ
+  const canSetup = user.role === 'manager' || user.role === 'admin';
 
   return (
     <div className="flex flex-col gap-6">
@@ -162,7 +164,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         Каши и зерно списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по наполнению тазов в 19:00, мешки — по счётчику «Мешков взяли».{canWrite && ' Нажми на позицию, чтобы поправить остаток.'}
       </p>
 
-      {user.role === 'admin' && <ScoopCard items={items} />}
+      {canSetup && <ScoopCard items={items} />}
 
       {history.length > 0 && (
         <Section title="Приход и поправки">
@@ -196,6 +198,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
 }
 
 function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null; user: CurrentUser; shiftId: string | null; onClose: () => void }) {
+  const canSetup = user.role === 'manager' || user.role === 'admin';
   const it = view?.item;
   const [full, setFull] = useState(0);
   const [frac, setFrac] = useState(0);
@@ -233,11 +236,11 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
           onClick={async () => {
             const delta = Math.round((target - view.balance) * 1000) / 1000;
             await addStockMove(it.id, delta, 'fix', user, shiftId);
-            if (user.role === 'admin' && it.id === 'veg') {
+            if (canSetup && it.id === 'veg') {
               const g = Number(perGarets.replace(',', '.'));
               if (perGarets && g !== it.kg_per_garets) await put('stock_items', { ...it, kg_per_garets: g || null } as StockItem);
             }
-            if (user.role === 'admin' && it.kind === 'sack') {
+            if (canSetup && it.kind === 'sack') {
               const s = Number(sackKg.replace(',', '.'));
               const g = Number(perGarets.replace(',', '.'));
               if ((s && s !== it.sack_kg) || (perGarets && g !== it.kg_per_garets)) {
@@ -289,14 +292,14 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
           </Field>
         )}
-        {user.role === 'admin' && it.id === 'veg' && (
+        {canSetup && it.id === 'veg' && (
           <div className="border-t border-line pt-4">
             <Field label="Порция овощей на слониху, кг" hint="Обычно 70–80 кг: база 60 (картофель, морковь, свёкла по 20) + сезонное 10–15. Кипер отмечает, всю ли порцию дал.">
               <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
             </Field>
           </div>
         )}
-        {user.role === 'admin' && it.kind === 'sack' && (
+        {canSetup && it.kind === 'sack' && (
           <div className="grid grid-cols-2 gap-3 border-t border-line pt-4">
             <Field label="Вес мешка, кг">
               <input className={inputCls} type="text" inputMode="decimal" value={sackKg} onChange={(e) => setSackKg(e.target.value)} />

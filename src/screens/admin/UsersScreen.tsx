@@ -11,8 +11,16 @@ const ROLES: { value: Role; label: string }[] = [
   { value: 'keeper', label: 'Кипер' },
   { value: 'vet', label: 'Ветврач' },
   { value: 'director', label: 'Директор' },
-  { value: 'admin', label: 'Админ' },
+  { value: 'manager', label: 'Администратор' },
+  { value: 'admin', label: 'Системный админ' },
 ];
+
+/** С кем может работать роль. Должно совпадать с MANAGES в supabase/functions/admin-users. */
+const MANAGES: Partial<Record<Role, Role[]>> = {
+  admin: ['keeper', 'vet', 'director', 'manager', 'admin'],
+  director: ['keeper', 'vet', 'director', 'manager'],
+  manager: ['keeper', 'vet'],
+};
 
 async function callAdmin(body: Record<string, string>) {
   const client = getClient();
@@ -43,9 +51,8 @@ export function UsersScreen({ session }: { session: Session }) {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const demo = session.mode === 'demo';
-  // директор ведёт людей, но администраторов не назначает и не меняет
-  const isAdmin = session.user.role === 'admin';
-  const roles = isAdmin ? ROLES : ROLES.filter((r) => r.value !== 'admin');
+  const manages = MANAGES[session.user.role] ?? [];
+  const roles = ROLES.filter((r) => manages.includes(r.value));
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,7 +72,7 @@ export function UsersScreen({ session }: { session: Session }) {
                 <button
                   key={p.id}
                   type="button"
-                  disabled={!isAdmin && p.role === 'admin'}
+                  disabled={!manages.includes(p.role)}
                   onClick={() => setEditing(p)}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-60"
                 >
@@ -219,6 +226,7 @@ function EditSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (profile && loadedFor !== profile.id) {
     setLoadedFor(profile.id);
@@ -226,6 +234,7 @@ function EditSheet({
     setActive(profile.active);
     setPassword('');
     setError(null);
+    setConfirmDelete(false);
   }
   if (!profile) return null;
   const self = profile.id === selfId;
@@ -249,6 +258,24 @@ function EditSheet({
         await syncNow();
       }
       toast(password ? `Новый пароль: ${password}` : 'Сохранено');
+      close();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const del = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (demo) await put('profiles', { ...profile, deleted: true });
+      else {
+        await callAdmin({ action: 'delete', id: profile.id });
+        await syncNow();
+      }
+      toast(`${profile.full_name} удалён`);
       close();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка');
@@ -294,6 +321,28 @@ function EditSheet({
           <Card className="overflow-hidden">
             <Check on={!active} label="Отключить доступ" sub="человек не сможет войти, его записи останутся" onChange={(v) => setActive(!v)} />
           </Card>
+        )}
+        {!self && !profile.active && (
+          // удалить можно только уже отключённого: случайно стереть работающего человека нельзя
+          <div className="flex flex-col gap-2">
+            {confirmDelete ? (
+              <>
+                <p className="m-0 px-1 text-[14px] font-semibold text-ink2">
+                  Удалить {profile.full_name} насовсем? Логин {profile.login} освободится. Его смены и записи в журнале останутся с именем.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button onClick={() => setConfirmDelete(false)}>Отмена</Button>
+                  <Button kind="danger" disabled={busy} onClick={del}>
+                    Удалить
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Button icon="trash" onClick={() => setConfirmDelete(true)}>
+                Удалить насовсем
+              </Button>
+            )}
+          </div>
         )}
         {error && <p className="m-0 text-[14px] font-bold text-coral">{error}</p>}
       </div>

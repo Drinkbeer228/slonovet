@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
 import { idbGet, idbPut } from './idb';
-import { acceptServerRow, applyRemote, dropOutbox, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
+import { acceptServerRow, applyRemote, dropOutbox, forgetMissing, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
 import { diff } from './patch';
 import { flushEvents } from './log';
 import { getClient } from './supabase';
@@ -153,6 +153,10 @@ export async function syncNow(): Promise<void> {
       }
       if (cursor !== cur) await idbPut('meta', { key: cursorKey, value: cursor });
     }
+
+    // людей удаляют насовсем — сверяем список целиком (их единицы)
+    const { data: ids } = await client.from('profiles').select('id');
+    if (ids) await forgetMissing('profiles', new Set(ids.map((r: { id: string }) => r.id)));
 
     const lastSync = new Date().toISOString();
     try {

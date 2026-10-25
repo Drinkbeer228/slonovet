@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { CurrentUser, Profile, Role } from '../domain/types';
 import { LOGIN_DOMAIN } from './config';
 import { getClient } from './supabase';
-import { setCloudMode, wipeAll } from './store';
+import { purgeDemo, setCloudMode, wipeAll } from './store';
 import { startSync, stopSync, syncNow } from './sync';
 import { seedDemo } from '../domain/demo';
 
@@ -58,6 +58,7 @@ export async function resumeSession() {
     return;
   }
   setCloudMode(true);
+  await purgeDemo();
   const client = getClient();
   if (client && navigator.onLine) {
     const { data } = await client.auth.getSession();
@@ -84,6 +85,7 @@ export async function loginCloud(login: string, password: string): Promise<void>
     throw new Error('Учётная запись отключена');
   }
   if (session?.mode === 'demo' || load()?.mode === 'demo') await wipeAll();
+  else await purgeDemo();
   set({ mode: 'cloud', user: { id: p.id, login: p.login, full_name: p.full_name, role: p.role } });
   setCloudMode(true);
   startSync();
@@ -105,6 +107,8 @@ export async function logout() {
     await getClient()?.auth.signOut().catch(() => undefined);
   }
   stopSync(false);
+  // пример не должен остаться в телефоне и попасть в рабочие данные при следующем входе
+  if (s?.mode === 'demo') await wipeAll();
   set(null);
 }
 
