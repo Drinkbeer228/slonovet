@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { logEvent } from '../../lib/log';
 import { ELEPHANTS } from '../../domain/elephants';
 import { ANSWER_PRESETS, FREQ_LABEL, requestProgress, whoLabel } from '../../domain/shift';
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
@@ -191,6 +192,7 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
           full
           disabled={!text.trim()}
           onClick={async () => {
+            logEvent('request.create', { who, text: text.trim().slice(0, 200), options: options.join(' / '), photo, urgent });
             await put('requests', {
               id: newId(),
               elephant: who,

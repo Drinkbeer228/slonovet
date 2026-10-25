@@ -19,7 +19,7 @@ export async function updateShift(shift: Shift, fn: (s: Shift) => void) {
 }
 
 export async function acceptShift(user: CurrentUser, safety: Record<string, boolean>, from: { id: string; remarks: string } | null = null) {
-  logEvent('shift.accept', { remarks: Boolean(from?.remarks) });
+  logEvent('shift.accept', { remarks: from?.remarks?.slice(0, 200) ?? '' });
   const date = isoDate();
   let id = date;
   for (let n = 2; getRow('shifts', id); n++) id = `${date}-${n}`;
@@ -28,7 +28,7 @@ export async function acceptShift(user: CurrentUser, safety: Record<string, bool
 
 /** Сдать дежурство: появляется код, который сдающий диктует сменщику. */
 export async function handOver(shift: Shift, note: string) {
-  logEvent('shift.handover', { shift: shift.id });
+  logEvent('shift.handover', { shift: shift.id, note: note.slice(0, 200) });
   await updateShift(shift, (s) => {
     // что не трогали — норма: в журнале остаётся явная отметка
     for (const el of ELEPHANTS) {
@@ -203,7 +203,7 @@ export async function setBags(shift: Shift, bags: number, user: CurrentUser) {
 }
 
 export async function addMark(requestId: string, shift: Shift, user: CurrentUser, note = '', photo?: File) {
-  logEvent('request.mark', { request: requestId, photo: Boolean(photo), answer: note.slice(0, 40) });
+  logEvent('request.mark', { request: requestId, photo: Boolean(photo), text: note.slice(0, 200) });
   const id = newId();
   const photo_path = photo ? await savePhoto(photo, shift.id, id) : null;
   await put('request_marks', {
@@ -226,7 +226,7 @@ export async function addNote(input: {
   photo?: File | null;
   user: CurrentUser;
 }) {
-  logEvent('note.add', { kind: input.kind, metric: input.metric, photo: Boolean(input.photo) });
+  logEvent('note.add', { kind: input.kind, metric: input.metric, photo: Boolean(input.photo), text: input.text.trim().slice(0, 200) });
   const id = newId();
   const photo_path = input.photo ? await savePhoto(input.photo, input.shift_id, id) : null;
   const note: Omit<Note, 'updated_at'> = {

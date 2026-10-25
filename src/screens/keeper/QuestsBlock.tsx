@@ -6,6 +6,7 @@ import { Card, Check, Chip, DecimalInput, Section, Segmented, Stepper, inputCls 
 import { Icon, type IconName } from '../../ui/Icon';
 import { WhyLink } from '../common/Why';
 import { nowTime } from '../../lib/dates';
+import { logEvent } from '../../lib/log';
 
 function Quest({
   icon,
@@ -238,7 +239,11 @@ function WashNote({ value, onCommit }: { value: string; onCommit: (v: string) =>
       className={inputCls}
       value={text}
       onChange={(e) => setText(e.target.value)}
-      onBlur={() => text !== value && onCommit(text.trim())}
+      onBlur={() => {
+        if (text === value) return;
+        onCommit(text.trim());
+        logEvent('wash.note', { text: text.trim().slice(0, 200) }); // частые фразы потом превратим в кнопки
+      }}
       placeholder="Если вели себя странно или что-то особенное (необязательно)"
     />
   );

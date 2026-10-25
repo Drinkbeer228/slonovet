@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { BRANCH_AMOUNT, ELEPHANTS, METRICS } from '../domain/elephants';
 import { FEED_TIMES, acceptedBy, shiftFlags, sortShifts } from '../domain/shift';
 import type { Shift } from '../domain/types';
@@ -70,9 +70,9 @@ export function JournalScreen() {
           <button type="button" disabled={!hasOlder} onClick={() => setPage(page + 1)} className="-my-1.5 h-11 pr-3 text-[14px] font-bold text-teal disabled:text-faint">
             ← раньше
           </button>
-          <span className="text-[13px] font-bold text-muted">
+          <DateJump value={selected} onPick={jump} className="h-11 px-2 text-[13px] font-bold text-ink2">
             {shortDate(start)} — {shortDate(addDays(start, WEEKS * 7 - 1))}
-          </span>
+          </DateJump>
           <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="-my-1.5 h-11 pl-3 text-[14px] font-bold text-teal disabled:text-faint">
             позже →
           </button>
@@ -134,19 +134,9 @@ export function JournalScreen() {
 
       <div className="flex items-center gap-2">
         <IconButton icon="back" label="Дежурство раньше" onClick={() => step(1)} className={!days[dayIdx + 1] ? 'opacity-30' : ''} />
-        {/* дата — кнопка: тап открывает выбор даты телефона, сразу переходим на день */}
-        <label className="relative flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line text-[15px] font-extrabold">
-          <Icon name="calendar" size={16} className="text-teal" />
+        <DateJump value={selected} onPick={jump} className="h-11 flex-1 rounded-xl border border-line text-[15px] font-extrabold">
           {longDate(selected)}
-          <input
-            type="date"
-            aria-label="Перейти к дате"
-            value={selected}
-            max={isoDate()}
-            onChange={(e) => e.target.value && jump(e.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-        </label>
+        </DateJump>
         <IconButton icon="next" label="Дежурство позже" onClick={() => step(-1)} className={!days[dayIdx - 1] ? 'opacity-30' : ''} />
       </div>
 
@@ -156,6 +146,34 @@ export function JournalScreen() {
       {!byDay.get(selected) && <Empty>{shifts.length ? 'В этот день дежурства нет' : 'Дежурств пока нет'}</Empty>}
       <ShiftDetail shift={open} onClose={() => setOpen(null)} />
     </div>
+  );
+}
+
+/**
+ * Кнопка «перейти к дате»: тап открывает календарь телефона (или браузера), выбранный день сразу открывается.
+ * Поле даты лежит прозрачным поверх кнопки — так тап на телефоне попадает прямо в него; на компьютере зовём showPicker.
+ */
+function DateJump({ value, onPick, className, children }: { value: string; onPick: (d: string) => void; className: string; children: ReactNode }) {
+  return (
+    <label className={`relative inline-flex cursor-pointer items-center justify-center gap-1.5 ${className}`}>
+      <Icon name="calendar" size={16} className="text-teal" />
+      {children}
+      <input
+        type="date"
+        aria-label="Перейти к дате"
+        value={value}
+        max={isoDate()}
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker();
+          } catch {
+            /* старые браузеры откроют календарь сами по тапу */
+          }
+        }}
+        onChange={(e) => e.target.value && onPick(e.target.value)}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </label>
   );
 }
 

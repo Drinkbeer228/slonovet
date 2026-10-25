@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { logEvent } from '../lib/log';
 import { DAYS_ID, MOVE_SECTIONS, moveNeeds } from '../domain/move';
 import type { CurrentUser, MoveItem } from '../domain/types';
 import { getRow, newId, put, remove, useRows } from '../lib/store';
@@ -116,6 +117,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
               kind="primary"
               disabled={!text.trim()}
               onClick={async () => {
+                logEvent('move.custom', { section, text: text.trim().slice(0, 200) });
                 await put('move_items', { id: newId(), section, text: text.trim(), qty: null, done_by: null, done_at: null, created_by: user.full_name });
                 setText('');
                 toast('Добавлено в список');

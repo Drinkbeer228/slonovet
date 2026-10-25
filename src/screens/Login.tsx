@@ -8,6 +8,7 @@ import { Logo } from './Shell';
 export function Login() {
   const [cfg, setCfg] = useState(getServerConfig());
   const [login, setLogin] = useState('');
+  const [showDemo, setShowDemo] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -90,15 +91,22 @@ export function Login() {
         </Card>
       )}
 
-      <div className="flex flex-col gap-2">
-        <span className="px-1 text-center text-[13px] font-bold text-muted">Посмотреть без сервера, на примере</span>
-        <div className="grid grid-cols-2 gap-2">
-          <Button onClick={() => loginDemo('keeper', 'Соколов')}>Кипер</Button>
-          <Button onClick={() => loginDemo('vet', 'Иванова')}>Врач</Button>
-          <Button onClick={() => loginDemo('director', 'Директор')}>Директор</Button>
-          <Button onClick={() => loginDemo('admin', 'Администратор')}>Админ</Button>
+      {/* пример спрятан: работник не должен случайно заполнять демо вместо своей смены */}
+      {showDemo ? (
+        <div className="flex flex-col gap-2">
+          <span className="px-1 text-center text-[13px] font-bold text-muted">Пример на выдуманных данных — ничего не сохраняется на сервер</span>
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => loginDemo('keeper', 'Соколов')}>Кипер</Button>
+            <Button onClick={() => loginDemo('vet', 'Иванова')}>Врач</Button>
+            <Button onClick={() => loginDemo('director', 'Директор')}>Директор</Button>
+            <Button onClick={() => loginDemo('admin', 'Администратор')}>Админ</Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <button type="button" onClick={() => setShowDemo(true)} className="mx-auto h-11 px-3 text-[13px] font-bold text-faint underline">
+          Посмотреть пример без входа
+        </button>
+      )}
     </div>
   );
 }
