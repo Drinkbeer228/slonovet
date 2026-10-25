@@ -129,7 +129,7 @@ function AddSheet({ open, demo, roles, onClose }: { open: boolean; demo: boolean
     const clean = login.trim().toLowerCase();
     try {
       if (!/^[a-z0-9._-]{2,32}$/.test(clean)) throw new Error('Логин: латиница, цифры, точка или дефис');
-      if (password.length < 6) throw new Error('Пароль минимум 6 символов');
+      if (password.length < 8) throw new Error('Пароль минимум 8 символов');
       if (demo) {
         await put('profiles', { id: newId(), login: clean, full_name: name.trim() || clean, role, active: true });
       } else {

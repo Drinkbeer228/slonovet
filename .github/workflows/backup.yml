@@ -1,0 +1,53 @@
+# Резервная копия базы раз в неделю — сама, без участия людей.
+# Все таблицы схемы public выгружаются в JSON, шифруются паролем (BACKUP_PASSPHRASE) и хранятся 90 дней
+# во вкладке Actions → «Резервная копия» → Artifacts. Репозиторий открытый, поэтому без пароля файл бесполезен.
+# Расшифровать: gpg -d slonovet-backup.tar.gz.gpg | tar xz
+# Фото (хранилище photos) в копию не входят.
+name: Резервная копия
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # понедельник, 06:00 по Москве
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Выгрузить таблицы
+        env:
+          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          PROJECT: vzimjtrcgcsllenaasmz
+        run: |
+          mkdir backup
+          python3 - <<'EOF'
+          import json, os, urllib.request
+          def q(sql):
+              req = urllib.request.Request(
+                  f"https://api.supabase.com/v1/projects/{os.environ['PROJECT']}/database/query",
+                  data=json.dumps({"query": sql}).encode(),
+                  headers={"Authorization": f"Bearer {os.environ['SUPABASE_TOKEN']}", "Content-Type": "application/json"},
+              )
+              return json.load(urllib.request.urlopen(req, timeout=120))
+          tables = [r["tablename"] for r in q("select tablename from pg_tables where schemaname = 'public' order by 1")]
+          for t in tables:
+              rows = q(f'select coalesce(json_agg(t), \'[]\') as rows from public."{t}" t')[0]["rows"]
+              json.dump(rows, open(f"backup/{t}.json", "w"), ensure_ascii=False)
+              print(t, len(rows))
+          if not tables:
+              raise SystemExit("Таблиц не нашлось — проверьте SUPABASE_TOKEN")
+          EOF
+      - name: Зашифровать
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          tar czf - backup | gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o slonovet-backup.tar.gz.gpg
+          rm -rf backup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slonovet-backup-${{ github.run_number }}
+          path: slonovet-backup.tar.gz.gpg
+          retention-days: 90

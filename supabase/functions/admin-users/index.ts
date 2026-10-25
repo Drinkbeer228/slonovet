@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
   if (body.action === 'create') {
     if (!loginOk) return reply({ error: 'Логин: латиница, цифры, точка, дефис, 2–32 символа' }, 400);
-    if (String(body.password ?? '').length < 6) return reply({ error: 'Пароль минимум 6 символов' }, 400);
+    if (String(body.password ?? '').length < 8) return reply({ error: 'Пароль минимум 8 символов' }, 400);
     if (!ROLES.includes(body.role)) return reply({ error: 'Неизвестная роль' }, 400);
     if (!canManage(body.role)) return reply({ error: NOT_YOURS }, 403);
     const { data, error } = await admin.auth.admin.createUser({
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
   if (!canManage(target.role) || (body.role && ROLES.includes(body.role) && !canManage(body.role))) return reply({ error: NOT_YOURS }, 403);
 
   if (body.action === 'password') {
-    if (String(body.password ?? '').length < 6) return reply({ error: 'Пароль минимум 6 символов' }, 400);
+    if (String(body.password ?? '').length < 8) return reply({ error: 'Пароль минимум 8 символов' }, 400);
     const { error } = await admin.auth.admin.updateUserById(body.id, { password: body.password });
     if (error) return reply({ error: error.message }, 400);
     return reply({ ok: true });
