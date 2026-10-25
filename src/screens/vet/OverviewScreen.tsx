@@ -125,9 +125,9 @@ export function OverviewScreen({ onRequests }: { onRequests: () => void }) {
           <Segmented label="Слониха" value={el} onChange={setEl} dots={alertEls} options={ELEPHANTS.map((e) => ({ value: e, label: e }))} />
           <Card className="flex flex-col gap-1.5 px-3 py-3.5">
             <div className="flex items-baseline justify-between px-0.5 pb-1">
-              <h2 className="m-0 text-[15px] font-extrabold">{DAYS} дежурств</h2>
+              <h2 className="m-0 text-[15px] font-extrabold">Последние {DAYS} дней</h2>
               <span className="text-[12px] font-semibold text-muted">
-                {shortDate(dates[0])} — {shortDate(dates[dates.length - 1])} · нажми на клетку
+                {shortDate(dates[0])} — {shortDate(dates[dates.length - 1])} · {dates.some((d) => byDate.has(d)) ? 'нажми на клетку' : 'клетки заполнятся по дежурствам'}
               </span>
             </div>
             {rows.map((r) => (

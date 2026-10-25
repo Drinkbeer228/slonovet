@@ -15,8 +15,8 @@ import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
 
-/** Ведут дежурство киперы (и админ). Остальные смотрят его как есть, ничего не меняя. */
-const canWork = (u: CurrentUser) => u.role === 'keeper' || u.role === 'admin';
+/** Ведут дежурство только киперы. Остальные, включая админов, смотрят его как есть, ничего не меняя. */
+const canWork = (u: CurrentUser) => u.role === 'keeper';
 
 export function ShiftScreen({ user }: { user: CurrentUser }) {
   const shifts = useRows('shifts');
@@ -45,7 +45,9 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Дежурство</h1>
-        <Card className="p-4 text-[15px] text-muted">Дежурств ещё не было.</Card>
+        <Card className="p-4 text-[15px] text-muted">
+          Дежурств ещё не было.{!canWork(user) && ' Здесь появится дежурство, как только кипер его примет.'}
+        </Card>
         {accept}
       </div>
     );
