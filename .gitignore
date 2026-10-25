@@ -14,3 +14,6 @@ coverage/
 demo/
 .claude/
 .mcp.json
+
+# личное: карта проекта, пароли и прочее — не публиковать
+private/
