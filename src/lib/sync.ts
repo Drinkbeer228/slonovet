@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
 import { idbGet, idbPut } from './idb';
-import { applyRemote, dropOutbox, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
+import { acceptServerRow, applyRemote, dropOutbox, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
+import { diff } from './patch';
 import { getClient } from './supabase';
 import { uploadPendingPhotos } from './photos';
 
@@ -12,7 +13,17 @@ export interface SyncStatus {
   error: string | null;
 }
 
-let status: SyncStatus = { state: 'idle', pending: 0, lastSync: null, error: null };
+// время последней удачной связи помним и после перезапуска — для плашки «не отправлено»
+const LAST_SYNC_KEY = 'slonovet_last_sync';
+function readLastSync(): string | null {
+  try {
+    return localStorage.getItem(LAST_SYNC_KEY);
+  } catch {
+    return null;
+  }
+}
+
+let status: SyncStatus = { state: 'idle', pending: 0, lastSync: readLastSync(), error: null };
 const listeners = new Set<() => void>();
 let enabled = false;
 let running = false;
@@ -95,6 +106,23 @@ export async function syncNow(): Promise<void> {
     let failed: string | null = null;
     for (const entry of getOutbox()) {
       const { deleted, ...row } = entry.row as TableMap[TableName] & { deleted?: boolean };
+      if (entry.patches || entry.insert) {
+        // смена: сервер вклеивает только изменённые поля в свою версию (apply_shift_patch)
+        const full = { ...row, deleted: Boolean(deleted) };
+        const { data, error } = await client.rpc('apply_shift_patch', {
+          p_id: row.id,
+          p_row: full,
+          p_patches: entry.insert ? diff({}, full) : entry.patches,
+        });
+        if (error) {
+          failed = error.message;
+          if (!navigator.onLine) break;
+          continue;
+        }
+        if (data) await acceptServerRow(entry.table, data as TableMap[TableName], entry.ts);
+        await dropOutbox(entry.key, entry.ts);
+        continue;
+      }
       const { error } = await client.from(entry.table).upsert({ ...row, deleted: Boolean(deleted) });
       if (error) {
         failed = error.message;
@@ -124,11 +152,13 @@ export async function syncNow(): Promise<void> {
       if (cursor !== cur) await idbPut('meta', { key: cursorKey, value: cursor });
     }
 
-    setStatus({
-      state: failed ? 'error' : 'idle',
-      error: failed,
-      lastSync: new Date().toISOString(),
-    });
+    const lastSync = new Date().toISOString();
+    try {
+      localStorage.setItem(LAST_SYNC_KEY, lastSync);
+    } catch {
+      /* без хранилища время просто не запомнится */
+    }
+    setStatus({ state: failed ? 'error' : 'idle', error: failed, lastSync });
   } catch (e) {
     setStatus({ state: navigator.onLine ? 'error' : 'offline', error: describe(e) });
   } finally {

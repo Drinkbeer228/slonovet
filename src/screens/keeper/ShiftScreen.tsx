@@ -4,7 +4,7 @@ import { FEED_TIMES, acceptedBy, currentShift, lastHanded, requestTodos, shiftFl
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { isoDate, longDate, relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { NotesList } from '../common/NotesList';
@@ -141,6 +141,10 @@ function HandoverNote({ shift }: { shift: Shift }) {
 
 function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; onClose: () => void }) {
   const requests = useRows('requests');
+  const [checked, setChecked] = useState(false);
+  useEffect(() => {
+    if (open) setChecked(false);
+  }, [open]);
   const marks = useRows('request_marks');
 
   const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done);
@@ -161,6 +165,7 @@ function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; 
           kind="primary"
           big
           full
+          disabled={!checked}
           onClick={async () => {
             await handOver(shift, shift.note.trim());
             toast('Дежурство сдано');
@@ -198,6 +203,14 @@ function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; 
             {shift.note.trim() ? shift.note : <span className="text-muted">Без заметки. Можно написать на экране, в блоке «Передать следующему дежурному».</span>}
           </Card>
         </div>
+        <Card className="overflow-hidden ring-1 ring-teal/40">
+          <Check
+            on={checked}
+            label="Осмотрел всех трёх и проверил тазы"
+            sub="всё, что не отмечено в таблице и в кормлении, — норма"
+            onChange={setChecked}
+          />
+        </Card>
         <p className="m-0 text-[13px] font-semibold text-muted">Следующий дежурный принимает дежурство под своим логином.</p>
       </div>
     </Sheet>

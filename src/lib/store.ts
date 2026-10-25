@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
 import { idbAll, idbClear, idbDelete, idbPut, idbPutMany, EXTRA_STORES } from './idb';
+import { applyPatches, diff, mergePatches, type Patch } from './patch';
 
 /**
  * Все данные держим в памяти + IndexedDB. Каждое изменение пишется локально сразу,
@@ -12,7 +13,14 @@ export interface OutboxEntry {
   table: TableName;
   row: TableMap[TableName];
   ts: number;
+  /** смены отправляем патчами: только изменённые поля (см. lib/patch.ts) */
+  patches?: Patch[];
+  /** смена создана на этом телефоне и ещё не отправлена — на сервер уйдёт целиком */
+  insert?: boolean;
 }
+
+/** Таблицы, где одну строку правят несколько телефонов, — их шлём патчами. */
+const PATCHED: TableName[] = ['shifts'];
 
 type AnyRow = TableMap[TableName];
 
@@ -82,11 +90,19 @@ export function useVersion() {
 
 export async function put<K extends TableName>(table: K, row: Omit<TableMap[K], 'updated_at'> & { updated_at?: string }) {
   const full = { ...row, updated_at: new Date().toISOString() } as TableMap[K];
+  const prev = cache[table].get(full.id);
   cache[table].set(full.id, full);
   emit([table]);
   await idbPut(table, full);
   if (cloud && table !== 'profiles') {
-    const entry: OutboxEntry = { key: `${table}:${full.id}`, table, row: full, ts: Date.now() };
+    const key = `${table}:${full.id}`;
+    const entry: OutboxEntry = { key, table, row: full, ts: Date.now() };
+    if (PATCHED.includes(table)) {
+      const pending = outbox.get(key);
+      if (!prev || pending?.insert) entry.insert = true;
+      // старая запись целиком (до патчей) так и уйдёт целиком; иначе копим изменения
+      else if (!pending || pending.patches) entry.patches = mergePatches(pending?.patches ?? [], diff(prev, full));
+    }
     outbox.set(entry.key, entry);
     await idbPut('outbox', entry);
     onLocalChange?.();
@@ -100,12 +116,30 @@ export async function remove<K extends TableName>(table: K, id: string) {
   await put(table, { ...(r as TableMap[K]), deleted: true });
 }
 
-/** Данные с сервера. Строки, которые ещё не отправлены, не перетираем. */
+/**
+ * Данные с сервера. Если у строки есть неотправленные патчи — берём серверную версию
+ * и накладываем их сверху: видно и чужие отметки, и свои. Остальные неотправленные строки не трогаем.
+ */
 export async function applyRemote<K extends TableName>(table: K, rows: TableMap[K][]) {
-  const accepted = rows.filter((r) => !outbox.has(`${table}:${r.id}`));
+  const accepted: TableMap[K][] = [];
+  for (const r of rows) {
+    const pending = outbox.get(`${table}:${r.id}`);
+    if (!pending) accepted.push(r);
+    else if (pending.patches) accepted.push(applyPatches(r, pending.patches));
+  }
   for (const r of accepted) cache[table].set(r.id, r);
   await idbPutMany(table, accepted);
   if (accepted.length) emit([table]);
+}
+
+/** Ответ сервера после отправки патчей: итоговая строка, если пока нет новых правок поверх. */
+export async function acceptServerRow<K extends TableName>(table: K, row: TableMap[K], ts: number) {
+  const pending = outbox.get(`${table}:${row.id}`);
+  const merged = pending && pending.ts !== ts && pending.patches ? applyPatches(row, pending.patches) : pending && pending.ts !== ts ? null : row;
+  if (!merged) return;
+  cache[table].set(row.id, merged);
+  await idbPut(table, merged);
+  emit([table]);
 }
 
 /** Для демо-данных: пишем без outbox. */

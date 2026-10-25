@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
 import { logout, type Session } from '../lib/auth';
 import { syncNow, useSyncStatus } from '../lib/sync';
-import { timeOf } from '../lib/dates';
+import { isoDate, relDate, timeOf } from '../lib/dates';
 import { Button, Card, Segmented, Sheet } from '../ui/kit';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
@@ -41,6 +41,26 @@ const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветв�
 
 export function Logo({ size = 32 }: { size?: number }) {
   return <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={size} height={size} className="rounded-[22%]" />;
+}
+
+/** Записи копятся на телефоне, а связи давно нет — сказать прямо, чтобы поймали Wi‑Fi. */
+export function OfflineBanner() {
+  const s = useSyncStatus();
+  if (s.state === 'demo' || !s.pending) return null;
+  const stale = !s.lastSync || Date.now() - new Date(s.lastSync).getTime() > 60 * 60 * 1000;
+  if (s.state !== 'offline' && s.state !== 'error' && !stale) return null;
+  const when = s.lastSync ? `${relDate(s.lastSync.slice(0, 10), isoDate())} в ${timeOf(s.lastSync)}` : 'ещё не было';
+  return (
+    <Card className="mb-4 flex gap-2.5 p-3.5 ring-1 ring-amber/50">
+      <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber" />
+      <span className="flex flex-col gap-0.5">
+        <span className="text-[14px] font-bold text-amber">
+          Не отправлено: {s.pending} · связь с сервером {s.lastSync ? `была ${when}` : when}
+        </span>
+        <span className="text-[13px] font-semibold text-muted">Всё сохранено на телефоне и отправится само, как появится интернет. Подойдёт любой Wi‑Fi.</span>
+      </span>
+    </Card>
+  );
 }
 
 export function SyncChip({ onClick }: { onClick: () => void }) {

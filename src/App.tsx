@@ -3,7 +3,7 @@ import { refreshCurrentUser, resumeSession, useSession } from './lib/auth';
 import { initStore, useRows } from './lib/store';
 import { Toaster } from './ui/kit';
 import { Login } from './screens/Login';
-import { BottomNav, MENU_TABS, MenuSheet, TABS_BY_ROLE, TopBar, type Tab } from './screens/Shell';
+import { BottomNav, MENU_TABS, MenuSheet, OfflineBanner, TABS_BY_ROLE, TopBar, type Tab } from './screens/Shell';
 import { ShiftScreen } from './screens/keeper/ShiftScreen';
 import { DietScreen } from './screens/DietScreen';
 import { StockScreen } from './screens/StockScreen';
@@ -81,6 +81,7 @@ function Main() {
     <div className="min-h-screen">
       <TopBar user={user} tabs={tabs} tab={current} onTab={setTab} onMenu={() => setMenu(true)} />
       <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:pb-16">
+        <OfflineBanner />
         <div className={current === 'shift' || current === 'overview' ? '' : 'mx-auto max-w-2xl'}>
           {current === 'shift' && <ShiftScreen user={user} />}
           {current === 'overview' && <OverviewScreen onRequests={() => setTab('requests')} />}

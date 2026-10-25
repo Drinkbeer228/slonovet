@@ -36,6 +36,7 @@ export async function handOver(shift: Shift, note: string) {
     s.handed_at = new Date().toISOString();
     s.note = note;
     s.handover_code = newHandoverCode();
+    s.checked_at = s.handed_at; // сдаём только с галочкой «осмотрел всех» — она и делает нетронутое нормой
   });
 }
 

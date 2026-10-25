@@ -69,6 +69,8 @@ export interface Shift extends Base {
   /** какую смену эта приняла — замечания принимающего относятся к ней */
   accepted_from?: string | null;
   accept_remarks?: string;
+  /** кипер подтвердил при сдаче: осмотрел всех трёх, проверил тазы — всё неотмеченное норма */
+  checked_at?: string | null;
 }
 
 export type RequestFrequency = 'once' | 'shift' | 'feeding';

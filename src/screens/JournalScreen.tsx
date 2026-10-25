@@ -13,6 +13,7 @@ import { washText } from './keeper/QuestsBlock';
 
 const EATEN: Record<string, string> = { all: 'всё', half: '½', none: 'отказ' };
 
+const UNSET = { sym: '·', cls: 'text-faint' };
 const MARK = [
   { sym: '+', cls: 'text-teal' },
   { sym: '!', cls: 'text-amber' },
@@ -169,7 +170,9 @@ function ShiftCard({ shift: s, shifts, onOpen }: { shift: Shift; shifts: Shift[]
             <Fragment key={el}>
               <span className="border-t border-surface2 py-1 text-left text-[13px] font-bold text-ink2">{el}</span>
               {METRICS.map((m) => {
-                const mark = MARK[s.state?.[el]?.[m.key]?.level ?? 0]; // не трогали — норма
+                // нетронутая клетка — норма, только если кипер подтвердил «осмотрел всех» при сдаче
+                const level = s.state?.[el]?.[m.key]?.level ?? (s.checked_at ? 0 : null);
+                const mark = level == null ? UNSET : MARK[level];
                 return (
                   <span key={m.key} className={`border-t border-surface2 py-1 text-[16px] font-extrabold ${mark.cls}`}>
                     {mark.sym}
