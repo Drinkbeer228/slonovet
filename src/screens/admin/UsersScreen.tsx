@@ -42,11 +42,21 @@ async function callAdmin(body: Record<string, string>) {
   return data as { id?: string };
 }
 
+/** Слова для придумываемых паролей — латиницей, чтобы набирать на любой раскладке. */
+const PASSWORD_WORDS = [
+  'slon', 'hobot', 'biven', 'seno', 'vetka', 'manezh', 'kasha', 'oves', 'morkov', 'svekla', 'tykva', 'yabloko',
+  'banan', 'arena', 'shater', 'baraban', 'kanat', 'fonar', 'kloun', 'akrobat', 'zhongler', 'tribuna', 'afisha', 'bilet',
+];
+
+/** Пароль из трёх слов и двух цифр, «seno-kloun-arena-47»: легко продиктовать, а подобрать — около 1,2 млн вариантов при 10 попытках в минуту (ограничение на сервере), то есть годы. */
 function genPassword() {
-  const words = ['слон', 'хобот', 'бивень', 'сено', 'ветка', 'манеж', 'каша'];
-  const tr: Record<string, string> = { слон: 'slon', хобот: 'hobot', бивень: 'biven', сено: 'seno', ветка: 'vetka', манеж: 'manezh', каша: 'kasha' };
-  const w = words[Math.floor(Math.random() * words.length)];
-  return `${tr[w]}${Math.floor(1000 + Math.random() * 9000)}`;
+  const rnd = (n: number) => {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] % n;
+  };
+  const words = Array.from({ length: 3 }, () => PASSWORD_WORDS[rnd(PASSWORD_WORDS.length)]);
+  return `${words.join('-')}-${String(rnd(90) + 10)}`;
 }
 
 /** Логины видят только директор и системный админ — остальным в «Персонале» только имена. */

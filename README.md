@@ -92,9 +92,20 @@ Push в `main` → GitHub Actions проверяет (lint, тесты), соб�
 - Учёт — таблица `slonovet.migrations` на сервере (схема закрыта от приложения).
 - Правила: миграции только добавляющие и повторяемые (`if not exists`, `drop … if exists`); применённый файл не правим — новую правку оформляем новым файлом.
 
+## Безопасность сервера
+
+- Вход в приложение: не больше 10 попыток в минуту с одного адреса (nginx `limit_req`, `server/nginx/`), пароли из приложения — три слова и цифры.
+- Регистрация закрыта (`DISABLE_SIGNUP=true`), SSH — только по ключу, файрвол открывает 22, 80, 443; база и API слушают только сам сервер.
+- **Доступность:** `uptime.yml` раз в час проверяет сайт и API; если не отвечают — GitHub присылает письмо о сбое.
+- **Обновление Supabase** (раз в 1–2 месяца или по новостям о безопасности): на сервере
+  1. `/opt/slonovet/backup.sh` — свежая копия;
+  2. `cd /opt/supabase && sh update.sh --dry-run` — что изменится (свои `.env` и данные скрипт не трогает);
+  3. `sh update.sh`, затем `docker compose -f docker-compose.yml -f docker-compose.local.yml pull && docker compose -f docker-compose.yml -f docker-compose.local.yml up -d`;
+  4. проверить: `docker ps` (все healthy), вход в приложение, `./server/migrate.sh` — «Всё применено»; если что-то не так — `/opt/slonovet/restore-check.sh` и откат на прежнюю версию: `sh update.sh --to <прежний тег>`.
+
 ## Резервные копии
 
-- **Каждую ночь** (03:30) сервер копирует всю базу (хранит 14 дней) и дописывает новые фото в зеркало — `server/backup.sh`, на сервере `/opt/slonovet/backup.sh`, копии в `/opt/slonovet/backups` (читает только пользователь `slonovet-backup`).
-- **Раз в неделю** `backup.yml` забирает свежую копию базы (без фото) своим ключом (секрет `BACKUP_SSH_KEY`, на сервере — `rrsync -ro`, только чтение копий), проверяет, что ей меньше двух суток, шифрует (секрет `BACKUP_PASSPHRASE`) и хранит 90 дней в Actions → «Резервная копия». Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`.
+- **Каждую ночь** (03:30) сервер копирует всю базу (хранит 14 дней), дописывает новые фото в зеркало и чистит журнал действий старше 180 дней — `server/backup.sh`, на сервере `/opt/slonovet/backup.sh`, копии в `/opt/slonovet/backups` (читает только пользователь `slonovet-backup`).
+- **Раз в неделю** `backup.yml` забирает свежую копию базы и фото (пока их меньше 400 МБ) своим ключом (секрет `BACKUP_SSH_KEY`, на сервере — `rrsync -ro`, только чтение копий), проверяет, что ей меньше двух суток, шифрует (секрет `BACKUP_PASSPHRASE`) и хранит 90 дней в Actions → «Резервная копия». Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`.
 - **Проверка восстановления:** `/opt/slonovet/restore-check.sh` поднимает временный Postgres того же образа без сети, заливает копию и сверяет с рабочей базой число строк, права и функции. 26.10.2026: все таблицы совпали; ошибки только по двум служебным ролям Supabase (realtime, webhooks), которых нет в голом образе.
 - **Восстановить на сервере:** поднять Supabase как в «Новая база с нуля» (шаг 1), затем в контейнере `supabase-db`: `pg_restore --clean --if-exists -U supabase_admin -d postgres db-latest.dump` (`postgres` в этом образе не суперпользователь) и вернуть фото: `rsync -a /opt/slonovet/backups/photos/ /opt/supabase/volumes/storage/`.
