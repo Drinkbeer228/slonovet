@@ -1,8 +1,9 @@
-# Резервная копия базы раз в неделю — сама, без участия людей.
-# Все таблицы схемы public выгружаются в JSON, шифруются паролем (BACKUP_PASSPHRASE) и хранятся 90 дней
-# во вкладке Actions → «Резервная копия» → Artifacts. Репозиторий открытый, поэтому без пароля файл бесполезен.
+# Копия базы вне сервера раз в неделю — сама, без участия людей.
+# Сервер каждую ночь делает свою копию (/opt/slonovet/backup.sh, хранит 14 дней). Отсюда раз в неделю
+# свежая копия забирается, шифруется паролем (BACKUP_PASSPHRASE) и хранится 90 дней в Actions → «Резервная копия»,
+# чтобы данные пережили даже потерю сервера. Репозиторий может быть открытым — без пароля файл бесполезен.
 # Расшифровать: gpg -d slonovet-backup.tar.gz.gpg | tar xz
-# Фото (хранилище photos) в копию не входят.
+# Восстановить базу: pg_restore --clean --if-exists -U postgres -d postgres db-latest.dump (в контейнере supabase-db)
 name: Резервная копия
 
 on:
@@ -17,29 +18,17 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Выгрузить таблицы
+      - name: Забрать копию с сервера
         env:
-          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-          PROJECT: vzimjtrcgcsllenaasmz
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          echo "159.194.208.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYsLfZgNv9gecQxSwvJjbbUYqMitmvS1ncpKJHqr3sE" > ~/.ssh/known_hosts
           mkdir backup
-          python3 - <<'EOF'
-          import json, os, urllib.request
-          def q(sql):
-              req = urllib.request.Request(
-                  f"https://api.supabase.com/v1/projects/{os.environ['PROJECT']}/database/query",
-                  data=json.dumps({"query": sql}).encode(),
-                  headers={"Authorization": f"Bearer {os.environ['SUPABASE_TOKEN']}", "Content-Type": "application/json"},
-              )
-              return json.load(urllib.request.urlopen(req, timeout=120))
-          tables = [r["tablename"] for r in q("select tablename from pg_tables where schemaname = 'public' order by 1")]
-          for t in tables:
-              rows = q(f'select coalesce(json_agg(t), \'[]\') as rows from public."{t}" t')[0]["rows"]
-              json.dump(rows, open(f"backup/{t}.json", "w"), ensure_ascii=False)
-              print(t, len(rows))
-          if not tables:
-              raise SystemExit("Таблиц не нашлось — проверьте SUPABASE_TOKEN")
-          EOF
+          rsync -L -e "ssh -i ~/.ssh/deploy" deploy@159.194.208.29:/opt/slonovet/backups/db-latest.dump deploy@159.194.208.29:/opt/slonovet/backups/photos-latest.tar.gz backup/
+          ls -l backup
+          test -s backup/db-latest.dump
       - name: Зашифровать
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
