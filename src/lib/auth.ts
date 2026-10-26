@@ -53,6 +53,12 @@ export function getSession() {
 export async function resumeSession() {
   if (!session) return;
   if (session.mode === 'demo') {
+    // на сайте примера больше нет: открытый когда-то пример стираем и ведём на вход
+    if (!import.meta.env.DEV) {
+      await wipeAll();
+      set(null);
+      return;
+    }
     setCloudMode(false);
     stopSync(true);
     return;

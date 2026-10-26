@@ -91,8 +91,8 @@ export function Login() {
         </Card>
       )}
 
-      {/* пример спрятан: работник не должен случайно заполнять демо вместо своей смены */}
-      {showDemo ? (
+      {/* пример — только при разработке; на сайте входа без логина нет */}
+      {import.meta.env.DEV && (showDemo ? (
         <div className="flex flex-col gap-2">
           <span className="px-1 text-center text-[13px] font-bold text-muted">Пример на выдуманных данных — ничего не сохраняется на сервер</span>
           <div className="grid grid-cols-2 gap-2">
@@ -106,7 +106,7 @@ export function Login() {
         <button type="button" onClick={() => setShowDemo(true)} className="mx-auto h-11 px-3 text-[13px] font-bold text-faint underline">
           Посмотреть пример без входа
         </button>
-      )}
+      ))}
     </div>
   );
 }
