@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { TOUR_VERSION, TOURS } from '../domain/tour';
 import type { CurrentUser } from '../domain/types';
@@ -15,6 +15,24 @@ function seenVersion(userId: string): number {
     return Number(localStorage.getItem(key(userId)) ?? 0);
   } catch {
     return TOUR_VERSION; // без хранилища не мучаем человека подсказками при каждом входе
+  }
+}
+
+/** Шаги, отложенные «на потом»: показать, когда их место появится на экране. */
+const laterKey = (userId: string) => `slonovet_tour_later_${userId}`;
+function readLater(userId: string): number[] {
+  try {
+    return JSON.parse(localStorage.getItem(laterKey(userId)) ?? '[]') as number[];
+  } catch {
+    return [];
+  }
+}
+function writeLater(userId: string, list: number[]) {
+  try {
+    if (list.length) localStorage.setItem(laterKey(userId), JSON.stringify(list));
+    else localStorage.removeItem(laterKey(userId));
+  } catch {
+    /* не запомнится — не беда */
   }
 }
 
@@ -74,22 +92,93 @@ function bringIntoView(el: HTMLElement) {
 export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab: (t: Tab) => void }) {
   const steps = TOURS[user.role];
   const replayed = useReplay();
-  const [open, setOpen] = useState(() => seenVersion(user.id) < TOUR_VERSION);
-  const [i, setI] = useState(0);
+  // какие шаги показываем сейчас (по порядку) и на каком мы
+  const [queue, setQueue] = useState<number[] | null>(() => (seenVersion(user.id) < TOUR_VERSION ? steps.map((_, k) => k) : null));
+  const [pos, setPos] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const deferred = useRef<number[]>([]);
+  // перед показом отсеиваем шаги, чьего места нет на этом экране (иначе «2 из 9» → «7 из 9»)
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!queue || ready) return;
+    // шаги, которые могут не найтись, проверяем на их разделе (повтор из Справки — сначала уходим туда)
+    const tabToCheck = queue.map((k) => steps[k]).find((st) => st.ifMissing && st.tab)?.tab;
+    if (tabToCheck && tabToCheck !== tab) {
+      onTab(tabToCheck);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      const keep = queue.filter((k) => {
+        const st = steps[k];
+        const here = !st.tab || st.tab === tab;
+        if (!(st.ifMissing && st.target && here && !findVisible(st.target))) return true;
+        if (st.ifMissing === 'later') deferred.current.push(k);
+        return false;
+      });
+      setPos(0);
+      setQueue(keep.length ? keep : null);
+      setReady(true);
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [queue, ready, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (replayed) {
-      setI(0);
-      setOpen(true);
+      deferred.current = [];
+      setPos(0);
+      setReady(false);
+      setQueue(steps.map((_, k) => k));
     }
-  }, [replayed]);
+  }, [replayed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const step = open ? steps[i] : undefined;
+  // отложенные шаги: как только их место появилось (кипер принял первое дежурство) — показываем
+  useEffect(() => {
+    if (queue) return;
+    const later = readLater(user.id);
+    if (!later.length) return;
+    const check = () => {
+      const first = steps[later[0]];
+      if (first?.target && findVisible(first.target)) {
+        writeLater(user.id, []);
+        deferred.current = [];
+        setPos(0);
+        setReady(true);
+        setQueue(later);
+      }
+    };
+    check();
+    const t = window.setInterval(check, 1500);
+    return () => window.clearInterval(t);
+  }, [queue, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const step = queue ? steps[queue[pos]] : undefined;
+
+  const finish = (skipped: boolean) => {
+    logEvent('tour.done', { role: user.role, step: pos + 1, of: queue?.length ?? 0, skipped });
+    markSeen(user.id);
+    // «Пропустить» — значит не надо и отложенного; дошёл до конца — отложенное покажем, когда появится
+    writeLater(user.id, skipped ? [] : deferred.current);
+    setQueue(null);
+    setReady(false);
+  };
+  // следующий шаг; те, чьего места нет на этом экране, сразу пропускаем или откладываем — без пауз
+  const next = () => {
+    if (!queue) return;
+    let k = pos + 1;
+    while (k < queue.length) {
+      const st = steps[queue[k]];
+      const here = !st.tab || st.tab === tab;
+      if (!(st.ifMissing && st.target && here && !findVisible(st.target))) break;
+      if (st.ifMissing === 'later') deferred.current.push(queue[k]);
+      k++;
+    }
+    if (k < queue.length) setPos(k);
+    else finish(false);
+  };
 
   // открыть нужный раздел и найти, что подсветить (раздел появляется не сразу — ждём немного)
   useLayoutEffect(() => {
-    if (!step) return;
+    if (!step || !ready) return;
     if (step.tab && step.tab !== tab) {
       onTab(step.tab);
       return;
@@ -103,7 +192,12 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
       if (el) {
         bringIntoView(el);
         setRect(frame(el));
-      } else if (tries++ < 10) timer = window.setTimeout(look, 100);
+      } else if (tries++ < 5) timer = window.setTimeout(look, 100);
+      else if (step.ifMissing) {
+        // подсвечивать нечего: пропускаем или откладываем до появления
+        if (step.ifMissing === 'later') deferred.current.push(queue![pos]);
+        next();
+      }
     };
     look();
     const onMove = () => {
@@ -117,16 +211,13 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
       window.removeEventListener('resize', onMove);
       window.removeEventListener('scroll', onMove, true);
     };
-  }, [step, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, tab, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!step) return null;
+  if (!step || !queue || !ready) return null;
+  // ждём, найдётся ли место для шага, который могут пропустить — пока не мигаем пустой подсказкой
+  if (step.ifMissing && !rect) return null;
 
-  const finish = (skipped: boolean) => {
-    logEvent('tour.done', { role: user.role, step: i + 1, of: steps.length, skipped });
-    markSeen(user.id);
-    setOpen(false);
-  };
-  const last = i === steps.length - 1;
+  const last = pos === queue.length - 1;
   const pad = 6;
   // карточка — с той стороны экрана, где не подсвечено
   const cardOnTop = rect ? rect.top + rect.height / 2 > window.innerHeight / 2 : false;
@@ -156,7 +247,7 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[17px] font-extrabold">{step.title}</span>
             <span className="text-[12px] font-bold text-muted">
-              {i + 1} из {steps.length}
+              {pos + 1} из {queue.length}
             </span>
           </div>
           <p className="m-0 text-[15px] leading-snug text-ink2">{step.text}</p>
@@ -166,7 +257,7 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
                 Пропустить
               </Button>
             )}
-            <Button kind="primary" full onClick={() => (last ? finish(false) : setI(i + 1))}>
+            <Button kind="primary" full onClick={next}>
               {last ? 'Понятно' : 'Дальше'}
             </Button>
           </div>
