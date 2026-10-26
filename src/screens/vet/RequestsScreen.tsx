@@ -57,6 +57,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
               )}
         </div>
       </header>
+      <div data-tour="requests-tabs">
       <Segmented
         label="Вид заявок"
         value={view}
@@ -66,11 +67,12 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
           { value: 'purchases', label: 'Закупки' },
         ]}
       />
+      </div>
       {view === 'purchases' ? (
         <PurchasesView user={user} adding={buying} onAddClose={() => setBuying(false)} />
       ) : (
         <>
-        <Section title="Активные" aside={active.length ? String(active.length) : undefined}>
+        <Section id="requests-active" title="Активные" aside={active.length ? String(active.length) : undefined}>
           {active.length === 0 ? <Empty>Активных заявок нет</Empty> : <RequestList list={active} onOpen={setOpen} />}
         </Section>
         {closed.length > 0 && (

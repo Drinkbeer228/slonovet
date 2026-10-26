@@ -79,8 +79,12 @@ export function Section({ title, aside, children, id }: { title: ReactNode; asid
   );
 }
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl bg-surface ${className}`}>{children}</div>;
+export function Card({ children, className = '', ...rest }: { children: ReactNode; className?: string; 'data-tour'?: string }) {
+  return (
+    <div className={`rounded-2xl bg-surface ${className}`} {...rest}>
+      {children}
+    </div>
+  );
 }
 
 /** Подпись под заголовком чужого раздела: смотреть можно, менять — хозяину. */

@@ -108,7 +108,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
             <FeedingBlock shift={shift} user={user} />
             <QuestsBlock shift={shift} user={user} />
           </div>
-          <Section title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
+          <Section id="sec-notes" title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
             {notes.length > 0 && <NotesList notes={[...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} />}
             {/* наблюдение может оставить любой — врач, директор, администратор */}
             {!handed && (
@@ -158,6 +158,7 @@ function JumpBar({ shift, readOnly }: { shift: Shift; readOnly: boolean }) {
     // прилипает под шапкой: посреди длинного дежурства переходы под рукой
     <nav
       aria-label="Блоки дежурства"
+      data-tour="jumpbar"
       className="sticky top-14 z-20 -mx-4 flex gap-2 overflow-x-auto bg-bg/95 px-4 py-2 backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {items.map((i) => (

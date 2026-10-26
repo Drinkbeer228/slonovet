@@ -125,7 +125,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       </header>
 
       {low.length > 0 && (
-        <Card className="flex flex-col gap-1 p-4 ring-1 ring-amber/40">
+        <Card className="flex flex-col gap-1 p-4 ring-1 ring-amber/40" data-tour="stock-low">
           <span className="text-[12px] font-extrabold tracking-wide text-amber">ЗАКАНЧИВАЕТСЯ</span>
           {low.map((v) => (
             <span key={v.item.id} className="text-[15px] font-bold">
@@ -146,7 +146,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
           .map((i) => i.id);
         if (!ids.length) return null;
         return (
-          <Section key={g.id} title={g.title}>
+          <Section key={g.id} id={`stock-${g.id}`} title={g.title}>
             <Card className="divide-y divide-surface2 overflow-hidden">
               {ids.map((id) => {
                 const v = views.get(id);
@@ -187,7 +187,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       </p>
 
       {history.length > 0 && (
-        <Section title="Приход, выдачи и брак">
+        <Section id="stock-history" title="Приход, выдачи и брак">
           <Card className="divide-y divide-surface2 overflow-hidden">
             {history.map((m) => {
               const it = items.find((i) => i.id === m.item_id);

@@ -54,7 +54,9 @@ export function DietScreen({ user }: { user: CurrentUser }) {
         {!canEdit && <ReadOnlyNote who={EDITORS.diet.who} />}
       </header>
 
+      <div data-tour="diet-el">
       <Segmented label="Слониха" value={el} onChange={setEl} options={ELEPHANTS.map((e) => ({ value: e, label: e }))} />
+      </div>
 
       {!shown ? (
         <Card className="p-4 text-muted">Рацион не загружен</Card>
