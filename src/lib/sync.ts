@@ -308,14 +308,14 @@ async function cycle(client: SupabaseClient) {
     let from: Cursor = saved ? { ts: new Date(Date.parse(saved.ts) - OVERLAP_MS).toISOString(), id: '' } : { ts: '1970-01-01T00:00:00Z', id: '' };
     let last = saved;
     for (;;) {
-      // по паре «время, id»: строки с одинаковым временем на границе пачки не теряются
-      const { data, error } = await client
-        .from(t)
-        .select('*')
-        .or(`updated_at.gt.${quote(from.ts)},and(updated_at.eq.${quote(from.ts)},id.gt.${quote(from.id)})`)
-        .order('updated_at')
-        .order('id')
-        .limit(PAGE);
+      // по паре «время, id»: строки с одинаковым временем на границе пачки не теряются.
+      // id ещё не знаем (начало или перекрытие) — просто «не раньше этого времени»: пустую строку
+      // с id сравнивать нельзя, у людей id — uuid, и база отвечает ошибкой
+      const query = client.from(t).select('*');
+      const page = from.id
+        ? query.or(`updated_at.gt.${quote(from.ts)},and(updated_at.eq.${quote(from.ts)},id.gt.${quote(from.id)})`)
+        : query.gte('updated_at', from.ts);
+      const { data, error } = await page.order('updated_at').order('id').limit(PAGE);
       if (error) {
         // одной таблицы может не быть на сервере (новая, миграцию ещё не применили) — остальные синхронизируем
         failed = `${t}: ${error.message}`;

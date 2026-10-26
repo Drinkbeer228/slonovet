@@ -237,6 +237,17 @@ describe('синхронизация — находки аудита, испра
     expect(cursor?.value).toEqual({ ts: '2026-10-26T08:00:05.000Z', id: 'm2' });
   });
 
+  it('люди (id — uuid) синхронизируются и при повторной синхронизации: без ошибки и с переименованием', async () => {
+    const katya = { id: '2fcbc11b-0000-4000-8000-000000000001', login: 'katya', full_name: 'Катя', role: 'vet', active: true };
+    server.write('profiles', katya);
+    const p = await phone();
+    expect((await syncOnce(p)).state).toBe('idle');
+    server.write('profiles', { ...katya, full_name: 'Екатерина' }); // переименовали в «Персонале»
+    const second = await syncOnce(p); // теперь с сохранённой меткой и перекрытием
+    expect(second.error).toBeNull();
+    expect(p.store.getRow('profiles', katya.id)?.full_name).toBe('Екатерина');
+  });
+
   it('С6: при начале работы приложение просит у браузера постоянное хранилище — один раз', async () => {
     const persist = vi.fn(async () => true);
     (navigator as unknown as { storage?: unknown }).storage = { persist };

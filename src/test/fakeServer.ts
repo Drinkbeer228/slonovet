@@ -91,7 +91,7 @@ const CURSOR_OR = /^updated_at\.gt\."((?:[^"\\]|\\.)*)",and\(updated_at\.eq\."((
 const unquote = (v: string) => v.replace(/\\(.)/g, '$1');
 
 function query(table: string) {
-  const st: { cols: string; gt?: [string, string]; eq?: [string, unknown]; after?: [string, string]; orders: string[]; limit: number; single: boolean } = {
+  const st: { cols: string; gt?: [string, string]; gte?: [string, string]; eq?: [string, unknown]; after?: [string, string]; orders: string[]; limit: number; single: boolean } = {
     cols: '*',
     orders: [],
     limit: Infinity,
@@ -102,6 +102,15 @@ function query(table: string) {
     if (st.gt) {
       const [c, v] = st.gt;
       rows = rows.filter((r) => String(r[c]) > v);
+    }
+    if (st.gte) {
+      const [c, v] = st.gte;
+      rows = rows.filter((r) => String(r[c]) >= v);
+    }
+    // как Postgres: у людей id — uuid, сравнение с пустой строкой — ошибка
+    if (table === 'profiles' && st.after && st.after[1] === '') {
+      server.log.push({ kind: 'select', table, user: server.user.id, cols: st.cols });
+      return { data: null, error: { message: 'invalid input syntax for type uuid: ""', code: '22P02' } };
     }
     if (st.eq) {
       const [c, v] = st.eq;
@@ -133,6 +142,10 @@ function query(table: string) {
     },
     gt(c: string, v: string) {
       st.gt = [c, v];
+      return b;
+    },
+    gte(c: string, v: string) {
+      st.gte = [c, v];
       return b;
     },
     eq(c: string, v: unknown) {
