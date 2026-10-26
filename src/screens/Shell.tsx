@@ -7,7 +7,7 @@ import { Button, Card, Segmented, Sheet } from '../ui/kit';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 
-export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'move';
+export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
 
 export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   shift: { label: 'Дежурство', icon: 'shift' },
@@ -17,6 +17,7 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   journal: { label: 'Журнал', icon: 'book' },
   users: { label: 'Персонал', icon: 'users' },
   guide: { label: 'Справка', icon: 'question' },
+  rating: { label: 'Мои достижения', icon: 'trophy' },
   move: { label: 'Переезд', icon: 'truck' },
 };
 
@@ -30,7 +31,7 @@ export const TABS_BY_ROLE: Record<Role, Tab[]> = {
 };
 
 /** Порядок разделов в меню */
-const ALL_TABS: Tab[] = ['shift', 'journal', 'requests', 'diet', 'stock', 'users', 'move', 'guide'];
+const ALL_TABS: Tab[] = ['shift', 'journal', 'requests', 'diet', 'stock', 'users', 'move', 'rating', 'guide'];
 
 /** Все видят всё: чего нет на нижней панели — открывается из меню (на чужом разделе — только просмотр). */
 export const MENU_TABS = Object.fromEntries(
