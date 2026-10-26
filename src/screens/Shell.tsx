@@ -16,7 +16,7 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   stock: { label: 'Фураж', icon: 'box' },
   journal: { label: 'Журнал', icon: 'book' },
   users: { label: 'Люди', icon: 'users' },
-  guide: { label: 'Справка и почемучка', icon: 'question' },
+  guide: { label: 'Справка', icon: 'question' },
   rating: { label: 'Рейтинг и ачивки', icon: 'trophy' },
   move: { label: 'Переезд', icon: 'truck' },
 };

@@ -17,7 +17,7 @@ function Answer({ item }: { item: WhyItem }) {
   );
 }
 
-/** Ссылка «почему?» рядом с делом — открывает ответ из «Почемучки». */
+/** Ссылка «почему?» рядом с делом — открывает ответ из «Почему так?» в Справке. */
 export function WhyLink({ id, label = 'почему?' }: { id: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const item = whyById(id);

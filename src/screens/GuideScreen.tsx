@@ -7,7 +7,7 @@ export function GuideScreen() {
   const [part, setPart] = useState<'guide' | 'why'>('guide');
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">{part === 'guide' ? 'Справка' : 'Почемучка'}</h1>
+      <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Справка</h1>
       <Segmented
         label="Раздел"
         value={part}
