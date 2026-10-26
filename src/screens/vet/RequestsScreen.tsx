@@ -6,7 +6,7 @@ import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '..
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, relDate, shortDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, Empty, Field, FilePreview, PhotoPick, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest } from '../../domain/access';
 import { PurchasesView } from '../PurchasesView';
 
@@ -338,7 +338,7 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
         </div>
         {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
         <Field label="До какого числа">
-          <input type="date" className={inputCls} value={until} onChange={(e) => setUntil(e.target.value)} min={isoDate()} />
+          <DateInput value={until} onChange={setUntil} min={isoDate()} label="До какого числа" />
         </Field>
         <Card className="divide-y divide-surface2 overflow-hidden">
           <Check on={photo} label="Нужно фото в ответ" sub="кипер отметит выполнение с фото" onChange={setPhoto} />

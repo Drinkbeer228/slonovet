@@ -7,7 +7,7 @@ import { isoDate, relDate, shortDate, timeOf } from '../lib/dates';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { countWords, fmtNum } from '../domain/stock';
-import { Button, Card, Check, Chip, Empty, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
+import { Button, Card, Check, Chip, DateInput, Empty, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
   new: { label: 'ждёт', cls: 'text-amber' },
@@ -199,7 +199,7 @@ function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null;
       }
     >
       <Field label="Когда привезут" hint="можно не указывать">
-        <input type="date" className={inputCls} value={date} min={isoDate()} onChange={(e) => setDate(e.target.value)} />
+        <DateInput value={date} onChange={setDate} min={isoDate()} label="Когда привезут" clearable />
       </Field>
     </Sheet>
   );

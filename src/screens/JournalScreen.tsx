@@ -4,7 +4,7 @@ import { FEED_TIMES, acceptedBy, shiftFlags, sortShifts } from '../domain/shift'
 import type { Shift } from '../domain/types';
 import { useRows } from '../lib/store';
 import { addDays, isoDate, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
-import { Card, Empty, IconButton, Section } from '../ui/kit';
+import { CalendarSheet, Card, Empty, IconButton, Section } from '../ui/kit';
 import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
@@ -162,26 +162,15 @@ function DaysView() {
  */
 /** Дата с календарём: тап по ней открывает выбор числа (единственный календарь в журнале). */
 function DateJump({ value, onPick, className, children }: { value: string; onPick: (d: string) => void; className: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
   return (
-    <label className={`relative inline-flex cursor-pointer items-center justify-center gap-1.5 ${className}`}>
-      <Icon name="calendar" size={16} className="text-teal" />
-      {children}
-      <input
-        type="date"
-        aria-label="Перейти к дате"
-        value={value}
-        max={isoDate()}
-        onClick={(e) => {
-          try {
-            e.currentTarget.showPicker();
-          } catch {
-            /* старые браузеры откроют календарь сами по тапу */
-          }
-        }}
-        onChange={(e) => e.target.value && onPick(e.target.value)}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-      />
-    </label>
+    <>
+      <button type="button" aria-label="Перейти к дате" onClick={() => setOpen(true)} className={`inline-flex items-center justify-center gap-1.5 ${className}`}>
+        <Icon name="calendar" size={16} className="text-teal" />
+        {children}
+      </button>
+      <CalendarSheet open={open} value={value} max={isoDate()} onPick={onPick} onClose={() => setOpen(false)} />
+    </>
   );
 }
 

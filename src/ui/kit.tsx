@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
+import { addDays, isoDate, longDate, parseIso } from '../lib/dates';
 import { usePhotoUrl } from '../lib/photos';
 
 /* ---------- Кнопки ---------- */
@@ -236,6 +238,157 @@ export function DecimalInput({
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       className={`${/(^|\s)w-/.test(className) ? inputCls.replace('w-full ', '') : inputCls} ${className}`}
     />
+  );
+}
+
+const MONTH_TITLE = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const WEEK_HEAD = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+/**
+ * Свой календарь в шторке — одинаковый на любом телефоне и компьютере
+ * (встроенный календарь браузера у всех свой и местами не даёт выбрать число).
+ */
+export function CalendarSheet({
+  open,
+  value,
+  min,
+  max,
+  onPick,
+  onClose,
+  onClear,
+}: {
+  open: boolean;
+  value: string;
+  min?: string;
+  max?: string;
+  onPick: (iso: string) => void;
+  onClose: () => void;
+  /** если поле необязательное — кнопка «Без даты» */
+  onClear?: () => void;
+}) {
+  const today = isoDate();
+  const [month, setMonth] = useState(() => (value || today).slice(0, 7));
+  useEffect(() => {
+    if (open) setMonth((value || today).slice(0, 7));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopImmediatePropagation(), onClose());
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [open, onClose]);
+  if (!open) return null;
+
+  const first = parseIso(`${month}-01`);
+  const lead = (first.getDay() + 6) % 7; // с понедельника
+  const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: daysIn }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)];
+  const shift = (n: number) => {
+    const d = new Date(first.getFullYear(), first.getMonth() + n, 1);
+    setMonth(isoDate(d).slice(0, 7));
+  };
+  const out = (d: string) => (min && d < min) || (max && d > max);
+  const canPrev = !min || `${month}-01` > min;
+  const canNext = !max || addDays(`${month}-${String(daysIn).padStart(2, '0')}`, 1) <= max;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[65] flex items-end justify-center bg-black/60 md:items-center" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Выбор даты"
+        className="animate-sheet flex w-full max-w-sm flex-col gap-3 rounded-t-3xl border border-line bg-bg p-4 pb-[max(16px,env(safe-area-inset-bottom))] md:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <IconButton icon="back" label="Предыдущий месяц" onClick={() => canPrev && shift(-1)} className={canPrev ? '' : 'opacity-30'} />
+          <span className="text-[17px] font-extrabold">
+            {MONTH_TITLE[first.getMonth()]} {first.getFullYear()}
+          </span>
+          <IconButton icon="next" label="Следующий месяц" onClick={() => canNext && shift(1)} className={canNext ? '' : 'opacity-30'} />
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center">
+          {WEEK_HEAD.map((w) => (
+            <span key={w} className="py-1 text-[12px] font-bold text-muted">
+              {w}
+            </span>
+          ))}
+          {cells.map((d, i) =>
+            d ? (
+              <button
+                key={d}
+                type="button"
+                disabled={Boolean(out(d))}
+                onClick={() => {
+                  onPick(d);
+                  onClose();
+                }}
+                className={`h-11 rounded-xl text-[16px] font-bold disabled:text-faint disabled:opacity-40 ${
+                  d === value ? 'bg-teal text-teal-ink' : d === today ? 'border border-teal text-ink' : 'text-ink'
+                }`}
+              >
+                {Number(d.slice(8))}
+              </button>
+            ) : (
+              <span key={`e${i}`} />
+            ),
+          )}
+        </div>
+        <div className="flex gap-2">
+          {!out(today) && (
+            <Button
+              full
+              onClick={() => {
+                onPick(today);
+                onClose();
+              }}
+            >
+              Сегодня
+            </Button>
+          )}
+          {onClear && (
+            <Button
+              full
+              onClick={() => {
+                onClear();
+                onClose();
+              }}
+            >
+              Без даты
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Поле даты: по нажатию открывает наш календарь в шторке. */
+export function DateInput({
+  value,
+  onChange,
+  min,
+  max,
+  label,
+  clearable,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  min?: string;
+  max?: string;
+  label?: string;
+  clearable?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" aria-label={label} onClick={() => setOpen(true)} className={`${inputCls} flex items-center justify-between text-left`}>
+        <span className={value ? '' : 'text-faint'}>{value ? longDate(value) : 'не выбрано'}</span>
+        <Icon name="calendar" size={18} className="text-teal" />
+      </button>
+      <CalendarSheet open={open} value={value} min={min} max={max} onPick={onChange} onClose={() => setOpen(false)} onClear={clearable ? () => onChange('') : undefined} />
+    </>
   );
 }
 
