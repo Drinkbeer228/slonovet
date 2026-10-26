@@ -14,6 +14,7 @@ import { GuideScreen } from './screens/GuideScreen';
 import { RatingScreen } from './screens/RatingScreen';
 import { logEvent } from './lib/log';
 import { MoveScreen } from './screens/MoveScreen';
+import { Tour } from './screens/Tour';
 
 const TAB_KEY = 'slonovet_tab';
 
@@ -97,6 +98,7 @@ function Main() {
       </main>
       <BottomNav tabs={tabs} tab={current} onTab={setTab} />
       <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} onTab={setTab} />
+      <Tour user={user} tab={current} onTab={setTab} />
     </div>
   );
 }

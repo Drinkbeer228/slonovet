@@ -80,69 +80,71 @@ function DaysView() {
         </DateJump>
         <IconButton icon="next" label="День позже" onClick={() => step(-1)} className={selected >= isoDate() ? 'opacity-30' : ''} />
       </div>
-      <Card className="flex flex-col gap-2 p-3">
-        <div className="flex items-center justify-between px-1">
-          <button type="button" disabled={!hasOlder} onClick={() => setPage(page + 1)} className="-my-1.5 h-11 pr-3 text-[14px] font-bold text-teal disabled:text-faint">
-            ← раньше
-          </button>
-          <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="-my-1.5 h-11 pl-3 text-[14px] font-bold text-teal disabled:text-faint">
-            позже →
-          </button>
-        </div>
-        <div className="grid gap-[3px]" style={{ gridTemplateColumns: `18px repeat(${WEEKS}, minmax(0, 1fr))` }}>
-          <div className="flex flex-col gap-[3px] text-[10px] font-bold text-faint">
-            <span className="h-[13px]" />
-            {['пн', '', 'ср', '', 'пт', '', 'вс'].map((d, i) => (
-              <span key={i} className="flex min-h-0 flex-1 items-center">
-                {d}
-              </span>
-            ))}
+      <div data-tour="journal-calendar">
+        <Card className="flex flex-col gap-2 p-3">
+          <div className="flex items-center justify-between px-1">
+            <button type="button" disabled={!hasOlder} onClick={() => setPage(page + 1)} className="-my-1.5 h-11 pr-3 text-[14px] font-bold text-teal disabled:text-faint">
+              ← раньше
+            </button>
+            <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="-my-1.5 h-11 pl-3 text-[14px] font-bold text-teal disabled:text-faint">
+              позже →
+            </button>
           </div>
-          {weeks.map((wk, w) => {
-            const first = parseIso(wk[0]);
-            const newMonth = w === 0 || first.getDate() <= 7;
-            return (
-              <div key={wk[0]} className="flex min-w-0 flex-col gap-[3px]">
-                <span className="h-[13px] overflow-visible whitespace-nowrap text-[10px] font-bold leading-[13px] text-faint">{newMonth ? MONTH_SHORT[first.getMonth()] : ''}</span>
-                {wk.map((d) => {
-                  const list = byDay.get(d);
-                  const future = d > today;
-                  return (
-                    <button
-                      key={d}
-                      type="button"
-                      disabled={future}
-                      onClick={() => setDay(d)}
-                      aria-label={`${shortDate(d)}${list ? `, дежурный ${list.map((x) => x.keeper_name).join(', ')}` : ', дежурства нет'}`}
-                      className={`aspect-square w-full rounded-[3px] ${
-                        list ? DAY_CLS[worst(list)] : future ? 'bg-transparent' : 'bg-empty'
-                      } ${d === selected ? 'ring-2 ring-ink' : ''} ${list?.some((x) => x.status === 'open') ? 'opacity-60' : ''}`}
-                    />
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] font-semibold text-muted">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-empty" />
-            нет дежурства
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-teal" />
-            норма
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-dot1" />
-            внимание
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-dot2" />
-            плохо
-          </span>
-        </div>
-      </Card>
+          <div className="grid gap-[3px]" style={{ gridTemplateColumns: `18px repeat(${WEEKS}, minmax(0, 1fr))` }}>
+            <div className="flex flex-col gap-[3px] text-[10px] font-bold text-faint">
+              <span className="h-[13px]" />
+              {['пн', '', 'ср', '', 'пт', '', 'вс'].map((d, i) => (
+                <span key={i} className="flex min-h-0 flex-1 items-center">
+                  {d}
+                </span>
+              ))}
+            </div>
+            {weeks.map((wk, w) => {
+              const first = parseIso(wk[0]);
+              const newMonth = w === 0 || first.getDate() <= 7;
+              return (
+                <div key={wk[0]} className="flex min-w-0 flex-col gap-[3px]">
+                  <span className="h-[13px] overflow-visible whitespace-nowrap text-[10px] font-bold leading-[13px] text-faint">{newMonth ? MONTH_SHORT[first.getMonth()] : ''}</span>
+                  {wk.map((d) => {
+                    const list = byDay.get(d);
+                    const future = d > today;
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={future}
+                        onClick={() => setDay(d)}
+                        aria-label={`${shortDate(d)}${list ? `, дежурный ${list.map((x) => x.keeper_name).join(', ')}` : ', дежурства нет'}`}
+                        className={`aspect-square w-full rounded-[3px] ${
+                          list ? DAY_CLS[worst(list)] : future ? 'bg-transparent' : 'bg-empty'
+                        } ${d === selected ? 'ring-2 ring-ink' : ''} ${list?.some((x) => x.status === 'open') ? 'opacity-60' : ''}`}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] font-semibold text-muted">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-[3px] bg-empty" />
+              нет дежурства
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-[3px] bg-teal" />
+              норма
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-[3px] bg-dot1" />
+              внимание
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2.5 w-2.5 rounded-[3px] bg-dot2" />
+              плохо
+            </span>
+          </div>
+        </Card>
+      </div>
 
 
       {(byDay.get(selected) ?? []).map((s) => (

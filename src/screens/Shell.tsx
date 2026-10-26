@@ -115,6 +115,7 @@ export function TopBar({
               key={t}
               type="button"
               aria-current={t === tab ? 'page' : undefined}
+              data-tour={`nav-${t}`}
               onClick={() => onTab(t)}
               className={`h-9 rounded-xl px-3.5 text-[14px] font-bold ${t === tab ? 'bg-surface text-ink' : 'text-muted hover:text-ink'}`}
             >
@@ -128,6 +129,7 @@ export function TopBar({
             type="button"
             onClick={onMenu}
             aria-label="Профиль и меню"
+            data-tour="menu"
             className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-surface2 text-[15px] font-extrabold"
           >
             {user.full_name.slice(0, 1)}
@@ -152,6 +154,7 @@ export function BottomNav({ tabs, tab, onTab }: { tabs: Tab[]; tab: Tab; onTab: 
             key={t}
             type="button"
             aria-current={on ? 'page' : undefined}
+            data-tour={`nav-${t}`}
             onClick={() => onTab(t)}
             className={`flex flex-col items-center gap-1 py-1.5 text-[12px] ${on ? 'font-extrabold text-teal' : 'font-bold text-muted'}`}
           >

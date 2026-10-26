@@ -33,9 +33,11 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
   // никто не дежурит: видно последнее дежурство, проверка при приёме — в шторке
   const accept = canWork(user) && (
     <>
-      <Button kind="primary" big full icon="shield" onClick={() => setAccepting(true)}>
-        Принять дежурство
-      </Button>
+      <div data-tour="accept">
+        <Button kind="primary" big full icon="shield" onClick={() => setAccepting(true)}>
+          Принять дежурство
+        </Button>
+      </div>
       <Sheet open={accepting} onClose={() => setAccepting(false)} title="Принять дежурство">
         <AcceptShift user={user} />
       </Sheet>

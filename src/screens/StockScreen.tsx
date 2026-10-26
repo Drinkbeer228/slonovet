@@ -135,7 +135,9 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         </Card>
       )}
 
-      <PurchasesBlock user={user} />
+      <div data-tour="purchases">
+        <PurchasesBlock user={user} />
+      </div>
 
       {STOCK_CATEGORIES.map((g) => {
         const ids = items
@@ -172,9 +174,11 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       })}
 
       {canWrite && (
-        <Button icon="plus" full onClick={() => setAdding(true)}>
-          Добавить позицию
-        </Button>
+        <div data-tour="stock-add">
+          <Button icon="plus" full onClick={() => setAdding(true)}>
+            Добавить позицию
+          </Button>
+        </div>
       )}
 
       <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">

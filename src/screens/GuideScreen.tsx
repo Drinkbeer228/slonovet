@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { GUIDE } from '../domain/guide';
-import { Card, Section, Segmented } from '../ui/kit';
+import { Button, Card, Section, Segmented } from '../ui/kit';
+import { startTour } from './Tour';
 import { WhyList } from './common/Why';
 
 export function GuideScreen() {
   const [part, setPart] = useState<'guide' | 'why'>('guide');
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Справка</h1>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Справка</h1>
+        <Button icon="question" onClick={startTour}>
+          Подсказки
+        </Button>
+      </div>
       <Segmented
         label="Раздел"
         value={part}
