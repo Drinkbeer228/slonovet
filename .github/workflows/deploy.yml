@@ -1,5 +1,5 @@
-# Выкладка на GitHub Pages: каждый push в main собирает приложение и публикует его.
-# Адрес: https://<аккаунт>.github.io/<репозиторий>/
+# Выкладка: каждый push в main проверяет и собирает приложение и кладёт его на сервер Beget.
+# Адрес: https://slonovet.ru (nginx на сервере, папка /var/www/slonovet, пользователь deploy).
 name: Выкладка
 
 on:
@@ -9,15 +9,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: deploy
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,18 +26,13 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      # сайт живёт в корне своего домена slonovet.ru (файл public/CNAME)
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Отправить на сервер
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          # ключ сервера записан здесь, чтобы не подключиться к подменённому
+          echo "159.194.208.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYsLfZgNv9gecQxSwvJjbbUYqMitmvS1ncpKJHqr3sE" > ~/.ssh/known_hosts
+          rsync -rlz --delete-after -e "ssh -i ~/.ssh/deploy" dist/ deploy@159.194.208.29:/var/www/slonovet/

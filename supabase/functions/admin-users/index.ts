@@ -59,6 +59,11 @@ Deno.serve(async (req) => {
       app_metadata: { role: body.role }, // роль задаёт только сервер — по ней триггер делает профиль активным
     });
     if (error) return reply({ error: error.message.includes('already') ? 'Такой логин уже есть' : error.message }, 400);
+    // профиль пишем сами: новые версии Auth кладут роль уже после вставки, и триггер её не видит
+    const { error: pErr } = await admin
+      .from('profiles')
+      .upsert({ id: data.user!.id, login, full_name: body.full_name || login, role: body.role, active: true });
+    if (pErr) return reply({ error: pErr.message }, 400);
     return reply({ id: data.user?.id });
   }
 
