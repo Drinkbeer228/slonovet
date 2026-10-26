@@ -2,7 +2,7 @@
 // Коды (Ф1, Д3…) — находки аудита 26.10.2026; ещё не исправленные помечены it.fails, как в src/lib/sync.test.ts.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { keeperA, phone } from '../test/app';
-import { balances, countPerDay, stockPerDay, stockView } from './stock';
+import { balances, countPerDay, stockPerDay, stockView, toStockUnits } from './stock';
 import { localDay, relDate } from '../lib/dates';
 import type { Diet, Shift, StockItem, StockMove } from './types';
 
@@ -50,6 +50,16 @@ describe('Фураж — работает', () => {
     await p.actions.setHay(s1(), 9, keeperA);
     const hay = p.store.getRows('stock_moves').filter((m) => m.item_id === 'hay');
     expect(hay.map((m) => m.delta)).toEqual([-9]);
+  });
+
+  it('«Привезли» по закупке: мешки переводятся в кг, приход один, закупка закрыта', async () => {
+    const oats = { ...item('oats', 'Овёс', 'grain'), sack_kg: 40 };
+    const purchase = { id: 'p1', item_id: 'oats', title: 'Овёс', amount: '5 мешков', note: '', urgent: false, status: 'ordered' as const, author_id: 'user-a', author_name: 'Кипер А', status_by: null, status_at: null, created_at: now, updated_at: now };
+    expect(toStockUnits(oats, 5)).toBe(200);
+    expect(await p.actions.arrivePurchase(purchase, oats, 5, keeperA, null)).toBe(200);
+    await p.actions.arrivePurchase(purchase, oats, 5, keeperA, null); // второе нажатие
+    expect(balances(p.store.getRows('stock_moves')).get('oats')).toBe(200);
+    expect(p.store.getRow('purchases', 'p1')?.status).toBe('done');
   });
 
   it('остаток — сумма движений, минус в сумме сохраняется', () => {

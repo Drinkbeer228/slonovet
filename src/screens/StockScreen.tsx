@@ -3,7 +3,7 @@ import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
 import { addStockMove, countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
+import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
 import { newId, put, useRows } from '../lib/store';
 import { localDay, plural, relDate, timeOf } from '../lib/dates';
@@ -411,7 +411,7 @@ function IncomingSheet({
   const typed = it?.kind === 'kg' || it?.kind === 'count';
   const isKg = it?.kind === 'kg';
   const typedNum = Number(kg.replace(',', '.')) || 0;
-  const amount = !it ? 0 : typed ? typedNum : qty * (it.sack_kg ?? 0);
+  const amount = !it ? 0 : toStockUnits(it, typed ? typedNum : qty);
   const unitWord = !it ? '' : it.kind === 'count' ? plural(Math.round(typedNum), ...countWords(it.id, it.unit)) : plural(qty, ...packWords(it));
 
   return (

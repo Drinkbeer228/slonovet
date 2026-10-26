@@ -3,7 +3,8 @@ import type { Role } from './types';
 /**
  * Правило: все видят всё, меняет только хозяин раздела.
  * Здесь — кто хозяин. На чужом разделе человек видит «Только просмотр — меняет …».
- * Права в базе (RLS) совпадают с этим списком; дежурство — только кипер (см. ShiftScreen).
+ * Все правила доступа приложения — здесь. Права в базе (RLS) и функция admin-users совпадают с ними:
+ * это проверяет src/domain/access.test.ts.
  */
 export const EDITORS = {
   // задачи ставят все; закрывать чужие — врач, директор, администратор, админ (своё — автор)
@@ -21,3 +22,16 @@ export const canEdit = (section: OwnedSection, role: Role) => (EDITORS[section].
 
 /** Закрыть или вернуть в работу задачу: автор или те, кто ведёт задачи. */
 export const canCloseRequest = (req: { author_id: string | null }, user: { id: string; role: Role }) => req.author_id === user.id || canEdit('requests', user.role);
+
+/** Ведёт дежурство (отметки, кормление, сдача) — только кипер. База пускает и системного админа, но экран строже. */
+export const canWorkShift = (role: Role) => role === 'keeper';
+
+/** С кем работает роль в «Персонале»: заводит, меняет пароль, отключает. Функция admin-users проверяет то же. */
+export const MANAGES: Partial<Record<Role, Role[]>> = {
+  admin: ['keeper', 'vet', 'director', 'manager', 'admin'],
+  director: ['keeper', 'vet', 'director', 'manager'],
+  manager: ['keeper', 'vet'],
+};
+
+/** Логины в «Персонале» видят только директор и системный админ — остальным только имена. */
+export const SEES_LOGINS: Role[] = ['director', 'admin'];

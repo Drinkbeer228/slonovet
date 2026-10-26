@@ -4,9 +4,9 @@ import type { CurrentUser, Purchase, PurchaseStatus } from '../domain/types';
 import { logEvent } from '../lib/log';
 import { newId, put, useRows } from '../lib/store';
 import { isoDate, localDay, relDate, shortDate, timeOf } from '../lib/dates';
-import { addStockMove } from '../domain/actions';
+import { arrivePurchase, setPurchaseStatus } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { categoryOf, countWords, fmtNum, packWords } from '../domain/stock';
+import { categoryOf, countWords, fmtNum, packWords, toStockUnits } from '../domain/stock';
 import { Button, Card, Check, Chip, DateInput, Empty, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
@@ -25,14 +25,7 @@ function statusText(p: Purchase) {
 }
 
 async function setStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser, delivery?: string | null) {
-  logEvent('purchase.status', { title: p.title.slice(0, 100), status, delivery: delivery ?? null });
-  await put('purchases', {
-    ...p,
-    status,
-    status_by: user.full_name,
-    status_at: new Date().toISOString(),
-    delivery_date: delivery === undefined ? (p.delivery_date ?? null) : delivery,
-  });
+  await setPurchaseStatus(p, status, user, delivery);
   toast(`Отмечено: ${STATUS[status].label}`);
 }
 
@@ -54,12 +47,10 @@ function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase | null
   const it = items.find((i) => i.id === p.item_id);
   const n = Number(qty.replace(',', '.')) || 0;
   const unit = !it ? '' : it.kind === 'kg' ? 'кг' : it.kind === 'sack' ? packWords(it)[2] : countWords(it.id, it.unit)[2];
-  const delta = !it ? 0 : it.kind === 'sack' ? n * (it.sack_kg ?? 0) : n;
+  const delta = it ? toStockUnits(it, n) : 0;
   const finish = async (withStock: boolean) => {
-    // id прихода — по закупке: два нажатия или два телефона дают один приход, а не два
-    if (withStock && it && delta > 0) await addStockMove(it.id, delta, 'in', user, currentShift(shifts)?.id ?? null, `in:purchase:${p.id}`);
-    await setStatus(p, 'done', user);
-    if (withStock && it && delta > 0) toast(`${it.name}: +${fmtNum(n, it.kind === 'kg' ? 1 : 0)} ${unit} в фураж`);
+    const added = await arrivePurchase(p, withStock ? it : undefined, n, user, currentShift(shifts)?.id ?? null);
+    toast(added > 0 && it ? `${it.name}: +${fmtNum(n, it.kind === 'kg' ? 1 : 0)} ${unit} в фураж` : `Отмечено: ${STATUS.done.label}`);
     onClose();
   };
   return (

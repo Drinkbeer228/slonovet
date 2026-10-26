@@ -6,7 +6,7 @@ import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '..
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest } from '../../domain/access';
 import { PurchasesView } from '../PurchasesView';
 

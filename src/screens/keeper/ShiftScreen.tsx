@@ -1,3 +1,4 @@
+import { canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, updateShift } from '../../domain/actions';
 import { FEED_TIMES, acceptedBy, currentShift, lastHanded, requestTodos, shiftFlags } from '../../domain/shift';
@@ -15,8 +16,8 @@ import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
 
-/** Ведут дежурство только киперы. Остальные, включая админов, смотрят его как есть, ничего не меняя. */
-const canWork = (u: CurrentUser) => u.role === 'keeper';
+/** Ведут дежурство только киперы (domain/access.ts). Остальные смотрят его как есть; назначения и лечение отмечают все. */
+const canWork = (u: CurrentUser) => canWorkShift(u.role);
 
 export function ShiftScreen({ user }: { user: CurrentUser }) {
   const shifts = useRows('shifts');
@@ -65,7 +66,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
   const [handoverOpen, setHandoverOpen] = useState(false);
   const handed = shift.status !== 'open';
   // назначения и записи о лечении — не только кипер: директор сам обработал Претти — отмечает, врач видит
-  const keeper = user.role === 'keeper';
+  const keeper = canWorkShift(user.role);
   const canMark = !readOnly || !keeper;
   const stale = !handed && shift.date < isoDate();
 

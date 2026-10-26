@@ -4,8 +4,8 @@ import { savePhoto } from '../lib/photos';
 import { logEvent } from '../lib/log';
 import { isoDate } from '../lib/dates';
 import { newHandoverCode, newShift } from './shift';
-import { balances, feedUsage, weighedItem } from './stock';
-import type { CurrentUser, ElephantName, Level, MetricKey, Note, NoteKind, Shift, StockMove } from './types';
+import { balances, feedUsage, toStockUnits, weighedItem } from './stock';
+import type { CurrentUser, ElephantName, Level, MetricKey, Note, NoteKind, Purchase, PurchaseStatus, Shift, StockItem, StockMove } from './types';
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
@@ -310,4 +310,27 @@ export async function countStock(item_id: string, counted: number, user: Current
     author_name: user.full_name,
     created_at: new Date().toISOString(),
   });
+}
+
+/** Статус закупки: «заказано» (с датой доставки), «привезли», «отменено». */
+export async function setPurchaseStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser, delivery?: string | null) {
+  logEvent('purchase.status', { title: p.title.slice(0, 100), status, delivery: delivery ?? null });
+  await put('purchases', {
+    ...p,
+    status,
+    status_by: user.full_name,
+    status_at: new Date().toISOString(),
+    delivery_date: delivery === undefined ? (p.delivery_date ?? null) : delivery,
+  });
+}
+
+/**
+ * «Привезли» по закупке: зачислить приход (n — мешков, кг или штук, как считается позиция) и закрыть закупку.
+ * id прихода — по закупке: два нажатия или два телефона дают один приход. Возвращает, сколько зачислено.
+ */
+export async function arrivePurchase(p: Purchase, item: StockItem | undefined, n: number, user: CurrentUser, shiftId: string | null): Promise<number> {
+  const delta = item ? toStockUnits(item, n) : 0;
+  if (item && delta > 0) await addStockMove(item.id, delta, 'in', user, shiftId, `in:purchase:${p.id}`);
+  await setPurchaseStatus(p, 'done', user);
+  return delta;
 }

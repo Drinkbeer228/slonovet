@@ -6,7 +6,7 @@ import { PreviewError, getPreviewRole } from '../../lib/preview';
 import { syncNow } from '../../lib/sync';
 import { newId, put, useRows } from '../../lib/store';
 import { Button, Card, Check, Chip, Field, ReadOnlyNote, Section, Sheet, inputCls, toast } from '../../ui/kit';
-import { EDITORS } from '../../domain/access';
+import { EDITORS, MANAGES, SEES_LOGINS } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 
 const ROLES: { value: Role; label: string }[] = [
@@ -17,12 +17,6 @@ const ROLES: { value: Role; label: string }[] = [
   { value: 'admin', label: 'Системный админ' },
 ];
 
-/** С кем может работать роль. Должно совпадать с MANAGES в supabase/functions/admin-users. */
-const MANAGES: Partial<Record<Role, Role[]>> = {
-  admin: ['keeper', 'vet', 'director', 'manager', 'admin'],
-  director: ['keeper', 'vet', 'director', 'manager'],
-  manager: ['keeper', 'vet'],
-};
 
 async function callAdmin(body: Record<string, string>) {
   if (getPreviewRole()) throw new PreviewError();
@@ -58,9 +52,6 @@ function genPassword() {
   const words = Array.from({ length: 3 }, () => PASSWORD_WORDS[rnd(PASSWORD_WORDS.length)]);
   return `${words.join('-')}-${String(rnd(90) + 10)}`;
 }
-
-/** Логины видят только директор и системный админ — остальным в «Персонале» только имена. */
-const SEES_LOGINS: Role[] = ['director', 'admin'];
 
 export function UsersScreen({ session, role }: { session: Session; role: Role }) {
   const profiles = useRows('profiles');

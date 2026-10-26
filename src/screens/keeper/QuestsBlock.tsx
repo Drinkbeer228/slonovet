@@ -2,7 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { BRANCH_AMOUNT, BRANCH_KINDS, ELEPHANTS } from '../../domain/elephants';
 import { setBags, updateShift } from '../../domain/actions';
 import type { CurrentUser, ElephantName, Quests, Shift } from '../../domain/types';
-import { Card, Check, Chip, DecimalInput, Section, Segmented, Stepper, inputCls } from '../../ui/kit';
+import { Card, Chip, Section, Segmented, Stepper, inputCls } from '../../ui/kit';
 import { Icon, type IconName } from '../../ui/Icon';
 import { WhyLink } from '../common/Why';
 import { ExtraIssues } from './ExtraIssues';

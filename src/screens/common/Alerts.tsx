@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ELEPHANTS, METRICS } from '../../domain/elephants';
 import { FEED_TIMES, sortShifts } from '../../domain/shift';
-import type { ElephantName, Level, MetricKey, Shift } from '../../domain/types';
+import type { ElephantName, Level, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { addDays, isoDate, relDate } from '../../lib/dates';
 import { Card, LEVEL_DOT } from '../../ui/kit';

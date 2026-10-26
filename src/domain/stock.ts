@@ -129,6 +129,11 @@ export function countPerDay(moves: StockMove[], itemId: string, today = isoDate(
   return avgPerDay(moves.filter((m) => m.item_id === itemId && (m.reason === 'hay' || m.reason === 'feed') && localDay(m.created_at) >= from));
 }
 
+/** Сколько это в единицах склада: мешки (ящики) — в кг по весу мешка, кг и штуки — как есть. */
+export function toStockUnits(item: StockItem, n: number): number {
+  return item.kind === 'sack' ? n * (item.sack_kg ?? 0) : n;
+}
+
 /** Как называть штуки на складе. */
 const COUNT_WORDS: Record<string, [string, string, string]> = {
   hay: ['тюк', 'тюка', 'тюков'],
