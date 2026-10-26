@@ -3,7 +3,7 @@ import { canEdit } from '../domain/access';
 import type { CurrentUser, Purchase, PurchaseStatus } from '../domain/types';
 import { logEvent } from '../lib/log';
 import { newId, put, useRows } from '../lib/store';
-import { relDate, timeOf } from '../lib/dates';
+import { isoDate, relDate, shortDate, timeOf } from '../lib/dates';
 import { Button, Card, Check, Chip, Empty, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
@@ -14,6 +14,24 @@ const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
 };
 
 const isActive = (p: Purchase) => p.status === 'new' || p.status === 'ordered';
+
+/** Статус словами: «заказано · привезут 30.10». */
+function statusText(p: Purchase) {
+  if (p.status === 'ordered' && p.delivery_date) return `заказано · привезут ${shortDate(p.delivery_date)}`;
+  return STATUS[p.status].label;
+}
+
+async function setStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser, delivery?: string | null) {
+  logEvent('purchase.status', { title: p.title.slice(0, 100), status, delivery: delivery ?? null });
+  await put('purchases', {
+    ...p,
+    status,
+    status_by: user.full_name,
+    status_at: new Date().toISOString(),
+    delivery_date: delivery === undefined ? (p.delivery_date ?? null) : delivery,
+  });
+  toast(status === 'done' && p.item_id ? 'Привезли. Внесите приход в «Фураж» → «Привезли»' : `Отмечено: ${STATUS[status].label}`);
+}
 const byNewest = (a: Purchase, b: Purchase) => (a.created_at < b.created_at ? 1 : -1);
 
 /** Закупки целиком: что просили купить, что заказано, что уже привезли. */
@@ -30,11 +48,11 @@ export function PurchasesView({ user }: { user: CurrentUser }) {
         Нужно купить
       </Button>
       <Section title="Активные" aside={active.length ? String(active.length) : undefined}>
-        {active.length ? <PurchaseList list={active} onOpen={setOpen} /> : <Empty>Ничего не просили купить</Empty>}
+        {active.length ? <PurchaseList list={active} user={user} onOpen={setOpen} /> : <Empty>Ничего не просили купить</Empty>}
       </Section>
       {closed.length > 0 && (
         <Section title="Закрытые">
-          <PurchaseList list={closed} onOpen={setOpen} />
+          <PurchaseList list={closed} user={user} onOpen={setOpen} />
         </Section>
       )}
       <NewPurchaseSheet open={creating} user={user} onClose={() => setCreating(false)} />
@@ -51,7 +69,7 @@ export function PurchasesBlock({ user }: { user: CurrentUser }) {
   const active = all.filter(isActive).sort((a, b) => Number(b.urgent) - Number(a.urgent) || byNewest(a, b));
   return (
     <Section title="Закупки" aside={active.length ? String(active.length) : undefined}>
-      {active.length > 0 && <PurchaseList list={active} onOpen={setOpen} />}
+      {active.length > 0 && <PurchaseList list={active} user={user} onOpen={setOpen} />}
       <Button icon="plus" full onClick={() => setCreating(true)}>
         Нужно купить
       </Button>
@@ -61,27 +79,75 @@ export function PurchasesBlock({ user }: { user: CurrentUser }) {
   );
 }
 
-function PurchaseList({ list, onOpen }: { list: Purchase[]; onOpen: (p: Purchase) => void }) {
+function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentUser; onOpen: (p: Purchase) => void }) {
+  const buyer = canEdit('purchases', user.role);
+  const [ordering, setOrdering] = useState<Purchase | null>(null);
   return (
     <Card className="divide-y divide-surface2 overflow-hidden">
       {list.map((p) => (
-        <button key={p.id} type="button" onClick={() => onOpen(p)} className={`flex w-full flex-col gap-0.5 px-4 py-3 text-left ${isActive(p) ? '' : 'opacity-60'}`}>
-          <span className="flex items-baseline justify-between gap-2">
-            <span className="text-[15px] font-bold">
-              {p.title}
-              {p.amount && <span className="font-semibold text-ink2"> · {p.amount}</span>}
+        <div key={p.id} className={`flex flex-col gap-2 px-4 py-3 ${isActive(p) ? '' : 'opacity-60'}`}>
+          <button type="button" onClick={() => onOpen(p)} className="flex w-full flex-col gap-0.5 text-left">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="text-[15px] font-bold">
+                {p.title}
+                {p.amount && <span className="font-semibold text-ink2"> · {p.amount}</span>}
+              </span>
+              {p.urgent && isActive(p) && <span className="shrink-0 rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] font-bold text-coral">СРОЧНО</span>}
             </span>
-            <span className={`shrink-0 text-[13px] font-bold ${STATUS[p.status].cls}`}>
-              {p.urgent && isActive(p) && <span className="mr-2 rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">СРОЧНО</span>}
-              {STATUS[p.status].label}
+            <span className="text-[12px] font-semibold text-muted">
+              {p.author_name}, {relDate(p.created_at.slice(0, 10))}
             </span>
-          </span>
-          <span className="text-[12px] font-semibold text-muted">
-            {p.author_name}, {relDate(p.created_at.slice(0, 10))}
-          </span>
-        </button>
+          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full bg-surface2 px-2.5 py-1 text-[12px] font-bold ${STATUS[p.status].cls}`}>{statusText(p)}</span>
+            {buyer && p.status === 'new' && (
+              <button type="button" onClick={() => setOrdering(p)} className="h-9 rounded-full border border-teal px-3.5 text-[13px] font-bold text-teal">
+                Заказано
+              </button>
+            )}
+            {buyer && isActive(p) && (
+              <button type="button" onClick={() => setStatus(p, 'done', user)} className="h-9 rounded-full border border-line px-3.5 text-[13px] font-bold text-ink2">
+                Привезли
+              </button>
+            )}
+          </div>
+        </div>
       ))}
+      <OrderSheet purchase={ordering} user={user} onClose={() => setOrdering(null)} />
     </Card>
+  );
+}
+
+/** «Заказано»: можно сразу указать, когда обещали привезти. */
+function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
+  const [date, setDate] = useState('');
+  useEffect(() => {
+    if (p) setDate(p.delivery_date ?? '');
+  }, [p]);
+  if (!p) return null;
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title={`Заказано: ${p.title}`}
+      footer={
+        <Button
+          kind="primary"
+          big
+          full
+          onClick={async () => {
+            await setStatus(p, 'ordered', user, date || null);
+            onClose();
+          }}
+        >
+          Заказано
+        </Button>
+      }
+    >
+      <Field label="Когда привезут" hint="можно не указывать">
+        <input type="date" className={inputCls} value={date} min={isoDate()} onChange={(e) => setDate(e.target.value)} />
+      </Field>
+    </Sheet>
   );
 }
 
@@ -170,13 +236,12 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
 }
 
 function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
+  const [ordering, setOrdering] = useState(false);
   if (!p) return null;
   const buyer = canEdit('purchases', user.role);
   const mine = p.author_id === user.id;
-  const setStatus = async (status: PurchaseStatus) => {
-    logEvent('purchase.status', { title: p.title.slice(0, 100), status });
-    await put('purchases', { ...p, status, status_by: user.full_name, status_at: new Date().toISOString() });
-    toast(status === 'done' && p.item_id ? 'Привезли. Внесите приход в «Фураж» → «Привезли»' : `Отмечено: ${STATUS[status].label}`);
+  const mark = async (status: PurchaseStatus) => {
+    await setStatus(p, status, user);
     onClose();
   };
   const active = isActive(p);
@@ -190,22 +255,22 @@ function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | n
         (buyer || (mine && active)) && (
           <div className="flex flex-col gap-2">
             {buyer && p.status === 'new' && (
-              <Button kind="primary" big full onClick={() => setStatus('ordered')}>
+              <Button kind="primary" big full onClick={() => setOrdering(true)}>
                 Заказано
               </Button>
             )}
             {buyer && active && (
-              <Button kind={p.status === 'ordered' ? 'primary' : 'light'} big full onClick={() => setStatus('done')}>
+              <Button kind={p.status === 'ordered' ? 'primary' : 'light'} big full onClick={() => mark('done')}>
                 Привезли
               </Button>
             )}
             {active && (
-              <Button full onClick={() => setStatus('cancelled')}>
+              <Button full onClick={() => mark('cancelled')}>
                 Отменить
               </Button>
             )}
             {buyer && !active && (
-              <Button full onClick={() => setStatus('new')}>
+              <Button full onClick={() => mark('new')}>
                 Вернуть в работу
               </Button>
             )}
@@ -220,11 +285,19 @@ function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | n
           {p.urgent ? ' · срочно' : ''}
         </span>
         <span className={`text-[14px] font-bold ${STATUS[p.status].cls}`}>
-          Сейчас: {STATUS[p.status].label}
+          Сейчас: {statusText(p)}
           {p.status_by && p.status !== 'new' ? ` (${p.status_by}, ${relDate((p.status_at ?? p.updated_at).slice(0, 10))})` : ''}
         </span>
         {!buyer && <span className="text-[13px] font-semibold text-muted">«Заказано» и «Привезли» отмечает администратор или директор.</span>}
       </div>
+      <OrderSheet
+        purchase={ordering ? p : null}
+        user={user}
+        onClose={() => {
+          setOrdering(false);
+          onClose();
+        }}
+      />
     </Sheet>
   );
 }

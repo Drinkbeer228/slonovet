@@ -64,10 +64,12 @@ export function OfflineBanner() {
   );
 }
 
+/** Значок в шапке — только когда есть что сказать: пример, нет сети, ошибка. В обычной работе его нет. */
 export function SyncChip({ onClick }: { onClick: () => void }) {
   const s = useSyncStatus();
+  if (s.state !== 'demo' && s.state !== 'offline' && s.state !== 'error') return null;
   let icon: IconName = 'cloud';
-  let text = 'сохранено';
+  let text = '';
   let cls = 'text-muted';
   if (s.state === 'demo') {
     text = 'пример';
@@ -76,20 +78,14 @@ export function SyncChip({ onClick }: { onClick: () => void }) {
     icon = 'cloudOff';
     text = s.pending ? `без сети · ${s.pending}` : 'без сети';
     cls = 'text-amber';
-  } else if (s.state === 'syncing') {
-    icon = 'refresh';
-    text = 'синхронизация';
-  } else if (s.state === 'error') {
+  } else {
     icon = 'alert';
     text = 'ошибка';
     cls = 'text-coral';
-  } else if (s.pending) {
-    text = `в очереди · ${s.pending}`;
-    cls = 'text-amber';
   }
   return (
     <button type="button" onClick={onClick} className={`inline-flex h-10 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-bold ${cls}`}>
-      <Icon name={icon} size={15} stroke={2.2} className={s.state === 'syncing' ? 'animate-spin' : ''} />
+      <Icon name={icon} size={15} stroke={2.2} />
       {text}
     </button>
   );

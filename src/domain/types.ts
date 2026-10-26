@@ -186,6 +186,8 @@ export interface Purchase extends Base {
   author_name: string;
   status_by: string | null;
   status_at: string | null;
+  /** когда обещали привезти — необязательно */
+  delivery_date?: string | null;
   created_at: string;
 }
 
