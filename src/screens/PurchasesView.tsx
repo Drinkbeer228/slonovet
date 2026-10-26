@@ -147,6 +147,7 @@ function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentU
               </span>
               {p.urgent && isActive(p) && <span className="shrink-0 rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] font-bold text-coral">СРОЧНО</span>}
             </span>
+            {p.note && <span className="text-[13px] font-medium text-ink2">{p.note}</span>}
             <span className="text-[12px] font-semibold text-muted">
               {p.author_name}, {relDate(p.created_at.slice(0, 10))}
             </span>
@@ -205,11 +206,15 @@ function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null;
   );
 }
 
+/** Овощи и фрукты заказывают конкретно; при «Привезли» они зачисляются в общую позицию «Овощи» (кг). */
+const PRODUCE = ['Морковь', 'Свёкла', 'Капуста', 'Яблоки', 'Бананы'];
+
 function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: CurrentUser; onClose: () => void }) {
   const items = useRows('stock_items');
   const [itemId, setItemId] = useState<string | null>(null);
   const [other, setOther] = useState('');
   const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
   const [urgent, setUrgent] = useState(false);
 
   useEffect(() => {
@@ -217,12 +222,15 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
       setItemId(null);
       setOther('');
       setAmount('');
+      setNote('');
       setUrgent(false);
     }
   }, [open]);
 
-  const item = items.find((i) => i.id === itemId);
-  const title = itemId === 'other' ? other.trim() : (item?.name ?? '');
+  const produce = itemId?.startsWith('p:') ? itemId.slice(2) : null;
+  const vegItem = items.find((i) => i.id === 'veg');
+  const item = produce ? vegItem : items.find((i) => i.id === itemId);
+  const title = itemId === 'other' ? other.trim() : (produce ?? item?.name ?? '');
 
   return (
     <Sheet
@@ -242,7 +250,7 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
               item_id: item ? item.id : null,
               title,
               amount: amount.trim(),
-              note: '',
+              note: note.trim(),
               urgent,
               status: 'new',
               author_id: user.id,
@@ -263,9 +271,20 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
         <div className="flex flex-col gap-2">
           <span className="px-1 text-[14px] font-bold text-muted">Что</span>
           <div className="flex flex-wrap gap-2">
-            {items.map((i) => (
-              <Chip key={i.id} on={itemId === i.id} onClick={() => setItemId(i.id)}>
-                {i.name}
+            {items
+              .filter((i) => i.id !== 'veg')
+              .sort((a, b) => a.sort - b.sort)
+              .map((i) => (
+                <Chip key={i.id} on={itemId === i.id} onClick={() => setItemId(i.id)}>
+                  {i.name}
+                </Chip>
+              ))}
+          </div>
+          <span className="px-1 pt-1 text-[13px] font-bold text-muted">Овощи и фрукты</span>
+          <div className="flex flex-wrap gap-2">
+            {PRODUCE.map((name) => (
+              <Chip key={name} on={itemId === `p:${name}`} onClick={() => setItemId(`p:${name}`)}>
+                {name}
               </Chip>
             ))}
             <Chip on={itemId === 'other'} onClick={() => setItemId('other')}>
@@ -280,6 +299,9 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
         )}
         <Field label="Сколько" hint="можно не писать">
           <input className={inputCls} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Например: 10 мешков" />
+        </Field>
+        <Field label="Примечание" hint="можно не писать">
+          <input className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Например: сено луговое" />
         </Field>
         <Card className="overflow-hidden">
           <Check on={urgent} label="Срочно" sub="заканчивается совсем" onChange={setUrgent} />
@@ -335,6 +357,7 @@ function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | n
     >
       <div className="flex flex-col gap-3">
         {p.amount && <p className="m-0 text-[16px] font-semibold">Сколько: {p.amount}</p>}
+        {p.note && <p className="m-0 text-[15px] text-ink2">{p.note}</p>}
         <span className="text-[14px] font-semibold text-muted">
           Попросил {p.author_name}, {relDate(p.created_at.slice(0, 10))} в {timeOf(p.created_at)}
           {p.urgent ? ' · срочно' : ''}
