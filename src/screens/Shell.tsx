@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
 import { logout, type Session } from '../lib/auth';
-import { syncNow, useSyncStatus } from '../lib/sync';
+import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Segmented, Sheet } from '../ui/kit';
+import { Button, Card, Chip, Confirm, Segmented, Sheet } from '../ui/kit';
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
@@ -80,14 +80,18 @@ export function OfflineBanner() {
   );
 }
 
-/** Значок в шапке — только когда есть что сказать: пример, нет сети, ошибка. В обычной работе его нет. */
+/** Значок в шапке — только когда есть что сказать: пример, нет сети, ошибка, сервер что-то не принял. В обычной работе его нет. */
 export function SyncChip({ onClick }: { onClick: () => void }) {
   const s = useSyncStatus();
-  if (s.state !== 'demo' && s.state !== 'offline' && s.state !== 'error') return null;
+  if (s.state !== 'demo' && s.state !== 'offline' && s.state !== 'error' && !s.rejected.length) return null;
   let icon: IconName = 'cloud';
   let text = '';
   let cls = 'text-muted';
-  if (s.state === 'demo') {
+  if (s.rejected.length && s.state !== 'demo') {
+    icon = 'alert';
+    text = 'не принято';
+    cls = 'text-coral';
+  } else if (s.state === 'demo') {
     text = 'пример';
     icon = 'cloudOff';
   } else if (s.state === 'offline') {
@@ -199,6 +203,7 @@ export function MenuSheet({
 }) {
   const s = useSyncStatus();
   const [busy, setBusy] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const extra = MENU_TABS[role];
   const preview = usePreviewRole();
   return (
@@ -208,6 +213,23 @@ export function MenuSheet({
           {ROLE_LABEL[session.user.role]}
           {session.mode === 'demo' ? ' · пример без сервера' : ` · ${session.user.login}`}
         </span>
+
+        {/* сервер окончательно что-то не принял: правку на телефоне уже вернули как на сервере — сказать, что именно */}
+        {session.mode === 'cloud' && s.rejected.length > 0 && (
+          <Card className="flex flex-col gap-2 p-4 ring-1 ring-coral/50">
+            <span className="text-[15px] font-bold text-coral">Сервер не принял: {s.rejected.length}</span>
+            {s.rejected.map((r, i) => (
+              <span key={i} className="text-[14px] leading-snug">
+                {r.what} — {r.reason}
+                <span className="text-muted"> · {relDate(r.at.slice(0, 10), isoDate())} в {timeOf(r.at)}</span>
+              </span>
+            ))}
+            <span className="text-[13px] font-semibold text-muted">
+              На телефоне вернули, как на сервере. Если это важно — скажите администратору или сделайте ещё раз.
+            </span>
+            <Button onClick={clearRejected}>Понятно</Button>
+          </Card>
+        )}
 
         {/* в обычной работе про отправку молчим; карточка — только если что-то не ушло */}
         {session.mode === 'cloud' && (s.state === 'offline' || s.state === 'error' || s.pending > 0) && (
@@ -291,12 +313,30 @@ export function MenuSheet({
           icon="logout"
           full
           onClick={async () => {
+            // неотправленное не пропадёт, но уйдёт только под входом этого же человека — предупредить
+            if (session.mode === 'cloud' && s.pending > 0) {
+              setConfirmLogout(true);
+              return;
+            }
             onClose();
             await logout();
           }}
         >
           Выйти
         </Button>
+        <Confirm
+          open={confirmLogout}
+          title="Не всё отправлено"
+          text={`Ждут отправки: ${s.pending}. Они сохранены на этом телефоне и уйдут, когда вы снова войдёте здесь и будет интернет. Под чужим входом они не отправятся.`}
+          okLabel="Всё равно выйти"
+          danger
+          onOk={async () => {
+            setConfirmLogout(false);
+            onClose();
+            await logout();
+          }}
+          onClose={() => setConfirmLogout(false)}
+        />
         <span className="text-center text-[12px] font-semibold text-muted">Версия от {__BUILD__}</span>
       </div>
     </Sheet>

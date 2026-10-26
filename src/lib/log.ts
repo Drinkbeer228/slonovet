@@ -54,7 +54,9 @@ export function logEvent(action: string, meta: Record<string, unknown> = {}) {
 
 /** Отправить накопленное. Ошибка — не беда, попробуем при следующей синхронизации. */
 export async function flushEvents() {
-  const list = read();
+  // сервер принимает события только от того, кто вошёл; чужие (общий телефон) ждут своего человека
+  const me = getSession()?.user.id;
+  const list = read().filter((e) => e.user_id === me);
   const client = getClient();
   if (!list.length || !client) return;
   const { error } = await client.from('events').upsert(list, { onConflict: 'id', ignoreDuplicates: true });

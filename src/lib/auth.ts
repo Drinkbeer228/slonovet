@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { CurrentUser, Profile, Role } from '../domain/types';
 import { LOGIN_DOMAIN } from './config';
 import { getClient } from './supabase';
-import { purgeDemo, setCloudMode, wipeAll } from './store';
+import { purgeDemo, setCloudMode, setOwner, wipeAll } from './store';
 import { startSync, stopSync, syncNow } from './sync';
 import { seedDemo } from '../domain/demo';
 
@@ -14,6 +14,9 @@ export interface Session {
 const KEY = 'slonovet_session';
 const listeners = new Set<() => void>();
 let session: Session | null = load();
+/** хозяин неотправленного в очереди — тот, кто вошёл (в примере очереди нет) */
+const ownerOf = (s: Session | null) => (s?.mode === 'cloud' ? s.user.id : null);
+setOwner(ownerOf(session));
 
 function load(): Session | null {
   try {
@@ -26,6 +29,7 @@ function load(): Session | null {
 
 function set(s: Session | null) {
   session = s;
+  setOwner(ownerOf(s));
   try {
     if (s) localStorage.setItem(KEY, JSON.stringify(s));
     else localStorage.removeItem(KEY);

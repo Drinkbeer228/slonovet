@@ -25,8 +25,10 @@ export class FakeServer {
   clock = Date.parse('2026-10-26T07:00:00Z');
   user: FakeUser = { id: 'user-a', name: 'Кипер А', role: 'keeper' };
   log: LogEntry[] = [];
-  /** вернуть текст ошибки — сервер откажет, как RLS */
+  /** вернуть текст ошибки — сервер откажет, как RLS (403, код 42501) */
   rls: (table: string, row: Row, user: FakeUser) => string | null = () => null;
+  /** любая другая ошибка сервера: сеть (status 0), перегрузка (503), нет колонки (400, PGRST204)… */
+  fail: (table: string, row: Row) => { status: number; code?: string; message: string } | null = () => null;
   storageFail: (path: string) => string | null = () => null;
   /** все записи получают одно время — как в одной транзакции или при импорте */
   frozenTime: string | null = null;
@@ -35,6 +37,7 @@ export class FakeServer {
     this.tables.clear();
     this.log = [];
     this.rls = () => null;
+    this.fail = () => null;
     this.storageFail = () => null;
     this.frozenTime = null;
     this.user = { id: 'user-a', name: 'Кипер А', role: 'keeper' };
@@ -59,12 +62,20 @@ export class FakeServer {
   write<T extends { id: string }>(table: string, row: T, at = this.now()) {
     this.t(table).set(row.id, { ...(structuredClone(row) as Row), updated_at: at });
   }
-  upsert(table: string, row: Row) {
+  /** отказ для этой строки, как его вернул бы PostgREST, или null */
+  refuse(table: string, row: Row) {
+    const f = this.fail(table, row);
+    if (f) return { error: { message: f.message, code: f.code ?? '' }, status: f.status };
     const err = this.rls(table, row, this.user);
-    this.log.push({ kind: 'upsert', table, user: this.user.id, id: row.id, ok: !err });
-    if (err) return { error: { message: err, code: '42501' } };
+    if (err) return { error: { message: err, code: '42501' }, status: 403 };
+    return null;
+  }
+  upsert(table: string, row: Row) {
+    const refused = this.refuse(table, row);
+    this.log.push({ kind: 'upsert', table, user: this.user.id, id: row.id, ok: !refused });
+    if (refused) return refused;
     this.write(table, row);
-    return { error: null };
+    return { error: null, status: 201 };
   }
   /** сколько полных циклов синхронизации прошло (последний шаг цикла — сверка людей: select id) */
   cycles() {
@@ -75,9 +86,14 @@ export class FakeServer {
 const g = globalThis as unknown as { __fakeServer?: FakeServer };
 export const server = (g.__fakeServer ??= new FakeServer());
 
+/** Курсор синхронизации: or=(updated_at.gt."T",and(updated_at.eq."T",id.gt."ID")) — другие формы фейку не нужны. */
+const CURSOR_OR = /^updated_at\.gt\."((?:[^"\\]|\\.)*)",and\(updated_at\.eq\."((?:[^"\\]|\\.)*)",id\.gt\."((?:[^"\\]|\\.)*)"\)$/;
+const unquote = (v: string) => v.replace(/\\(.)/g, '$1');
+
 function query(table: string) {
-  const st: { cols: string; gt?: [string, string]; eq?: [string, unknown]; order?: string; limit: number; single: boolean } = {
+  const st: { cols: string; gt?: [string, string]; eq?: [string, unknown]; after?: [string, string]; orders: string[]; limit: number; single: boolean } = {
     cols: '*',
+    orders: [],
     limit: Infinity,
     single: false,
   };
@@ -91,9 +107,18 @@ function query(table: string) {
       const [c, v] = st.eq;
       rows = rows.filter((r) => r[c] === v);
     }
-    if (st.order) {
-      const c = st.order;
-      rows.sort((a, b) => (String(a[c]) < String(b[c]) ? -1 : String(a[c]) > String(b[c]) ? 1 : 0));
+    if (st.after) {
+      const [ts, id] = st.after;
+      rows = rows.filter((r) => String(r.updated_at) > ts || (String(r.updated_at) === ts && String(r.id) > id));
+    }
+    if (st.orders.length) {
+      rows.sort((a, b) => {
+        for (const c of st.orders) {
+          if (String(a[c]) < String(b[c])) return -1;
+          if (String(a[c]) > String(b[c])) return 1;
+        }
+        return 0;
+      });
     }
     rows = rows.slice(0, st.limit);
     server.log.push({ kind: 'select', table, user: server.user.id, cols: st.cols });
@@ -114,8 +139,14 @@ function query(table: string) {
       st.eq = [c, v];
       return b;
     },
+    or(filter: string) {
+      const m = CURSOR_OR.exec(filter);
+      if (!m || m[1] !== m[2]) throw new Error(`фейк не понимает or: ${filter}`);
+      st.after = [unquote(m[1]), unquote(m[3])];
+      return b;
+    },
     order(c: string) {
-      st.order = c;
+      st.orders.push(c);
       return b;
     },
     limit(n: number) {
@@ -143,10 +174,10 @@ function query(table: string) {
 export const fakeClient = {
   from: (table: string) => query(table),
   async rpc(name: string, args: { p_id: string; p_row: Row; p_patches: Patch[] }) {
-    if (name !== 'apply_shift_patch') return { data: null, error: { message: 'нет такой функции' } };
-    const err = server.rls('shifts', args.p_row, server.user);
-    server.log.push({ kind: 'rpc', table: 'shifts', user: server.user.id, id: args.p_id, ok: !err });
-    if (err) return { data: null, error: { message: err } };
+    if (name !== 'apply_shift_patch') return { data: null, error: { message: 'нет такой функции', code: 'PGRST202' }, status: 404 };
+    const refused = server.refuse('shifts', args.p_row);
+    server.log.push({ kind: 'rpc', table: 'shifts', user: server.user.id, id: args.p_id, ok: !refused });
+    if (refused) return { data: null, ...refused };
     const cur = server.get('shifts', args.p_id);
     if (!cur) {
       const defaults = { status: 'open', safety: {}, state: {}, feeds: {}, quests: {}, hay_bales: 0, note: '', accept_remarks: '', deleted: false };
@@ -155,7 +186,7 @@ export const fakeClient = {
       // как public.apply_shift_patch: патчи вклеиваются в серверную версию
       server.write('shifts', { ...applyPatches(cur, args.p_patches), id: args.p_id });
     }
-    return { data: structuredClone(server.get('shifts', args.p_id)), error: null };
+    return { data: structuredClone(server.get('shifts', args.p_id)), error: null, status: 200 };
   },
   storage: {
     from: () => ({

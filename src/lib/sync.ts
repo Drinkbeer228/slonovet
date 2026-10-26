@@ -1,25 +1,54 @@
 import { useSyncExternalStore } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
 import { idbGet, idbPut } from './idb';
-import { acceptServerRow, applyRemote, checkServer, dropOutbox, forgetMissing, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
+import {
+  acceptServerRow,
+  applyRemote,
+  checkServer,
+  dropOutbox,
+  forgetMissing,
+  getOutbox,
+  pendingCount,
+  rejectOutbox,
+  reloadOutbox,
+  setLocalChangeHandler,
+  subscribe as subscribeStore,
+  type OutboxEntry,
+} from './store';
 import { diff } from './patch';
-import { flushEvents } from './log';
+import { flushEvents, logEvent } from './log';
 import { getClient } from './supabase';
 import { getServerConfig } from './config';
 import { uploadPendingPhotos } from './photos';
 
 /** Поднять — и все телефоны заберут данные с сервера заново (например, после переноса базы). */
 const SYNC_EPOCH = 1;
+/** Сколько строк забирать за раз. */
+const PAGE = 500;
+/** Каждый раз берём ещё раз последние 30 с: строка, чья запись на сервере закрылась позже своего времени, не проскочит. */
+const OVERLAP_MS = 30_000;
+/** При возвращении в приложение — не чаще раза в 15 с: вкладки переключают часто. */
+const FOCUS_GAP_MS = 15_000;
+
+/** То, что сервер окончательно не принял (нет прав, неверные данные), — показываем в меню. */
+export interface Rejected {
+  what: string;
+  reason: string;
+  at: string;
+}
 
 export interface SyncStatus {
   state: 'demo' | 'idle' | 'syncing' | 'offline' | 'error';
   pending: number;
   lastSync: string | null;
   error: string | null;
+  rejected: Rejected[];
 }
 
 // время последней удачной связи помним и после перезапуска — для плашки «не отправлено»
 const LAST_SYNC_KEY = 'slonovet_last_sync';
+const REJECTED_KEY = 'slonovet_rejected';
 function readLastSync(): string | null {
   try {
     return localStorage.getItem(LAST_SYNC_KEY);
@@ -27,12 +56,21 @@ function readLastSync(): string | null {
     return null;
   }
 }
+function readRejected(): Rejected[] {
+  try {
+    return JSON.parse(localStorage.getItem(REJECTED_KEY) ?? '[]') as Rejected[];
+  } catch {
+    return [];
+  }
+}
 
-let status: SyncStatus = { state: 'idle', pending: 0, lastSync: readLastSync(), error: null };
+let status: SyncStatus = { state: 'idle', pending: 0, lastSync: readLastSync(), error: null, rejected: readRejected() };
 const listeners = new Set<() => void>();
 let enabled = false;
 let running = false;
 let again = false;
+let lastStart = 0;
+let askedPersist = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let interval: ReturnType<typeof setInterval> | null = null;
 
@@ -55,19 +93,61 @@ export function useSyncStatus() {
   );
 }
 
+export function getSyncStatus() {
+  return status;
+}
+
+/** «Понятно» в меню: убрать список непринятого. */
+export function clearRejected() {
+  try {
+    localStorage.removeItem(REJECTED_KEY);
+  } catch {
+    /* не запомнится — не беда */
+  }
+  setStatus({ rejected: [] });
+}
+
+function addRejected(item: Rejected) {
+  const list = [item, ...status.rejected].slice(0, 20);
+  try {
+    localStorage.setItem(REJECTED_KEY, JSON.stringify(list));
+  } catch {
+    /* покажем до перезапуска */
+  }
+  setStatus({ rejected: list });
+}
+
 const onOnline = () => syncNow();
-const onFocus = () => {
-  if (document.visibilityState === 'visible') syncNow();
-};
+const onOffline = () => setStatus({ state: 'offline' });
+
+/** Вернулись в приложение — подтянуть новое, но не чаще раза в FOCUS_GAP_MS. */
+export function syncOnFocus() {
+  if (document.visibilityState !== 'visible') return;
+  if (Date.now() - lastStart < FOCUS_GAP_MS) return;
+  syncNow();
+}
+
+/** Попросить браузер не стирать наши данные сам (Safari чистит сайты, которые давно не открывали). */
+function askPersistentStorage() {
+  if (askedPersist) return;
+  askedPersist = true;
+  try {
+    navigator.storage?.persist?.().catch(() => undefined);
+  } catch {
+    /* браузер не умеет — живём как есть */
+  }
+}
 
 export function startSync() {
-  enabled = true;
-  setLocalChangeHandler(() => scheduleSync());
-  window.addEventListener('online', onOnline);
-  window.addEventListener('offline', () => setStatus({ state: 'offline' }));
-  document.addEventListener('visibilitychange', onFocus);
-  if (interval) clearInterval(interval);
-  interval = setInterval(() => syncNow(), 60_000);
+  if (!enabled) {
+    enabled = true;
+    setLocalChangeHandler(() => scheduleSync());
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    document.addEventListener('visibilitychange', syncOnFocus);
+    interval = setInterval(() => syncNow(), 60_000);
+    askPersistentStorage();
+  }
   syncNow();
 }
 
@@ -75,8 +155,11 @@ export function stopSync(demo: boolean) {
   enabled = false;
   if (interval) clearInterval(interval);
   interval = null;
+  if (timer) clearTimeout(timer);
+  timer = null;
   window.removeEventListener('online', onOnline);
-  document.removeEventListener('visibilitychange', onFocus);
+  window.removeEventListener('offline', onOffline);
+  document.removeEventListener('visibilitychange', syncOnFocus);
   setStatus({ state: demo ? 'demo' : 'idle', error: null });
 }
 
@@ -89,6 +172,78 @@ export function scheduleSync(delay = 1500) {
 function describe(e: unknown): string {
   if (e && typeof e === 'object' && 'message' in e) return String((e as { message: string }).message);
   return String(e);
+}
+
+interface ServerError {
+  message: string;
+  code?: string;
+}
+
+/**
+ * Отказ, который повтор не исправит: нет прав, неверные данные. Нет сети, сервер перегружен или упал,
+ * истёк вход, на сервере ещё нет новой таблицы или колонки (PGRST2xx, миграцию не применили) —
+ * временное: правка остаётся в очереди и уйдёт со следующей попыткой.
+ */
+function isPermanent(error: ServerError, httpStatus: number | undefined): boolean {
+  if (!httpStatus || httpStatus >= 500 || httpStatus === 401 || httpStatus === 408 || httpStatus === 429) return false;
+  if (error.code?.startsWith('PGRST2')) return false;
+  return httpStatus >= 400;
+}
+
+const WHAT: Record<TableName, string> = {
+  profiles: 'Человек',
+  shifts: 'Дежурство',
+  requests: 'Задача',
+  request_marks: 'Отметка задачи',
+  notes: 'Запись',
+  stock_items: 'Позиция фуража',
+  stock_moves: 'Движение фуража',
+  diets: 'Рацион',
+  move_items: 'Пункт переезда',
+  purchases: 'Закупка',
+};
+
+function describeEntry(e: OutboxEntry): string {
+  const r = e.row as unknown as Record<string, unknown>;
+  const name = [r.name, r.title, r.text, r.keeper_name].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
+  return name ? `${WHAT[e.table]} «${name.length > 40 ? `${name.slice(0, 40)}…` : name}»` : WHAT[e.table];
+}
+
+/** Окончательный отказ: правку из очереди убрать, строку вернуть как на сервере, человеку — сказать. */
+async function reject(client: SupabaseClient, entry: OutboxEntry, error: ServerError, httpStatus?: number): Promise<boolean> {
+  const { data, error: readError } = await client.from(entry.table).select('*').eq('id', entry.row.id).limit(1);
+  if (readError) return false; // версию с сервера не получили — попробуем в следующий раз
+  await rejectOutbox(entry, ((data ?? [])[0] as TableMap[TableName] | undefined) ?? null);
+  addRejected({
+    what: describeEntry(entry),
+    reason: httpStatus === 403 || error.code === '42501' ? 'нет прав' : 'сервер не принял данные',
+    at: new Date().toISOString(),
+  });
+  logEvent('sync.rejected', { table: entry.table, id: entry.row.id, code: error.code ?? '', status: httpStatus ?? 0, message: error.message.slice(0, 200) });
+  return true;
+}
+
+/** Метка «докуда скачали»: время изменения и id последней строки (у старых телефонов — только время). */
+interface Cursor {
+  ts: string;
+  id: string;
+}
+async function readCursor(t: TableName): Promise<Cursor | null> {
+  const v = (await idbGet<{ key: string; value: unknown }>('meta', `cursor:${t}`))?.value;
+  if (typeof v === 'string') return { ts: v, id: '' };
+  if (v && typeof v === 'object' && typeof (v as Cursor).ts === 'string') return v as Cursor;
+  return null;
+}
+const quote = (v: string) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+const after = (a: Cursor, b: Cursor) => a.ts > b.ts || (a.ts === b.ts && a.id > b.id);
+
+/** Только одна вкладка этого браузера синхронизирует в один момент. */
+async function exclusive(fn: () => Promise<void>) {
+  const locks = navigator.locks;
+  if (!locks?.request) return fn();
+  await locks.request('slonovet-sync', { ifAvailable: true }, async (lock) => {
+    if (lock) await fn();
+  });
 }
 
 export async function syncNow(): Promise<void> {
@@ -104,72 +259,9 @@ export async function syncNow(): Promise<void> {
     return;
   }
   running = true;
-  setStatus({ state: 'syncing' });
+  lastStart = Date.now();
   try {
-    await checkServer(`${getServerConfig()?.url}#${SYNC_EPOCH}`);
-    await uploadPendingPhotos();
-    await flushEvents();
-
-    let failed: string | null = null;
-    for (const entry of getOutbox()) {
-      const { deleted, ...row } = entry.row as TableMap[TableName] & { deleted?: boolean };
-      if (entry.patches || entry.insert) {
-        // смена: сервер вклеивает только изменённые поля в свою версию (apply_shift_patch)
-        const full = { ...row, deleted: Boolean(deleted) };
-        const { data, error } = await client.rpc('apply_shift_patch', {
-          p_id: row.id,
-          p_row: full,
-          p_patches: entry.insert ? diff({}, full) : entry.patches,
-        });
-        if (error) {
-          failed = error.message;
-          if (!navigator.onLine) break;
-          continue;
-        }
-        if (data) await acceptServerRow(entry.table, data as TableMap[TableName], entry.ts);
-        await dropOutbox(entry.key, entry.ts);
-        continue;
-      }
-      const { error } = await client.from(entry.table).upsert({ ...row, deleted: Boolean(deleted) });
-      if (error) {
-        failed = error.message;
-        // сеть пропала — дальше не пытаемся
-        if (!navigator.onLine) break;
-        continue;
-      }
-      await dropOutbox(entry.key, entry.ts);
-    }
-
-    for (const t of TABLES) {
-      const cursorKey = `cursor:${t}`;
-      const cur = (await idbGet<{ key: string; value: string }>('meta', cursorKey))?.value ?? '1970-01-01T00:00:00Z';
-      let cursor = cur;
-      for (;;) {
-        const { data, error } = await client.from(t).select('*').gt('updated_at', cursor).order('updated_at').limit(500);
-        if (error) {
-          // одной таблицы может не быть на сервере (новая, миграцию ещё не применили) — остальные синхронизируем
-          failed = `${t}: ${error.message}`;
-          break;
-        }
-        if (!data?.length) break;
-        await applyRemote(t, data as TableMap[typeof t][]);
-        cursor = (data[data.length - 1] as { updated_at: string }).updated_at;
-        if (data.length < 500) break;
-      }
-      if (cursor !== cur) await idbPut('meta', { key: cursorKey, value: cursor });
-    }
-
-    // людей удаляют насовсем — сверяем список целиком (их единицы)
-    const { data: ids } = await client.from('profiles').select('id');
-    if (ids) await forgetMissing('profiles', new Set(ids.map((r: { id: string }) => r.id)));
-
-    const lastSync = new Date().toISOString();
-    try {
-      localStorage.setItem(LAST_SYNC_KEY, lastSync);
-    } catch {
-      /* без хранилища время просто не запомнится */
-    }
-    setStatus({ state: failed ? 'error' : 'idle', error: failed, lastSync });
+    await exclusive(() => cycle(client));
   } catch (e) {
     setStatus({ state: navigator.onLine ? 'error' : 'offline', error: describe(e) });
   } finally {
@@ -179,4 +271,75 @@ export async function syncNow(): Promise<void> {
       scheduleSync(500);
     }
   }
+}
+
+async function cycle(client: SupabaseClient) {
+  setStatus({ state: 'syncing' });
+  await checkServer(`${getServerConfig()?.url}#${SYNC_EPOCH}`);
+  let failed: string | null = null;
+
+  const photos = await uploadPendingPhotos();
+  if (photos.failed) failed = `Фото не отправлено (${photos.failed}): ${photos.error}`;
+  await flushEvents();
+
+  // очередь — общая для вкладок; перечитываем, чтобы не отправить то, что уже ушло из другой вкладки
+  await reloadOutbox();
+  for (const entry of getOutbox()) {
+    const { deleted, ...row } = entry.row as TableMap[TableName] & { deleted?: boolean };
+    const full = { ...row, deleted: Boolean(deleted) };
+    const patched = Boolean(entry.patches || entry.insert);
+    // смена: сервер вклеивает только изменённые поля в свою версию (apply_shift_patch)
+    const res = patched
+      ? await client.rpc('apply_shift_patch', { p_id: row.id, p_row: full, p_patches: entry.insert ? diff({}, full) : entry.patches })
+      : await client.from(entry.table).upsert(full as Record<string, unknown>);
+    if (res.error) {
+      if (isPermanent(res.error, res.status) && (await reject(client, entry, res.error, res.status))) continue;
+      failed = res.error.message;
+      // сеть пропала — дальше не пытаемся
+      if (!navigator.onLine) break;
+      continue;
+    }
+    if (patched && res.data) await acceptServerRow(entry.table, res.data as TableMap[TableName], entry.ts);
+    await dropOutbox(entry.key, entry.ts);
+  }
+
+  for (const t of TABLES) {
+    const saved = await readCursor(t);
+    let from: Cursor = saved ? { ts: new Date(Date.parse(saved.ts) - OVERLAP_MS).toISOString(), id: '' } : { ts: '1970-01-01T00:00:00Z', id: '' };
+    let last = saved;
+    for (;;) {
+      // по паре «время, id»: строки с одинаковым временем на границе пачки не теряются
+      const { data, error } = await client
+        .from(t)
+        .select('*')
+        .or(`updated_at.gt.${quote(from.ts)},and(updated_at.eq.${quote(from.ts)},id.gt.${quote(from.id)})`)
+        .order('updated_at')
+        .order('id')
+        .limit(PAGE);
+      if (error) {
+        // одной таблицы может не быть на сервере (новая, миграцию ещё не применили) — остальные синхронизируем
+        failed = `${t}: ${error.message}`;
+        break;
+      }
+      if (!data?.length) break;
+      await applyRemote(t, data as TableMap[typeof t][]);
+      const tail = data[data.length - 1] as { updated_at: string; id: string };
+      from = { ts: tail.updated_at, id: tail.id };
+      if (!last || after(from, last)) last = from;
+      if (data.length < PAGE) break;
+    }
+    if (last && (!saved || last.ts !== saved.ts || last.id !== saved.id)) await idbPut('meta', { key: `cursor:${t}`, value: last });
+  }
+
+  // людей удаляют насовсем — сверяем список целиком (их единицы)
+  const { data: ids } = await client.from('profiles').select('id');
+  if (ids) await forgetMissing('profiles', new Set(ids.map((r: { id: string }) => r.id)));
+
+  const lastSync = new Date().toISOString();
+  try {
+    localStorage.setItem(LAST_SYNC_KEY, lastSync);
+  } catch {
+    /* без хранилища время просто не запомнится */
+  }
+  setStatus({ state: failed ? 'error' : 'idle', error: failed, lastSync });
 }

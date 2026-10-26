@@ -1,6 +1,6 @@
 import { PreviewError, getPreviewRole } from './preview';
 import { useEffect, useState } from 'react';
-import { idbAll, idbGet, idbPut } from './idb';
+import { idbAll, idbDelete, idbGet, idbPut } from './idb';
 import { getClient } from './supabase';
 
 /** Фото сначала сохраняются на устройстве, в облако уходят при синхронизации. */
@@ -9,7 +9,15 @@ interface BlobEntry {
   path: string;
   blob: Blob;
   uploaded: boolean;
+  /** когда ушло на сервер — через 30 дней копию на телефоне удаляем, фото остаётся на сервере */
+  uploaded_at?: string;
+  /** сколько раз не приняли и почему — фото пробует снова, но остальное не ждёт */
+  tries?: number;
+  error?: string;
 }
+
+/** Сколько дней держать на телефоне уже отправленные фото (для показа без сети). */
+const KEEP_DAYS = 30;
 
 const objectUrls = new Map<string, string>();
 const signedUrls = new Map<string, { url: string; exp: number }>();
@@ -34,18 +42,56 @@ export async function savePhoto(file: File, folder: string, id: string): Promise
   return path;
 }
 
-export async function uploadPendingPhotos(): Promise<number> {
+/**
+ * Отправить фото, которые ещё на телефоне. Каждое — само по себе: фото, которое сервер не принял,
+ * не останавливает ни остальные фото, ни отправку записей (повтор — при следующей синхронизации).
+ */
+export async function uploadPendingPhotos(): Promise<{ sent: number; failed: number; error: string | null }> {
   const client = getClient();
-  if (!client) return 0;
+  if (!client) return { sent: 0, failed: 0, error: null };
   const all = await idbAll<BlobEntry>('blobs');
-  let n = 0;
+  let sent = 0;
+  let failed = 0;
+  let lastError: string | null = null;
   for (const e of all.filter((x) => !x.uploaded)) {
-    const { error } = await client.storage.from('photos').upload(e.path, e.blob, { upsert: true, contentType: 'image/jpeg' });
-    if (error) throw error;
-    await idbPut('blobs', { ...e, uploaded: true });
-    n++;
+    let message: string | null = null;
+    try {
+      const { error } = await client.storage.from('photos').upload(e.path, e.blob, { upsert: true, contentType: 'image/jpeg' });
+      if (error) message = error.message;
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    if (message) {
+      failed++;
+      lastError = message;
+      await idbPut('blobs', { ...e, tries: (e.tries ?? 0) + 1, error: message });
+      if (!navigator.onLine) break;
+      continue;
+    }
+    await idbPut('blobs', { path: e.path, blob: e.blob, uploaded: true, uploaded_at: new Date().toISOString() } satisfies BlobEntry);
+    sent++;
   }
-  return n;
+  await pruneUploaded(all);
+  return { sent, failed, error: lastError };
+}
+
+/** Убрать с телефона отправленные фото старше KEEP_DAYS дней: они есть на сервере, место на телефоне не бесконечно. */
+async function pruneUploaded(all: BlobEntry[]) {
+  const cutoff = Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000;
+  for (const e of all) {
+    if (!e.uploaded) continue;
+    if (!e.uploaded_at) {
+      // отправлено до того, как стали помнить время, — отсчёт с сегодняшнего дня
+      await idbPut('blobs', { ...e, uploaded_at: new Date().toISOString() });
+    } else if (Date.parse(e.uploaded_at) < cutoff) {
+      await idbDelete('blobs', e.path);
+      const u = objectUrls.get(e.path);
+      if (u) {
+        URL.revokeObjectURL(u);
+        objectUrls.delete(e.path);
+      }
+    }
+  }
 }
 
 async function resolveUrl(path: string): Promise<string | null> {

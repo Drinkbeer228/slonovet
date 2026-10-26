@@ -17,6 +17,8 @@ export interface OutboxEntry {
   patches?: Patch[];
   /** смена создана на этом телефоне и ещё не отправлена — на сервер уйдёт целиком */
   insert?: boolean;
+  /** кто внёс: на общем телефоне неотправленное одного не уходит под входом другого */
+  user?: string;
 }
 
 /** Таблицы, где одну строку правят несколько телефонов, — их шлём патчами. */
@@ -31,6 +33,10 @@ const listeners = new Set<() => void>();
 let version = 0;
 let cloud = false;
 let onLocalChange: (() => void) | null = null;
+/** кто сейчас вошёл (ставит auth.ts) — хозяин новых записей в outbox */
+let owner: string | null = null;
+/** записи outbox, которые сейчас пишутся в IndexedDB, — при перечитывании очереди их не теряем */
+const writing = new Set<string>();
 
 for (const t of TABLES) cache[t] = new Map();
 
@@ -54,6 +60,13 @@ export function setCloudMode(on: boolean) {
 export function setLocalChangeHandler(fn: () => void) {
   onLocalChange = fn;
 }
+
+export function setOwner(id: string | null) {
+  owner = id;
+}
+
+/** Своё неотправленное: записи этого человека и старые записи без хозяина. */
+const mine = (e: OutboxEntry) => !e.user || e.user === owner;
 
 export async function initStore() {
   for (const t of TABLES) {
@@ -104,6 +117,7 @@ export async function put<K extends TableName>(table: K, row: Omit<TableMap[K], 
   if (cloud && table !== 'profiles') {
     const key = `${table}:${full.id}`;
     const entry: OutboxEntry = { key, table, row: full, ts: Date.now() };
+    if (owner) entry.user = owner;
     if (PATCHED.includes(table)) {
       const pending = outbox.get(key);
       if (!prev || pending?.insert) entry.insert = true;
@@ -111,7 +125,12 @@ export async function put<K extends TableName>(table: K, row: Omit<TableMap[K], 
       else if (!pending || pending.patches) entry.patches = mergePatches(pending?.patches ?? [], diff(prev, full));
     }
     outbox.set(entry.key, entry);
-    await idbPut('outbox', entry);
+    writing.add(key);
+    try {
+      await idbPut('outbox', entry);
+    } finally {
+      writing.delete(key);
+    }
     onLocalChange?.();
   }
   return full;
@@ -131,8 +150,12 @@ export async function applyRemote<K extends TableName>(table: K, rows: TableMap[
   const accepted: TableMap[K][] = [];
   for (const r of rows) {
     const pending = outbox.get(`${table}:${r.id}`);
-    if (!pending) accepted.push(r);
-    else if (pending.patches) accepted.push(applyPatches(r, pending.patches));
+    if (!pending) {
+      // курсор берёт последние секунды с перекрытием — то, что уже есть, второй раз не пишем
+      const have = cache[table].get(r.id);
+      if (have && have.updated_at === r.updated_at) continue;
+      accepted.push(r);
+    } else if (pending.patches) accepted.push(applyPatches(r, pending.patches));
   }
   for (const r of accepted) cache[table].set(r.id, r);
   await idbPutMany(table, accepted);
@@ -166,8 +189,44 @@ export async function seedRows<K extends TableName>(table: K, rows: TableMap[K][
   emit([table]);
 }
 
+/** Что отправлять сейчас: своё, по порядку внесения. */
 export function getOutbox(): OutboxEntry[] {
-  return [...outbox.values()].sort((a, b) => a.ts - b.ts);
+  return [...outbox.values()].filter(mine).sort((a, b) => a.ts - b.ts);
+}
+
+/**
+ * Перечитать очередь из IndexedDB перед отправкой. Её делят все вкладки этого браузера: то, что отправила
+ * другая вкладка, отсюда пропадает, и старая правка не уйдёт второй раз поверх новой.
+ */
+export async function reloadOutbox() {
+  const stored = new Map((await idbAll<OutboxEntry>('outbox')).map((e) => [e.key, e]));
+  for (const [key, e] of outbox) {
+    const s = stored.get(key);
+    // пишется прямо сейчас или здесь новее — оставляем своё
+    if ((!s && writing.has(key)) || (s && s.ts < e.ts)) stored.set(key, e);
+  }
+  outbox.clear();
+  for (const [key, e] of stored) outbox.set(key, e);
+}
+
+/**
+ * Сервер окончательно отказал (нет прав, неверные данные): убираем правку из очереди и возвращаем строку,
+ * как она есть на сервере (serverRow), или убираем её совсем, если на сервере её нет.
+ */
+export async function rejectOutbox(entry: OutboxEntry, serverRow: AnyRow | null) {
+  const cur = outbox.get(entry.key);
+  // за время отправки строку успели поправить ещё раз — новая правка попробует сама
+  if (cur && cur.ts !== entry.ts) return;
+  outbox.delete(entry.key);
+  await idbDelete('outbox', entry.key);
+  if (serverRow) {
+    cache[entry.table].set(serverRow.id, serverRow);
+    await idbPut(entry.table, serverRow);
+  } else {
+    cache[entry.table].delete(entry.row.id);
+    await idbDelete(entry.table, entry.row.id);
+  }
+  emit([entry.table]);
 }
 
 export async function dropOutbox(key: string, ts: number) {
@@ -180,7 +239,7 @@ export async function dropOutbox(key: string, ts: number) {
 }
 
 export function pendingCount() {
-  return outbox.size;
+  return [...outbox.values()].filter(mine).length;
 }
 
 export async function wipeAll() {
