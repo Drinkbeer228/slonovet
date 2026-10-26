@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // дата сборки — видна в меню, чтобы понять, свежая ли версия на телефоне
+  define: { __BUILD__: JSON.stringify(new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) },
   // сайт в корне домена slonovet.ru; BASE_PATH — если когда-нибудь снова понадобится подпапка
   base: process.env.BASE_PATH ?? '/',
   plugins: [

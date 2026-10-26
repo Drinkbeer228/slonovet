@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
-import { idbAll, idbClear, idbDelete, idbPut, idbPutMany, EXTRA_STORES } from './idb';
+import { idbAll, idbClear, idbDelete, idbGet, idbPut, idbPutMany, EXTRA_STORES } from './idb';
 import { applyPatches, diff, mergePatches, type Patch } from './patch';
 
 /**
@@ -200,7 +200,24 @@ export async function wipeAll() {
  */
 export async function purgeDemo(): Promise<boolean> {
   if (![...cache.profiles.keys()].some((id) => id.startsWith('demo-'))) return false;
-  const keep = [...outbox.values()].filter((e) => !JSON.stringify(e.row).includes('"demo-'));
+  await resetLocal((e) => !JSON.stringify(e.row).includes('"demo-'));
+  return true;
+}
+
+/**
+ * Данные на телефоне — от этого ли сервера? После переезда на свой сервер старые телефоны
+ * помнили, докуда уже скачали, и не забирали перенесённое (у тебя в «Персонале» — одна Ольга).
+ * Сменился сервер или SYNC_EPOCH — забираем всё заново; неотправленное остаётся и уйдёт.
+ */
+export async function checkServer(tag: string) {
+  const cur = await idbGet<{ key: string; value: string }>('meta', 'server');
+  if (cur?.value === tag) return;
+  await resetLocal(() => true);
+  await idbPut('meta', { key: 'server', value: tag });
+}
+
+async function resetLocal(keepEntry: (e: OutboxEntry) => boolean) {
+  const keep = [...outbox.values()].filter(keepEntry);
   for (const t of TABLES) {
     cache[t] = new Map();
     await idbClear(t);
@@ -215,7 +232,6 @@ export async function purgeDemo(): Promise<boolean> {
     await idbPut('outbox', e);
   }
   emit([...TABLES]);
-  return true;
 }
 
 export function newId() {

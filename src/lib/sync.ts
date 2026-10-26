@@ -1,11 +1,15 @@
 import { useSyncExternalStore } from 'react';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
 import { idbGet, idbPut } from './idb';
-import { acceptServerRow, applyRemote, dropOutbox, forgetMissing, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
+import { acceptServerRow, applyRemote, checkServer, dropOutbox, forgetMissing, getOutbox, pendingCount, setLocalChangeHandler, subscribe as subscribeStore } from './store';
 import { diff } from './patch';
 import { flushEvents } from './log';
 import { getClient } from './supabase';
+import { getServerConfig } from './config';
 import { uploadPendingPhotos } from './photos';
+
+/** Поднять — и все телефоны заберут данные с сервера заново (например, после переноса базы). */
+const SYNC_EPOCH = 1;
 
 export interface SyncStatus {
   state: 'demo' | 'idle' | 'syncing' | 'offline' | 'error';
@@ -102,6 +106,7 @@ export async function syncNow(): Promise<void> {
   running = true;
   setStatus({ state: 'syncing' });
   try {
+    await checkServer(`${getServerConfig()?.url}#${SYNC_EPOCH}`);
     await uploadPendingPhotos();
     await flushEvents();
 

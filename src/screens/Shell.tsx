@@ -230,8 +230,6 @@ export function MenuSheet({
           </Card>
         )}
 
-        <ThemeCard />
-
         {session.user.role === 'admin' && (
           // админу: посмотреть приложение глазами другой роли, не выходя из своего входа
           <Card className="flex flex-col gap-2 p-4">
@@ -254,6 +252,8 @@ export function MenuSheet({
             <span className="text-[12px] font-semibold text-muted">Настоящие данные, только просмотр — изменения не сохраняются.</span>
           </Card>
         )}
+
+        <ThemeCard />
 
         {extra.length > 0 && (
           <Card className="divide-y divide-surface2 overflow-hidden">
@@ -297,6 +297,7 @@ export function MenuSheet({
         >
           Выйти
         </Button>
+        <span className="text-center text-[12px] font-semibold text-muted">Версия от {__BUILD__}</span>
       </div>
     </Sheet>
   );
