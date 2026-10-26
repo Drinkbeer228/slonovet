@@ -7,11 +7,10 @@ import { Button, Card, Segmented, Sheet } from '../ui/kit';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 
-export type Tab = 'shift' | 'overview' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
+export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
 
 export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   shift: { label: 'Дежурство', icon: 'shift' },
-  overview: { label: 'Обзор', icon: 'pulse' },
   requests: { label: 'Заявки', icon: 'message' },
   diet: { label: 'Рацион', icon: 'bowl' },
   stock: { label: 'Фураж', icon: 'box' },
@@ -25,14 +24,14 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
 export const TABS_BY_ROLE: Record<Role, Tab[]> = {
   keeper: ['shift', 'diet', 'stock', 'journal'],
   // дежурство видят все: не кипер — только смотрит
-  vet: ['overview', 'shift', 'requests', 'diet', 'journal'],
-  director: ['overview', 'shift', 'requests', 'stock', 'journal'],
-  manager: ['stock', 'shift', 'overview', 'journal'],
-  admin: ['shift', 'overview', 'requests', 'stock', 'journal'],
+  vet: ['journal', 'shift', 'requests', 'diet'],
+  director: ['journal', 'shift', 'requests', 'stock'],
+  manager: ['stock', 'shift', 'journal'],
+  admin: ['shift', 'journal', 'requests', 'stock'],
 };
 
 /** Порядок разделов в меню */
-const ALL_TABS: Tab[] = ['shift', 'overview', 'requests', 'diet', 'stock', 'journal', 'users', 'move', 'rating', 'guide'];
+const ALL_TABS: Tab[] = ['shift', 'journal', 'requests', 'diet', 'stock', 'users', 'move', 'rating', 'guide'];
 
 /** Все видят всё: чего нет на нижней панели — открывается из меню (на чужом разделе — только просмотр). */
 export const MENU_TABS = Object.fromEntries(

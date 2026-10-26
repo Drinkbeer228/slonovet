@@ -8,7 +8,6 @@ import { ShiftScreen } from './screens/keeper/ShiftScreen';
 import { DietScreen } from './screens/DietScreen';
 import { StockScreen } from './screens/StockScreen';
 import { JournalScreen } from './screens/JournalScreen';
-import { OverviewScreen } from './screens/vet/OverviewScreen';
 import { RequestsScreen } from './screens/vet/RequestsScreen';
 import { UsersScreen } from './screens/admin/UsersScreen';
 import { GuideScreen } from './screens/GuideScreen';
@@ -84,13 +83,12 @@ function Main() {
       <TopBar user={user} tabs={tabs} tab={current} onTab={setTab} onMenu={() => setMenu(true)} />
       <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:pb-16">
         <OfflineBanner />
-        <div className={current === 'shift' || current === 'overview' ? '' : 'mx-auto max-w-2xl'}>
+        <div className={current === 'shift' ? '' : 'mx-auto max-w-2xl'}>
           {current === 'shift' && <ShiftScreen user={user} />}
-          {current === 'overview' && <OverviewScreen onRequests={() => setTab('requests')} />}
           {current === 'requests' && <RequestsScreen user={user} />}
           {current === 'diet' && <DietScreen user={user} onGuide={() => setTab('guide')} />}
           {current === 'stock' && <StockScreen user={user} />}
-          {current === 'journal' && <JournalScreen />}
+          {current === 'journal' && <JournalScreen user={user} onRequests={() => setTab('requests')} />}
           {current === 'users' && <UsersScreen session={session} />}
           {current === 'guide' && <GuideScreen />}
           {current === 'rating' && <RatingScreen user={user} />}

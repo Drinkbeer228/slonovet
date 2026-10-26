@@ -56,16 +56,9 @@ function computeAlerts(byDate: Map<string, Shift>, dates: string[]): Alert[] {
   return out.sort((a, b) => b.level - a.level);
 }
 
-export function OverviewScreen({ onRequests }: { onRequests: () => void }) {
-  const shiftsAll = useRows('shifts');
-  const notes = useRows('notes');
-  const requests = useRows('requests');
-  const [el, setEl] = useState<ElephantName>('Марго');
-  const [detail, setDetail] = useState<Shift | null>(null);
-  const [creating, setCreating] = useState<ElephantName | 'all' | null>(null);
-  const user = getSession()!.user;
-
-  const shifts = sortShifts(shiftsAll);
+/** Последние 14 дней: дежурство на каждую дату и тревоги по слонихам. */
+function useRecent() {
+  const shifts = sortShifts(useRows('shifts'));
   const latest = shifts[0];
   const end = latest && latest.date > isoDate() ? latest.date : isoDate();
   const dates = useMemo(() => Array.from({ length: DAYS }, (_, i) => addDays(end, i - DAYS + 1)), [end]);
@@ -75,8 +68,47 @@ export function OverviewScreen({ onRequests }: { onRequests: () => void }) {
     for (const s of [...shifts].reverse()) m.set(s.date, s);
     return m;
   }, [shifts]);
-
   const alerts = useMemo(() => computeAlerts(byDate, dates), [byDate, dates]);
+  return { latest, dates, byDate, alerts };
+}
+
+/** Тревоги сверху журнала: что плохо или повторяется несколько дежурств подряд. Тап — к этой слонихе. */
+export function AlertsCard({ onPick }: { onPick: (el: ElephantName) => void }) {
+  const { alerts } = useRecent();
+  if (!alerts.length) return null;
+  return (
+    <Card className="flex flex-col gap-1.5 p-4 ring-1 ring-amber/40">
+      <span className="text-[12px] font-extrabold tracking-wide text-amber">ТРЕБУЕТ ВНИМАНИЯ</span>
+      {alerts.map((a, i) => (
+        <button key={i} type="button" onClick={() => onPick(a.el)} className="flex items-start gap-2 text-left text-[15px] font-bold leading-snug">
+          <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${LEVEL_DOT[a.level]}`} />
+          <span>
+            {a.el}: {a.text}
+          </span>
+        </button>
+      ))}
+    </Card>
+  );
+}
+
+/** Строка под заголовком журнала: кто дежурил последним. */
+export function LatestShiftLine() {
+  const { latest } = useRecent();
+  return (
+    <span className="px-1 text-[13px] font-semibold text-muted">
+      {latest ? `последнее дежурство — ${relDate(latest.date)}, ${latest.keeper_name}${latest.status === 'open' ? ' (идёт)' : ''}` : 'дежурств пока нет'}
+    </span>
+  );
+}
+
+/** Журнал «По слонихам»: как каждая слониха жила последние 14 дней, записи киперов и заявки. */
+export function ElephantsView({ el, setEl, onRequests }: { el: ElephantName; setEl: (el: ElephantName) => void; onRequests: () => void }) {
+  const notes = useRows('notes');
+  const requests = useRows('requests');
+  const [detail, setDetail] = useState<Shift | null>(null);
+  const [creating, setCreating] = useState<ElephantName | 'all' | null>(null);
+  const user = getSession()!.user;
+  const { dates, byDate, alerts } = useRecent();
   const alertEls = Object.fromEntries(ELEPHANTS.map((e) => [e, alerts.some((a) => a.el === e)])) as Record<ElephantName, boolean>;
 
   const rows: Row[] = [
@@ -100,28 +132,7 @@ export function OverviewScreen({ onRequests }: { onRequests: () => void }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-0.5 px-1">
-        <span className="text-[13px] font-semibold text-muted">
-          {latest ? `последнее дежурство — ${relDate(latest.date)}, ${latest.keeper_name}${latest.status === 'open' ? ' (идёт)' : ''}` : 'дежурств пока нет'}
-        </span>
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Слонихи</h1>
-      </header>
-
-      {alerts.length > 0 && (
-        <Card className="flex flex-col gap-1.5 p-4 ring-1 ring-amber/40">
-          <span className="text-[12px] font-extrabold tracking-wide text-amber">ТРЕБУЕТ ВНИМАНИЯ</span>
-          {alerts.map((a, i) => (
-            <button key={i} type="button" onClick={() => setEl(a.el)} className="flex items-start gap-2 text-left text-[15px] font-bold leading-snug">
-              <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${LEVEL_DOT[a.level]}`} />
-              <span>
-                {a.el}: {a.text}
-              </span>
-            </button>
-          ))}
-        </Card>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start">
+      <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
           <Segmented label="Слониха" value={el} onChange={setEl} dots={alertEls} options={ELEPHANTS.map((e) => ({ value: e, label: e }))} />
           <Card className="flex flex-col gap-1.5 px-3 py-3.5">

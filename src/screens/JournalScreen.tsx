@@ -1,10 +1,11 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { BRANCH_AMOUNT, ELEPHANTS, METRICS } from '../domain/elephants';
 import { FEED_TIMES, acceptedBy, shiftFlags, sortShifts } from '../domain/shift';
-import type { Shift } from '../domain/types';
+import type { CurrentUser, ElephantName, Shift } from '../domain/types';
 import { useRows } from '../lib/store';
 import { addDays, isoDate, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
-import { Card, Empty, IconButton, Section, Sheet } from '../ui/kit';
+import { Card, Empty, IconButton, Section, Segmented, Sheet } from '../ui/kit';
+import { AlertsCard, ElephantsView, LatestShiftLine } from './vet/ElephantsView';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
 import { StateMatrix } from './keeper/StateMatrix';
@@ -30,8 +31,58 @@ function worst(shifts: Shift[]): number {
   return Math.max(0, ...shifts.map((s) => Math.max(0, ...shiftFlags(s).map((f) => f.level))));
 }
 
-/** Журнал: календарь как активность на GitHub, под ним смена выбранного дня — таблицей, как на бумаге. */
-export function JournalScreen() {
+type JournalView = 'days' | 'elephants';
+const VIEW_KEY = 'slonovet_journal_view';
+
+/** Журнал: тревоги сверху и две вкладки — «По дням» (как бумажный журнал) и «По слонихам» (14 дней каждой). */
+export function JournalScreen({ user, onRequests }: { user: CurrentUser; onRequests: () => void }) {
+  const [view, setViewState] = useState<JournalView>(() => {
+    try {
+      const v = localStorage.getItem(VIEW_KEY);
+      if (v === 'days' || v === 'elephants') return v;
+    } catch {
+      /* без хранилища — по роли */
+    }
+    return user.role === 'vet' ? 'elephants' : 'days';
+  });
+  const [el, setEl] = useState<ElephantName>('Марго');
+  const setView = (v: JournalView) => {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* не запомнится — не беда */
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-col gap-0.5">
+        <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Журнал</h1>
+        <LatestShiftLine />
+      </header>
+      <AlertsCard
+        onPick={(e) => {
+          setEl(e);
+          setView('elephants');
+        }}
+      />
+      <Segmented
+        label="Вид журнала"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'days', label: 'По дням' },
+          { value: 'elephants', label: 'По слонихам' },
+        ]}
+      />
+      {view === 'days' ? <DaysView /> : <ElephantsView el={el} setEl={setEl} onRequests={onRequests} />}
+    </div>
+  );
+}
+
+/** «По дням»: календарь как активность на GitHub, под ним смена выбранного дня — таблицей, как на бумаге. */
+function DaysView() {
   const all = useRows('shifts');
   const shifts = sortShifts(all);
   const [open, setOpen] = useState<Shift | null>(null);
@@ -64,7 +115,6 @@ export function JournalScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Журнал</h1>
       <Card className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between px-1">
           <button type="button" disabled={!hasOlder} onClick={() => setPage(page + 1)} className="-my-1.5 h-11 pr-3 text-[14px] font-bold text-teal disabled:text-faint">
