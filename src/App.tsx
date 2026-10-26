@@ -11,7 +11,6 @@ import { JournalScreen } from './screens/JournalScreen';
 import { RequestsScreen } from './screens/vet/RequestsScreen';
 import { UsersScreen } from './screens/admin/UsersScreen';
 import { GuideScreen } from './screens/GuideScreen';
-import { RatingScreen } from './screens/RatingScreen';
 import { logEvent } from './lib/log';
 import { MoveScreen } from './screens/MoveScreen';
 
@@ -91,7 +90,6 @@ function Main() {
           {current === 'journal' && <JournalScreen />}
           {current === 'users' && <UsersScreen session={session} />}
           {current === 'guide' && <GuideScreen />}
-          {current === 'rating' && <RatingScreen user={user} />}
           {current === 'move' && <MoveScreen user={user} />}
         </div>
       </main>
