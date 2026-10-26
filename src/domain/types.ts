@@ -117,8 +117,11 @@ export interface Note extends Base {
   created_at: string;
 }
 
+export type StockCategory = 'feed' | 'porridge' | 'grain' | 'veg' | 'supplements' | 'household' | 'other';
+
 export interface StockItem extends Base {
   name: string;
+  category: StockCategory;
   kind: 'count' | 'kg' | 'sack';
   unit: string;
   sack_kg: number | null;

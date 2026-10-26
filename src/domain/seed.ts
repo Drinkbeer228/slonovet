@@ -5,17 +5,17 @@ import type { Diet, StockItem } from './types';
 const t = '2026-01-01T00:00:00.000Z';
 
 export const SEED_STOCK_ITEMS: StockItem[] = [
-  { id: 'hay', name: 'Сено', kind: 'count', unit: 'тюк', sack_kg: null, kg_per_garets: null, low_days: 3, sort: 1, updated_at: t },
-  { id: 'veg', name: 'Овощи', kind: 'kg', unit: 'кг', sack_kg: null, kg_per_garets: 75, low_days: 3, sort: 2, updated_at: t },
-  { id: 'formamax', name: 'ФормаМакс', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: null, low_days: 3, sort: 3, updated_at: t },
-  { id: 'optiform', name: 'ОптиФорм Микс (Юниор)', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: null, low_days: 3, sort: 4, updated_at: t },
-  { id: 'monograss', name: 'Mono Grass', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: null, low_days: 3, sort: 5, updated_at: t },
-  { id: 'hercules', name: 'Геркулес', kind: 'sack', unit: 'кг', sack_kg: 30, kg_per_garets: 1.5, low_days: 3, sort: 6, updated_at: t },
-  { id: 'bran', name: 'Отруби', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: 1.1, low_days: 3, sort: 7, updated_at: t },
-  { id: 'oats', name: 'Овёс', kind: 'sack', unit: 'кг', sack_kg: 40, kg_per_garets: 2, low_days: 3, sort: 8, updated_at: t },
-  { id: 'corn', name: 'Кукуруза', kind: 'sack', unit: 'кг', sack_kg: 45, kg_per_garets: 3.2, low_days: 3, sort: 9, updated_at: t },
-  { id: 'seeds', name: 'Семечки', kind: 'sack', unit: 'кг', sack_kg: 25, kg_per_garets: 1.9, low_days: 3, sort: 10, updated_at: t },
-  { id: 'bags', name: 'Мешки для мусора 240 л', kind: 'count', unit: 'шт', sack_kg: null, kg_per_garets: null, low_days: 3, sort: 11, updated_at: t },
+  { id: 'hay', category: 'feed', name: 'Сено', kind: 'count', unit: 'тюк', sack_kg: null, kg_per_garets: null, low_days: 3, sort: 1, updated_at: t },
+  { id: 'veg', category: 'veg', name: 'Овощи', kind: 'kg', unit: 'кг', sack_kg: null, kg_per_garets: 75, low_days: 3, sort: 2, updated_at: t },
+  { id: 'formamax', category: 'porridge', name: 'ФормаМакс', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: null, low_days: 3, sort: 3, updated_at: t },
+  { id: 'optiform', category: 'porridge', name: 'ОптиФорм Микс (Юниор)', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: null, low_days: 3, sort: 4, updated_at: t },
+  { id: 'monograss', category: 'porridge', name: 'Mono Grass', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: null, low_days: 3, sort: 5, updated_at: t },
+  { id: 'hercules', category: 'grain', name: 'Геркулес', kind: 'sack', unit: 'кг', sack_kg: 30, kg_per_garets: 1.5, low_days: 3, sort: 6, updated_at: t },
+  { id: 'bran', category: 'grain', name: 'Отруби', kind: 'sack', unit: 'кг', sack_kg: 20, kg_per_garets: 1.1, low_days: 3, sort: 7, updated_at: t },
+  { id: 'oats', category: 'grain', name: 'Овёс', kind: 'sack', unit: 'кг', sack_kg: 40, kg_per_garets: 2, low_days: 3, sort: 8, updated_at: t },
+  { id: 'corn', category: 'grain', name: 'Кукуруза', kind: 'sack', unit: 'кг', sack_kg: 45, kg_per_garets: 3.2, low_days: 3, sort: 9, updated_at: t },
+  { id: 'seeds', category: 'grain', name: 'Семечки', kind: 'sack', unit: 'кг', sack_kg: 25, kg_per_garets: 1.9, low_days: 3, sort: 10, updated_at: t },
+  { id: 'bags', category: 'household', name: 'Мешки для мусора 240 л', kind: 'count', unit: 'шт', sack_kg: null, kg_per_garets: null, low_days: 3, sort: 11, updated_at: t },
 ];
 
 const porridge = (item: string, name: string, qty: number) => [

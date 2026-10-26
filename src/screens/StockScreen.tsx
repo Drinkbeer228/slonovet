@@ -3,19 +3,12 @@ import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { PACK_SIZE, balances, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
-import type { CurrentUser, StockItem } from '../domain/types';
-import { put, useRows } from '../lib/store';
+import { PACK_SIZE, STOCK_CATEGORIES, balances, categoryOf, deleteBlocker, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
+import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
+import { newId, put, useRows } from '../lib/store';
 import { plural, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Field, ReadOnlyNote, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, Field, ReadOnlyNote, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
-
-const GROUPS: { title: string; ids: string[] }[] = [
-  { title: 'Корма', ids: ['hay', 'veg'] },
-  { title: 'Каши', ids: ['formamax', 'optiform', 'monograss'] },
-  { title: 'Зерно', ids: ['hercules', 'bran', 'oats', 'corn', 'seeds'] },
-  { title: 'Хозяйство', ids: ['bags'] },
-];
 
 const FRACTIONS = [
   { v: 0, label: 'пусто' },
@@ -35,7 +28,7 @@ function fracLabel(f: number) {
 
 function amountText(v: StockView) {
   const { item, balance } = v;
-  if (item.kind === 'count') return `${fmtNum(balance, 0)} ${plural(Math.round(balance), ...countWords(item.id))}`;
+  if (item.kind === 'count') return `${fmtNum(balance, 0)} ${plural(Math.round(balance), ...countWords(item.id, item.unit))}`;
   if (item.kind === 'sack' && item.sack_kg) {
     if (balance <= 0) return 'пусто';
     const parts = [];
@@ -110,8 +103,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
     .slice(0, 15);
   const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
   const canWrite = canEdit('stock', user.role);
-  // вес мешка, мерки, таз овощей — настраивают администратор и админ
-  const canSetup = user.role === 'manager' || user.role === 'admin';
+  const [adding, setAdding] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -140,35 +132,49 @@ export function StockScreen({ user }: { user: CurrentUser }) {
 
       <PurchasesBlock user={user} />
 
-      {GROUPS.map((g) => (
-        <Section key={g.title} title={g.title}>
-          <Card className="divide-y divide-surface2 overflow-hidden">
-            {g.ids.map((id) => {
-              const v = views.get(id);
-              if (!v) return null;
-              return (
-                <button key={id} type="button" disabled={!canWrite} onClick={() => setEdit(v)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="text-[15px] font-bold">{v.item.name}</span>
-                    <span className={`text-[13px] font-semibold ${v.low ? 'text-amber' : 'text-muted'}`}>
-                      {amountText(v)}
-                      {daysText(v, noQty.has(id)) && ` · ${daysText(v, noQty.has(id))}`}
+      {STOCK_CATEGORIES.map((g) => {
+        const ids = items
+          .filter((i) => categoryOf(i) === g.id)
+          .sort((a, b) => a.sort - b.sort)
+          .map((i) => i.id);
+        if (!ids.length) return null;
+        return (
+          <Section key={g.id} title={g.title}>
+            <Card className="divide-y divide-surface2 overflow-hidden">
+              {ids.map((id) => {
+                const v = views.get(id);
+                if (!v) return null;
+                return (
+                  <button key={id} type="button" disabled={!canWrite} onClick={() => setEdit(v)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="text-[15px] font-bold">{v.item.name}</span>
+                      <span className={`text-[13px] font-semibold ${v.low ? 'text-amber' : 'text-muted'}`}>
+                        {amountText(v)}
+                        {daysText(v, noQty.has(id)) && ` · ${daysText(v, noQty.has(id))}`}
+                      </span>
                     </span>
-                  </span>
-                  {v.item.kind === 'sack' ? (
-                    <Sacks v={v} />
-                  ) : (
-                    <span className={`text-[20px] font-extrabold ${v.low ? 'text-amber' : ''}`}>{fmtNum(v.balance, v.item.kind === 'count' ? 0 : 1)}</span>
-                  )}
-                </button>
-              );
-            })}
-          </Card>
-        </Section>
-      ))}
+                    {v.item.kind === 'sack' ? (
+                      <Sacks v={v} />
+                    ) : (
+                      <span className={`text-[20px] font-extrabold ${v.low ? 'text-amber' : ''}`}>{fmtNum(v.balance, v.item.kind === 'count' ? 0 : 1)}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </Card>
+          </Section>
+        );
+      })}
+
+      {canWrite && (
+        <Button icon="plus" full onClick={() => setAdding(true)}>
+          Добавить позицию
+        </Button>
+      )}
 
       <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
-        Каши и зерно списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по наполнению тазов в 19:00, мешки — по счётчику «Мешков взяли».{canWrite && ' Нажми на позицию, чтобы поправить остаток.'}
+        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по наполнению тазов в 19:00, мешки — по счётчику «Мешков взяли». Остальное считается вручную: «Привезли» и поправка остатка.
+        {canWrite && ' Нажми на позицию, чтобы поправить остаток, переименовать или удалить.'}
       </p>
 
       {history.length > 0 && (
@@ -176,7 +182,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
           <Card className="divide-y divide-surface2 overflow-hidden">
             {history.map((m) => {
               const it = items.find((i) => i.id === m.item_id);
-              const unit = it?.kind === 'count' ? countWords(it.id)[2] : 'кг';
+              const unit = it?.kind === 'count' ? countWords(it.id, it.unit)[2] : 'кг';
               return (
                 <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
                   <span className="flex min-w-0 flex-1 flex-col">
@@ -197,14 +203,17 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       )}
 
       <AdjustSheet view={edit} user={user} shiftId={shiftId} onClose={() => setEdit(null)} />
+      <AddItemSheet open={adding} items={items} user={user} shiftId={shiftId} onClose={() => setAdding(false)} />
       <IncomingSheet open={incoming} items={items} user={user} shiftId={shiftId} onClose={() => setIncoming(false)} />
     </div>
   );
 }
 
 function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null; user: CurrentUser; shiftId: string | null; onClose: () => void }) {
-  const canSetup = user.role === 'manager' || user.role === 'admin';
+  const diets = useRows('diets');
   const it = view?.item;
+  const [name, setName] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [full, setFull] = useState(0);
   const [frac, setFrac] = useState(0);
   const [value, setValue] = useState('');
@@ -218,6 +227,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
     setFrac(FRACTIONS.reduce((a, b) => (Math.abs(b.v - view.openFrac) < Math.abs(a.v - view.openFrac) ? b : a)).v);
     setValue(String(Math.round(view.balance * 10) / 10));
     setSackKg(String(it.sack_kg ?? ''));
+    setName(it.name);
     setPerGarets(String(it.kg_per_garets ?? ''));
   }
   const close = () => {
@@ -241,18 +251,19 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
           onClick={async () => {
             const delta = Math.round((target - view.balance) * 1000) / 1000;
             await addStockMove(it.id, delta, 'fix', user, shiftId);
-            if (canSetup && it.id === 'veg') {
+            if (name.trim() && name.trim() !== it.name) await put('stock_items', { ...it, name: name.trim() });
+            if (it.id === 'veg') {
               const g = Number(perGarets.replace(',', '.'));
               if (perGarets && g !== it.kg_per_garets) await put('stock_items', { ...it, kg_per_garets: g || null } as StockItem);
             }
-            if (canSetup && it.kind === 'sack') {
+            if (it.kind === 'sack') {
               const s = Number(sackKg.replace(',', '.'));
               const g = Number(perGarets.replace(',', '.'));
               if ((s && s !== it.sack_kg) || (perGarets && g !== it.kg_per_garets)) {
                 await put('stock_items', { ...it, sack_kg: s || it.sack_kg, kg_per_garets: perGarets ? g : it.kg_per_garets } as StockItem);
               }
             }
-            toast('Остаток обновлён');
+            toast('Сохранено');
             close();
           }}
         >
@@ -293,28 +304,53 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             </span>
           </>
         ) : (
-          <Field label={it.kind === 'count' ? `Сейчас ${countWords(it.id)[2]}` : 'Сейчас, кг'}>
+          <Field label={it.kind === 'count' ? `Сейчас ${countWords(it.id, it.unit)[2]}` : 'Сейчас, кг'}>
             <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
           </Field>
         )}
-        {canSetup && it.id === 'veg' && (
+        {it.id === 'veg' && (
           <div className="border-t border-line pt-4">
             <Field label="Порция овощей на слониху, кг" hint="Обычно 70–80 кг: база 60 (картофель, морковь, свёкла по 20) + сезонное 10–15. Кипер отмечает, всю ли порцию дал.">
               <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
             </Field>
           </div>
         )}
-        {canSetup && it.kind === 'sack' && (
+        {it.kind === 'sack' && (
           <div className="grid grid-cols-2 gap-3 border-t border-line pt-4">
             <Field label="Вес мешка, кг">
               <input className={inputCls} type="text" inputMode="decimal" value={sackKg} onChange={(e) => setSackKg(e.target.value)} />
             </Field>
-            <Field label="1 гарец ≈ кг">
+            <Field label="В совке, кг" hint="полный мерный совок">
               <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
             </Field>
           </div>
         )}
+        <div className="flex flex-col gap-3 border-t border-line pt-4">
+          <Field label="Название">
+            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          {deleteBlocker(it, diets) ? (
+            <p className="m-0 px-1 text-[13px] font-semibold text-muted">{deleteBlocker(it, diets)}</p>
+          ) : (
+            <Button icon="trash" onClick={() => setConfirmDelete(true)}>
+              Удалить позицию
+            </Button>
+          )}
+        </div>
       </div>
+      <Confirm
+        open={confirmDelete}
+        title={`Удалить «${it.name}»?`}
+        text="Позиция пропадёт из фуража у всех. История приходов останется."
+        okLabel="Удалить"
+        danger
+        onOk={async () => {
+          await put('stock_items', { ...it, deleted: true });
+          toast(`${it.name} удалена`);
+          close();
+        }}
+        onClose={() => setConfirmDelete(false)}
+      />
     </Sheet>
   );
 }
@@ -345,7 +381,7 @@ function IncomingSheet({
     : pack
       ? `${plural(qty, 'упаковка', 'упаковки', 'упаковок')} (${amount} шт.)`
       : it.kind === 'count'
-        ? plural(qty, ...countWords(it.id))
+        ? plural(qty, ...countWords(it.id, it.unit))
         : plural(qty, 'мешок', 'мешка', 'мешков');
 
   return (
@@ -403,6 +439,139 @@ function IncomingSheet({
           <Icon name="user" size={16} />
           Запишется от имени: {user.full_name}
         </span>
+      </div>
+    </Sheet>
+  );
+}
+
+const KINDS: { id: StockItem['kind']; label: string; hint: string }[] = [
+  { id: 'count', label: 'Штуки', hint: 'тюки, упаковки, банки' },
+  { id: 'kg', label: 'Килограммы', hint: 'на развес' },
+  { id: 'sack', label: 'Мешки', hint: 'с весом мешка' },
+];
+const UNITS = ['шт.', 'упак.', 'тюк', 'банка', 'ведро', 'пучок'];
+
+/** Новая позиция фуража: группа, название, как считаем, сколько есть. */
+function AddItemSheet({
+  open,
+  items,
+  user,
+  shiftId,
+  onClose,
+}: {
+  open: boolean;
+  items: StockItem[];
+  user: CurrentUser;
+  shiftId: string | null;
+  onClose: () => void;
+}) {
+  const [category, setCategory] = useState<StockCategory>('feed');
+  const [name, setName] = useState('');
+  const [kind, setKind] = useState<StockItem['kind']>('count');
+  const [unit, setUnit] = useState('шт.');
+  const [sackKg, setSackKg] = useState('');
+  const [qty, setQty] = useState('');
+  const [openedAt, setOpenedAt] = useState(false);
+
+  if (open && !openedAt) {
+    setOpenedAt(true);
+    setCategory('feed');
+    setName('');
+    setKind('count');
+    setUnit('шт.');
+    setSackKg('');
+    setQty('');
+  }
+  if (!open && openedAt) setOpenedAt(false);
+
+  const num = (v: string) => Number(v.replace(',', '.')) || 0;
+  const taken = items.some((i) => i.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const ready = name.trim() && !taken && (kind !== 'sack' || num(sackKg) > 0);
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Новая позиция"
+      footer={
+        <Button
+          kind="primary"
+          big
+          full
+          disabled={!ready}
+          onClick={async () => {
+            const id = newId();
+            const item: Omit<StockItem, 'updated_at'> = {
+              id,
+              name: name.trim(),
+              category,
+              kind,
+              unit: kind === 'count' ? unit : 'кг',
+              sack_kg: kind === 'sack' ? num(sackKg) : null,
+              kg_per_garets: null,
+              low_days: 3,
+              sort: Math.max(0, ...items.map((i) => i.sort)) + 1,
+            };
+            await put('stock_items', item);
+            // сколько есть сейчас — первой поправкой, чтобы остаток сразу был виден
+            const have = kind === 'sack' ? num(qty) * num(sackKg) : num(qty);
+            if (have > 0) await addStockMove(id, have, 'fix', user, shiftId);
+            toast(`Добавлено: ${item.name}`);
+            onClose();
+          }}
+        >
+          Добавить
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-2">
+          <span className="px-1 text-[14px] font-bold text-muted">Группа</span>
+          <div className="flex flex-wrap gap-2">
+            {STOCK_CATEGORIES.filter((c) => c.id !== 'other').map((c) => (
+              <Chip key={c.id} on={category === c.id} onClick={() => setCategory(c.id)}>
+                {c.title}
+              </Chip>
+            ))}
+          </div>
+        </div>
+        <Field label="Название" hint={taken ? 'такая позиция уже есть' : undefined}>
+          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Например: Яблоки" />
+        </Field>
+        <div className="flex flex-col gap-2">
+          <span className="px-1 text-[14px] font-bold text-muted">Как считаем</span>
+          <div className="grid grid-cols-3 gap-2">
+            {KINDS.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                aria-pressed={kind === k.id}
+                onClick={() => setKind(k.id)}
+                className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 text-center ${kind === k.id ? 'border-ink text-ink' : 'border-line text-muted'}`}
+              >
+                <span className="text-[14px] font-bold">{k.label}</span>
+                <span className="text-[11px] font-semibold">{k.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {kind === 'count' && (
+          <div className="flex flex-wrap gap-2">
+            {UNITS.map((u) => (
+              <Chip key={u} on={unit === u} onClick={() => setUnit(u)}>
+                {u}
+              </Chip>
+            ))}
+          </div>
+        )}
+        {kind === 'sack' && (
+          <Field label="Вес одного мешка, кг">
+            <input className={inputCls} inputMode="decimal" value={sackKg} onChange={(e) => setSackKg(e.target.value)} placeholder="Например: 25" />
+          </Field>
+        )}
+        <Field label={kind === 'sack' ? 'Сколько полных мешков есть' : kind === 'kg' ? 'Сколько кг есть' : `Сколько есть, ${unit}`} hint="можно не писать">
+          <input className={inputCls} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
+        </Field>
       </div>
     </Sheet>
   );

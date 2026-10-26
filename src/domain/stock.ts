@@ -1,4 +1,4 @@
-import type { Diet, MealItem, StockItem, StockMove } from './types';
+import type { Diet, MealItem, StockCategory, StockItem, StockMove } from './types';
 import { addDays, isoDate } from '../lib/dates';
 
 /** Перевод позиции рецепта в единицы склада (кг или штуки). null — если перевести нельзя. */
@@ -84,8 +84,49 @@ const COUNT_WORDS: Record<string, [string, string, string]> = {
   hay: ['тюк', 'тюка', 'тюков'],
   bags: ['мешок', 'мешка', 'мешков'],
 };
-export function countWords(itemId: string): [string, string, string] {
-  return COUNT_WORDS[itemId] ?? ['шт.', 'шт.', 'шт.'];
+/** Как называть штуки: у сена и мешков — склонения, у остального — единица, которую вписали при добавлении. */
+export function countWords(itemId: string, unit = 'шт.'): [string, string, string] {
+  return COUNT_WORDS[itemId] ?? [unit, unit, unit];
+}
+
+/** Группы фуража по порядку на экране. */
+export const STOCK_CATEGORIES: { id: StockCategory; title: string }[] = [
+  { id: 'feed', title: 'Корма' },
+  { id: 'porridge', title: 'Каши' },
+  { id: 'grain', title: 'Зерно и крупы' },
+  { id: 'veg', title: 'Овощи и фрукты' },
+  { id: 'supplements', title: 'Добавки и витамины' },
+  { id: 'household', title: 'Хозяйство' },
+  { id: 'other', title: 'Прочее' },
+];
+
+/** Группа позиции; у старых записей (до групп) — по известным позициям. */
+const KNOWN_CATEGORY: Record<string, StockCategory> = {
+  hay: 'feed',
+  veg: 'veg',
+  formamax: 'porridge',
+  optiform: 'porridge',
+  monograss: 'porridge',
+  hercules: 'grain',
+  bran: 'grain',
+  oats: 'grain',
+  corn: 'grain',
+  seeds: 'grain',
+  bags: 'household',
+};
+export function categoryOf(item: StockItem): StockCategory {
+  return item.category ?? KNOWN_CATEGORY[item.id] ?? 'other';
+}
+
+/** Сено, овощи и мешки списываются по счётчикам дежурства — их не удалить. */
+const BUILT_IN = new Set(['hay', 'veg', 'bags']);
+
+/** Почему позицию нельзя удалить (или null — можно). */
+export function deleteBlocker(item: StockItem, diets: Diet[]): string | null {
+  if (BUILT_IN.has(item.id)) return 'Списывается по счётчикам дежурства — удалить нельзя, можно переименовать.';
+  if (diets.some((d) => d.meals.some((m) => m.items.some((mi) => mi.item === item.id))))
+    return 'Есть в рационе и списывается при кормлении. Сначала уберите её из рациона у врача.';
+  return null;
 }
 
 /** Что привозят упаковками: мешки для мусора — по 10 штук. */

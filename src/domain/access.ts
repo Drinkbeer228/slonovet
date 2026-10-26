@@ -8,7 +8,7 @@ import type { Role } from './types';
 export const EDITORS = {
   requests: { roles: ['vet', 'director', 'admin'], who: 'врач и директор' },
   diet: { roles: ['vet', 'admin'], who: 'врач' },
-  stock: { roles: ['keeper', 'manager', 'admin'], who: 'киперы и администратор' },
+  stock: { roles: ['keeper', 'director', 'manager', 'admin'], who: 'киперы, директор и администратор' },
   users: { roles: ['director', 'manager', 'admin'], who: 'директор и администратор' },
   // просить купить может любой; «заказано» и «привезли» отмечают они
   purchases: { roles: ['director', 'manager', 'admin'], who: 'администратор и директор' },
