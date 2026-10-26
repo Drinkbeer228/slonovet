@@ -88,7 +88,7 @@ function Main() {
           {current === 'requests' && <RequestsScreen user={user} />}
           {current === 'diet' && <DietScreen user={user} onGuide={() => setTab('guide')} />}
           {current === 'stock' && <StockScreen user={user} />}
-          {current === 'journal' && <JournalScreen user={user} onRequests={() => setTab('requests')} />}
+          {current === 'journal' && <JournalScreen />}
           {current === 'users' && <UsersScreen session={session} />}
           {current === 'guide' && <GuideScreen />}
           {current === 'rating' && <RatingScreen user={user} />}

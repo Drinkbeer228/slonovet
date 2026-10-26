@@ -1,14 +1,13 @@
 import { Fragment, useState, type ReactNode } from 'react';
-import { BRANCH_AMOUNT, ELEPHANTS, METRICS } from '../domain/elephants';
+import { BRANCH_AMOUNT, ELEPHANTS, LEVEL_LABEL, METRIC_LABEL, METRICS } from '../domain/elephants';
 import { FEED_TIMES, acceptedBy, shiftFlags, sortShifts } from '../domain/shift';
-import type { CurrentUser, ElephantName, Shift } from '../domain/types';
+import type { Shift } from '../domain/types';
 import { useRows } from '../lib/store';
 import { addDays, isoDate, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
-import { Card, Empty, IconButton, Section, Segmented, Sheet } from '../ui/kit';
-import { AlertsCard, ElephantsView, LatestShiftLine } from './vet/ElephantsView';
+import { Card, Empty, IconButton, Section } from '../ui/kit';
+import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
-import { StateMatrix } from './keeper/StateMatrix';
 import { mealTitle } from './keeper/FeedingBlock';
 import { washText } from './keeper/QuestsBlock';
 
@@ -31,61 +30,21 @@ function worst(shifts: Shift[]): number {
   return Math.max(0, ...shifts.map((s) => Math.max(0, ...shiftFlags(s).map((f) => f.level))));
 }
 
-type JournalView = 'days' | 'elephants';
-const VIEW_KEY = 'slonovet_journal_view';
-
-/** Журнал: тревоги сверху и две вкладки — «По дням» (как бумажный журнал) и «По слонихам» (14 дней каждой). */
-export function JournalScreen({ user, onRequests }: { user: CurrentUser; onRequests: () => void }) {
-  const [view, setViewState] = useState<JournalView>(() => {
-    try {
-      const v = localStorage.getItem(VIEW_KEY);
-      if (v === 'days' || v === 'elephants') return v;
-    } catch {
-      /* без хранилища — по роли */
-    }
-    return user.role === 'vet' ? 'elephants' : 'days';
-  });
-  const [el, setEl] = useState<ElephantName>('Марго');
-  const setView = (v: JournalView) => {
-    setViewState(v);
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      /* не запомнится — не беда */
-    }
-  };
-
+/** Журнал как бумажный: выбрал день — видишь отметки и всё, что было за дежурство. Тревоги — сверху, только если есть. */
+export function JournalScreen() {
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-col gap-0.5">
-        <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Журнал</h1>
-        <LatestShiftLine />
-      </header>
-      <AlertsCard
-        onPick={(e) => {
-          setEl(e);
-          setView('elephants');
-        }}
-      />
-      <Segmented
-        label="Вид журнала"
-        value={view}
-        onChange={setView}
-        options={[
-          { value: 'days', label: 'По дням' },
-          { value: 'elephants', label: 'По слонихам' },
-        ]}
-      />
-      {view === 'days' ? <DaysView /> : <ElephantsView el={el} setEl={setEl} onRequests={onRequests} />}
+      <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Журнал</h1>
+      <AlertsCard />
+      <DaysView />
     </div>
   );
 }
 
-/** «По дням»: календарь как активность на GitHub, под ним смена выбранного дня — таблицей, как на бумаге. */
+/** Дата, под ней календарь как активность на GitHub, ниже смена выбранного дня — таблицей, как на бумаге, и подробности. */
 function DaysView() {
   const all = useRows('shifts');
   const shifts = sortShifts(all);
-  const [open, setOpen] = useState<Shift | null>(null);
   const [day, setDay] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
@@ -115,6 +74,13 @@ function DaysView() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <IconButton icon="back" label="Дежурство раньше" onClick={() => step(1)} className={!days[dayIdx + 1] ? 'opacity-30' : ''} />
+        <DateJump value={selected} onPick={jump} className="h-11 flex-1 rounded-xl border border-line text-[15px] font-extrabold">
+          {longDate(selected)}
+        </DateJump>
+        <IconButton icon="next" label="Дежурство позже" onClick={() => step(-1)} className={!days[dayIdx - 1] ? 'opacity-30' : ''} />
+      </div>
       <Card className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between px-1">
           <button type="button" disabled={!hasOlder} onClick={() => setPage(page + 1)} className="-my-1.5 h-11 pr-3 text-[14px] font-bold text-teal disabled:text-faint">
@@ -179,19 +145,14 @@ function DaysView() {
         </div>
       </Card>
 
-      <div className="flex items-center gap-2">
-        <IconButton icon="back" label="Дежурство раньше" onClick={() => step(1)} className={!days[dayIdx + 1] ? 'opacity-30' : ''} />
-        <DateJump value={selected} onPick={jump} className="h-11 flex-1 rounded-xl border border-line text-[15px] font-extrabold">
-          {longDate(selected)}
-        </DateJump>
-        <IconButton icon="next" label="Дежурство позже" onClick={() => step(-1)} className={!days[dayIdx - 1] ? 'opacity-30' : ''} />
-      </div>
 
       {(byDay.get(selected) ?? []).map((s) => (
-        <ShiftCard key={s.id} shift={s} shifts={shifts} onOpen={() => setOpen(s)} />
+        <Fragment key={s.id}>
+          <ShiftCard shift={s} />
+          <ShiftDetails shift={s} />
+        </Fragment>
       ))}
       {!byDay.get(selected) && <Empty>{shifts.length ? 'В этот день дежурства нет' : 'Дежурств пока нет'}</Empty>}
-      <ShiftDetail shift={open} onClose={() => setOpen(null)} />
     </div>
   );
 }
@@ -226,15 +187,9 @@ function DateJump({ value, onPick, className, children }: { value: string; onPic
 }
 
 /** Смена таблицей, как в бумажном журнале. */
-function ShiftCard({ shift: s, shifts, onOpen }: { shift: Shift; shifts: Shift[]; onOpen: () => void }) {
-  const notes = useRows('notes');
-  const n = notes.filter((x) => x.shift_id === s.id).length;
-  const next = acceptedBy(shifts, s);
-  const branches = s.quests?.branches?.amount || s.quests?.branches?.kg ? '+' : '—';
-  const wash = washText(s.quests);
+function ShiftCard({ shift: s }: { shift: Shift }) {
   return (
-    <button type="button" onClick={onOpen} className="block w-full text-left">
-      <Card className="flex flex-col gap-2 p-3">
+    <Card className="flex flex-col gap-2 p-3">
         <div className="flex items-baseline gap-2 px-1">
           <span className="truncate text-[15px] font-extrabold">{s.keeper_name}</span>
           <span className="flex-1 text-[13px] font-semibold text-muted">
@@ -242,7 +197,6 @@ function ShiftCard({ shift: s, shifts, onOpen }: { shift: Shift; shifts: Shift[]
             {s.handed_at ? ` до ${timeOf(s.handed_at)}` : ''}
           </span>
           {s.status === 'open' && <span className="text-[12px] font-bold text-teal">идёт</span>}
-          <Icon name="next" size={16} className="text-muted" />
         </div>
         <div className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] text-center text-[11px] font-bold text-muted">
           <span />
@@ -265,29 +219,21 @@ function ShiftCard({ shift: s, shifts, onOpen }: { shift: Shift; shifts: Shift[]
             </Fragment>
           ))}
         </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 px-1 text-[12px] font-semibold text-muted">
-          <span>сено {s.hay_bales}</span>
-          <span>ветки {branches}</span>
-          {wash && <span>{wash.split(',')[0]}</span>}
-          {n > 0 && <span>записей: {n}</span>}
-          {next?.accept_remarks && <span className="text-amber">приняли с замечаниями</span>}
-        </div>
-        {s.note && <p className="m-0 line-clamp-2 px-1 text-[13px] leading-snug text-ink2">{s.note}</p>}
       </Card>
-    </button>
   );
 }
 
-export function ShiftDetail({ shift, onClose }: { shift: Shift | null; onClose: () => void }) {
+/** Подробности дежурства под таблицей: передача, отклонения, кормление, «за дежурство», назначения, записи. */
+function ShiftDetails({ shift }: { shift: Shift }) {
   const notes = useRows('notes');
-  const next = acceptedBy(useRows('shifts'), shift ?? undefined);
+  const next = acceptedBy(useRows('shifts'), shift);
   const marks = useRows('request_marks');
   const requests = useRows('requests');
   const diets = useRows('diets');
-  if (!shift) return null;
   const q = shift.quests ?? {};
   const sNotes = notes.filter((n) => n.shift_id === shift.id).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
   const sMarks = marks.filter((m) => m.shift_id === shift.id);
+  const flags = shiftFlags(shift);
   const urine = ELEPHANTS.map((e) => `${e} ${q.urine?.[e]?.ok ?? 0}${q.urine?.[e]?.miss ? ` (мимо ${q.urine[e]!.miss})` : ''}`).join(' · ');
   const care = ELEPHANTS.map((e) => {
     const c = q.care?.[e];
@@ -310,8 +256,7 @@ export function ShiftDetail({ shift, onClose }: { shift: Shift | null; onClose: 
   const branchesText = branches ? `${branches}${b?.kinds?.length ? ` · ${b.kinds.join(', ')}` : ''}` : '—';
 
   return (
-    <Sheet open onClose={onClose} title={`${longDate(shift.date)} · ${shift.keeper_name}`}>
-      <div className="flex flex-col gap-6 pb-2">
+    <div className="flex flex-col gap-5">
         {shift.note && (
           <Card className="p-4">
             <span className="mb-1 block text-[12px] font-extrabold tracking-wide text-muted">ЗАМЕТКА ДЕЖУРСТВУ</span>
@@ -332,7 +277,18 @@ export function ShiftDetail({ shift, onClose }: { shift: Shift | null; onClose: 
           </Card>
         )}
 
-        <StateMatrix shift={shift} readOnly />
+        {flags.length > 0 && (
+          <Section title="Не норма">
+            <Card className="flex flex-col gap-1.5 p-4">
+              {flags.map((f) => (
+                <span key={`${f.elephant}-${f.metric}`} className={`text-[14px] font-bold ${f.level === 2 ? 'text-coral' : 'text-amber'}`}>
+                  {f.elephant} · {METRIC_LABEL[f.metric].toLowerCase()} — {LEVEL_LABEL[f.level]}
+                  {f.symptoms.length > 0 && <span className="font-semibold">: {f.symptoms.join(', ')}</span>}
+                </span>
+              ))}
+            </Card>
+          </Section>
+        )}
 
         <Section title="Кормление">
           <Card className="divide-y divide-surface2 overflow-hidden">
@@ -396,8 +352,7 @@ export function ShiftDetail({ shift, onClose }: { shift: Shift | null; onClose: 
           Принял {timeOf(shift.accepted_at)}
           {shift.handed_at ? ` · сдал ${relDate(shift.handed_at.slice(0, 10))} ${timeOf(shift.handed_at)}` : ' · идёт'}
         </p>
-      </div>
-    </Sheet>
+    </div>
   );
 }
 
