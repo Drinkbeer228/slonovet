@@ -230,6 +230,7 @@ function EditSheet({
   selfId: string;
   onClose: () => void;
 }) {
+  const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('keeper');
   const [active, setActive] = useState(true);
   const [password, setPassword] = useState('');
@@ -240,6 +241,7 @@ function EditSheet({
 
   if (profile && loadedFor !== profile.id) {
     setLoadedFor(profile.id);
+    setName(profile.full_name);
     setRole(profile.role);
     setActive(profile.active);
     setPassword('');
@@ -255,14 +257,20 @@ function EditSheet({
   };
 
   const save = async () => {
+    const fullName = name.trim().replace(/\s+/g, ' ');
+    if (!fullName) {
+      setError('Впишите имя');
+      return;
+    }
+    const renamed = fullName !== profile.full_name;
     setBusy(true);
     setError(null);
     try {
       if (demo) {
-        await put('profiles', { ...profile, role, active });
+        await put('profiles', { ...profile, full_name: fullName, role, active });
       } else {
-        if (role !== profile.role || active !== profile.active) {
-          await callAdmin({ action: 'update', id: profile.id, role, active: String(active) });
+        if (renamed || role !== profile.role || active !== profile.active) {
+          await callAdmin({ action: 'update', id: profile.id, full_name: fullName, role, active: String(active) });
         }
         if (password) await callAdmin({ action: 'password', id: profile.id, password });
         await syncNow();
@@ -308,7 +316,10 @@ function EditSheet({
       }
     >
       <div className="flex flex-col gap-5">
-        <span className="px-1 text-[14px] font-semibold text-muted">логин: {profile.login}</span>
+        {/* имя — как его видят в журнале и сменах; логин для входа не меняется */}
+        <Field label="Имя" hint={`логин для входа: ${profile.login} — не меняется`}>
+          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+        </Field>
         <div className="flex flex-col gap-2">
           <span className="px-1 text-[14px] font-bold text-muted">Роль</span>
           <div className="flex flex-wrap gap-2">
