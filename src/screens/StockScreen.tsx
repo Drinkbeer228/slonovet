@@ -3,7 +3,7 @@ import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { GRAIN_RATIO, PACK_SIZE, balances, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
+import { PACK_SIZE, balances, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
 import type { CurrentUser, StockItem } from '../domain/types';
 import { put, useRows } from '../lib/store';
 import { plural, relDate, timeOf } from '../lib/dates';
@@ -195,8 +195,6 @@ export function StockScreen({ user }: { user: CurrentUser }) {
           </Card>
         </Section>
       )}
-
-      {canSetup && <ScoopCard items={items} />}
 
       <AdjustSheet view={edit} user={user} shiftId={shiftId} onClose={() => setEdit(null)} />
       <IncomingSheet open={incoming} items={items} user={user} shiftId={shiftId} onClose={() => setIncoming(false)} />
@@ -407,70 +405,5 @@ function IncomingSheet({
         </span>
       </div>
     </Sheet>
-  );
-}
-
-/** Мерный совок («гарец»): одна цифра — сколько кг овса в полном совке. Остальное зерно пересчитывается по плотности. */
-function ScoopCard({ items }: { items: StockItem[] }) {
-  const oats = items.find((i) => i.id === 'oats');
-  const current = oats?.kg_per_garets ?? 1.5;
-  const [text, setText] = useState(String(current).replace('.', ','));
-  // разовая настройка — свёрнута, чтобы не нажать случайно
-  const [open, setOpen] = useState(false);
-  const kg = Number(text.replace(',', '.')) || 0;
-  const apply = async (v: number) => {
-    for (const it of items) {
-      const r = GRAIN_RATIO[it.id];
-      if (r) await put('stock_items', { ...it, kg_per_garets: Math.round(v * r * 100) / 100 });
-    }
-    setText(String(v).replace('.', ','));
-    toast(`Совок: ${fmtNum(v, 2)} кг овса`);
-  };
-  return (
-    <Card className="flex flex-col overflow-hidden">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left">
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[15px] font-bold">Калибровка мерного совка</span>
-          <span className="text-[13px] font-semibold text-muted">сейчас {fmtNum(current, 2)} кг овса в совке · меняют раз, при новой таре</span>
-        </span>
-        <Icon name="down" size={18} className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div className="flex flex-col gap-3 border-t border-surface2 p-4">
-          <span className="text-[14px] font-semibold text-ink2">Сколько кг овса в полном совке? Взвесь один раз — остальное зерно пересчитается само.</span>
-          <div className="flex flex-wrap items-center gap-2">
-            {[1.5, 3].map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={kg === v}
-                onClick={() => setText(String(v).replace('.', ','))}
-                className={`h-11 rounded-xl border px-4 text-[15px] font-bold ${kg === v ? 'border-ink bg-ink text-bg' : 'border-line bg-surface2 text-ink2'}`}
-              >
-                {fmtNum(v)} кг
-              </button>
-            ))}
-            <input
-              className={`${inputCls.replace('w-full ', '')} w-24 py-2.5 text-right`}
-              inputMode="decimal"
-              aria-label="Кг овса в полном совке"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
-            <Button kind="light" disabled={!kg || kg === current} onClick={() => apply(kg)}>
-              Применить
-            </Button>
-          </div>
-          <span className="text-[12px] font-semibold text-muted">
-            Сейчас в совке:{' '}
-            {items
-              .filter((i) => GRAIN_RATIO[i.id] && i.kg_per_garets)
-              .map((i) => `${i.name.toLowerCase()} ${fmtNum(i.kg_per_garets!, 2)}`)
-              .join(' · ')}{' '}
-            кг
-          </span>
-        </div>
-      )}
-    </Card>
   );
 }
