@@ -3,7 +3,7 @@ import { BRANCH_AMOUNT, ELEPHANTS, LEVEL_LABEL, METRIC_LABEL, METRICS } from '..
 import { FEED_TIMES, acceptedBy, shiftFlags, sortShifts } from '../domain/shift';
 import type { Shift } from '../domain/types';
 import { useRows } from '../lib/store';
-import { addDays, isoDate, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
+import { addDays, isoDate, localDay, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
 import { CalendarSheet, Card, Empty, IconButton, Section } from '../ui/kit';
 import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
@@ -342,7 +342,7 @@ function ShiftDetails({ shift }: { shift: Shift }) {
 
         <p className="m-0 px-1 text-[12px] font-semibold text-muted">
           Принял {timeOf(shift.accepted_at)}
-          {shift.handed_at ? ` · сдал ${relDate(shift.handed_at.slice(0, 10))} ${timeOf(shift.handed_at)}` : ' · идёт'}
+          {shift.handed_at ? ` · сдал ${relDate(localDay(shift.handed_at))} ${timeOf(shift.handed_at)}` : ' · идёт'}
         </p>
     </div>
   );

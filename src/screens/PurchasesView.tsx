@@ -3,7 +3,7 @@ import { canEdit } from '../domain/access';
 import type { CurrentUser, Purchase, PurchaseStatus } from '../domain/types';
 import { logEvent } from '../lib/log';
 import { newId, put, useRows } from '../lib/store';
-import { isoDate, relDate, shortDate, timeOf } from '../lib/dates';
+import { isoDate, localDay, relDate, shortDate, timeOf } from '../lib/dates';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { categoryOf, countWords, fmtNum, packWords } from '../domain/stock';
@@ -150,7 +150,7 @@ function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentU
             </span>
             {p.note && <span className="text-[13px] font-medium text-ink2">{p.note}</span>}
             <span className="text-[12px] font-semibold text-muted">
-              {p.author_name}, {relDate(p.created_at.slice(0, 10))}
+              {p.author_name}, {relDate(localDay(p.created_at))}
             </span>
           </button>
           <div className="flex flex-wrap items-center gap-2">
@@ -356,12 +356,12 @@ function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | n
         {p.amount && <p className="m-0 text-[16px] font-semibold">Сколько: {p.amount}</p>}
         {p.note && <p className="m-0 text-[15px] text-ink2">{p.note}</p>}
         <span className="text-[14px] font-semibold text-muted">
-          Попросил {p.author_name}, {relDate(p.created_at.slice(0, 10))} в {timeOf(p.created_at)}
+          Попросил {p.author_name}, {relDate(localDay(p.created_at))} в {timeOf(p.created_at)}
           {p.urgent ? ' · срочно' : ''}
         </span>
         <span className={`text-[14px] font-bold ${STATUS[p.status].cls}`}>
           Сейчас: {statusText(p)}
-          {p.status_by && p.status !== 'new' ? ` (${p.status_by}, ${relDate((p.status_at ?? p.updated_at).slice(0, 10))})` : ''}
+          {p.status_by && p.status !== 'new' ? ` (${p.status_by}, ${relDate(localDay(p.status_at ?? p.updated_at))})` : ''}
         </span>
         {!buyer && <span className="text-[13px] font-semibold text-muted">«Заказано» и «Привезли» отмечает администратор или директор.</span>}
       </div>

@@ -8,6 +8,11 @@ export function isoDate(d = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Местная дата (YYYY-MM-DD) момента времени. Не created_at.slice(0, 10): там дата по UTC, и запись в 00:30 по Москве — «вчера». */
+export function localDay(ts: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(ts) ? ts : isoDate(new Date(ts));
+}
+
 export function parseIso(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d);

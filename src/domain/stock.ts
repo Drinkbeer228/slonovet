@@ -1,5 +1,5 @@
 import type { Diet, MealItem, StockCategory, StockItem, StockMove } from './types';
-import { addDays, isoDate } from '../lib/dates';
+import { addDays, isoDate, localDay } from '../lib/dates';
 
 /** Перевод позиции рецепта в единицы склада (кг или штуки). null — если перевести нельзя. */
 export function itemToStockUnits(mi: MealItem, item: StockItem | undefined): number | null {
@@ -74,7 +74,7 @@ export function balances(moves: StockMove[]): Map<string, number> {
 
 /** Средний расход в сутки: делим на число дней, за которые есть выдачи (а не всегда на 7). */
 function avgPerDay(moves: StockMove[]): number {
-  const days = new Set(moves.map((m) => m.created_at.slice(0, 10))).size;
+  const days = new Set(moves.map((m) => localDay(m.created_at))).size;
   if (!days) return 0;
   return moves.reduce((s, m) => s - Number(m.delta), 0) / days;
 }
@@ -120,13 +120,13 @@ export function stockPerDay(items: StockItem[], diets: Diet[], moves: StockMove[
 /** Средний расход в сутки по фактическим выдачам «по весу» за 7 дней. */
 export function weighedPerDay(moves: StockMove[], itemId: string, today = isoDate()): number {
   const from = addDays(today, -7);
-  return avgPerDay(moves.filter((m) => m.item_id === itemId && m.id.startsWith('veg:') && m.created_at.slice(0, 10) >= from));
+  return avgPerDay(moves.filter((m) => m.item_id === itemId && m.id.startsWith('veg:') && localDay(m.created_at) >= from));
 }
 
 /** Штучные позиции (сено, мешки): среднее в сутки по выдачам за последние 7 дней. */
 export function countPerDay(moves: StockMove[], itemId: string, today = isoDate()): number {
   const from = addDays(today, -7);
-  return avgPerDay(moves.filter((m) => m.item_id === itemId && (m.reason === 'hay' || m.reason === 'feed') && m.created_at.slice(0, 10) >= from));
+  return avgPerDay(moves.filter((m) => m.item_id === itemId && (m.reason === 'hay' || m.reason === 'feed') && localDay(m.created_at) >= from));
 }
 
 /** Как называть штуки на складе. */

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
-import { isoDate, relDate, timeOf } from '../lib/dates';
+import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
 import { Button, Card, Chip, Confirm, Segmented, Sheet } from '../ui/kit';
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
@@ -66,7 +66,7 @@ export function OfflineBanner() {
   if (s.state === 'demo' || !s.pending) return null;
   const stale = !s.lastSync || Date.now() - new Date(s.lastSync).getTime() > 60 * 60 * 1000;
   if (s.state !== 'offline' && s.state !== 'error' && !stale) return null;
-  const when = s.lastSync ? `${relDate(s.lastSync.slice(0, 10), isoDate())} в ${timeOf(s.lastSync)}` : 'ещё не было';
+  const when = s.lastSync ? `${relDate(localDay(s.lastSync), isoDate())} в ${timeOf(s.lastSync)}` : 'ещё не было';
   return (
     <Card className="mb-4 flex gap-2.5 p-3.5 ring-1 ring-amber/50">
       <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber" />
@@ -221,7 +221,7 @@ export function MenuSheet({
             {s.rejected.map((r, i) => (
               <span key={i} className="text-[14px] leading-snug">
                 {r.what} — {r.reason}
-                <span className="text-muted"> · {relDate(r.at.slice(0, 10), isoDate())} в {timeOf(r.at)}</span>
+                <span className="text-muted"> · {relDate(localDay(r.at), isoDate())} в {timeOf(r.at)}</span>
               </span>
             ))}
             <span className="text-[13px] font-semibold text-muted">

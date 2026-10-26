@@ -21,9 +21,25 @@ export async function updateShift(shift: Shift, fn: (s: Shift) => void) {
 export async function acceptShift(user: CurrentUser, safety: Record<string, boolean>, from: { id: string; remarks: string } | null = null) {
   logEvent('shift.accept', { remarks: from?.remarks?.slice(0, 200) ?? '' });
   const date = isoDate();
-  let id = date;
-  for (let n = 2; getRow('shifts', id); n++) id = `${date}-${n}`;
+  // id — дата и случайный хвост: два телефона без связи в один день не создадут одну и ту же смену
+  // (иначе вторая при отправке затёрла бы отметки первой)
+  const id = `${date}-${newId().replace(/-/g, '').slice(0, 8)}`;
   await put('shifts', { ...newShift(user, safety, date, from), id });
+}
+
+/**
+ * Принять без кода: у сдающего нет связи, и его «Сдать» до этого телефона не дошло. Его смену отмечаем сданной,
+ * а когда его телефон выйдет на связь, его заметка и отметки сольются с этим (смены шлются патчами).
+ */
+export async function takeOverShift(prev: Shift, user: CurrentUser, safety: Record<string, boolean>, remarks: string) {
+  logEvent('shift.takeover', { from: prev.id });
+  await updateShift(prev, (s) => {
+    if (s.status !== 'open') return;
+    s.status = 'handed';
+    s.handed_at = new Date().toISOString();
+  });
+  const note = ['Принято без кода: у сдающего не было связи', remarks].filter(Boolean).join('. ');
+  await acceptShift(user, safety, { id: prev.id, remarks: note });
 }
 
 /** Сдать дежурство: появляется код, который сдающий диктует сменщику. */

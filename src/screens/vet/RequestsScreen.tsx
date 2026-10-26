@@ -5,7 +5,7 @@ import { ANSWER_PRESETS, FREQ_LABEL, requestProgress, whoLabel } from '../../dom
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
-import { addDays, isoDate, relDate, shortDate, timeOf } from '../../lib/dates';
+import { addDays, isoDate, localDay, relDate, shortDate, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest } from '../../domain/access';
 import { PurchasesView } from '../PurchasesView';
@@ -113,7 +113,7 @@ export function RequestList({ list, onOpen }: { list: VetRequest[]; onOpen: (r: 
             </span>
             {closed && p.last && (
               <span className="text-[12px] font-semibold text-teal">
-                Выполнил: {p.last.done_by}, {relDate(p.last.done_at.slice(0, 10))} {timeOf(p.last.done_at)}
+                Выполнил: {p.last.done_by}, {relDate(localDay(p.last.done_at))} {timeOf(p.last.done_at)}
               </span>
             )}
             {!closed && (
@@ -126,9 +126,9 @@ export function RequestList({ list, onOpen }: { list: VetRequest[]; onOpen: (r: 
                 <span className="text-[12px] font-semibold text-muted">
                   {r.frequency === 'once'
                     ? p.done
-                      ? `Выполнил: ${p.last!.done_by}, ${relDate(p.last!.done_at.slice(0, 10))} ${timeOf(p.last!.done_at)}`
+                      ? `Выполнил: ${p.last!.done_by}, ${relDate(localDay(p.last!.done_at))} ${timeOf(p.last!.done_at)}`
                       : 'ждёт отметки кипера'
-                    : `${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}${p.last ? ` · последнее ${relDate(p.last.done_at.slice(0, 10))}, ${p.last.done_by}${p.last.photo_path ? ', с фото' : ''}` : ''}`}
+                    : `${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}${p.last ? ` · последнее ${relDate(localDay(p.last.done_at))}, ${p.last.done_by}${p.last.photo_path ? ', с фото' : ''}` : ''}`}
                 </span>
               </>
             )}
@@ -177,7 +177,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
         <span className="text-[13px] font-semibold text-muted">
           {FREQ_LABEL[req.frequency]}
           {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
-          {req.needs_photo ? ' · с фото' : ''} · {req.author_name}, {relDate(req.created_at.slice(0, 10))}
+          {req.needs_photo ? ' · с фото' : ''} · {req.author_name}, {relDate(localDay(req.created_at))}
         </span>
         <Section title="Выполнение" aside={String(mine.length)}>
           {mine.length === 0 ? (
@@ -189,7 +189,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
                   <PhotoThumb path={m.photo_path} size={56} />
                   <span className="flex flex-col gap-0.5">
                     <span className="text-[12px] font-bold text-muted">
-                      {relDate(m.done_at.slice(0, 10))} {timeOf(m.done_at)} · {m.done_by}
+                      {relDate(localDay(m.done_at))} {timeOf(m.done_at)} · {m.done_by}
                     </span>
                     <span className="text-[15px] font-medium">{m.note || 'выполнено'}</span>
                   </span>

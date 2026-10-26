@@ -1,6 +1,6 @@
 import { METRIC_LABEL } from '../../domain/elephants';
 import type { Note } from '../../domain/types';
-import { relDate, timeOf } from '../../lib/dates';
+import { localDay, relDate, timeOf } from '../../lib/dates';
 import { Card, PhotoThumb } from '../../ui/kit';
 
 const KIND: Record<Note['kind'], string> = { observation: '', procedure: '💉 процедура', medication: '💊 препарат' };
@@ -14,7 +14,7 @@ export function NotesList({ notes, showElephant = true, showDate = false }: { no
           <div className="flex min-w-0 flex-col gap-1">
             <span className="text-[12px] font-bold text-muted">
               {[
-                showDate ? relDate(n.created_at.slice(0, 10)) : null,
+                showDate ? relDate(localDay(n.created_at)) : null,
                 timeOf(n.created_at),
                 showElephant ? n.elephant : null,
                 n.metric ? METRIC_LABEL[n.metric].toLowerCase() : KIND[n.kind] || null,

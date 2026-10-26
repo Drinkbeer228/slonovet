@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { keeperA, phone } from '../test/app';
 import { balances, countPerDay, stockPerDay, stockView } from './stock';
+import { localDay, relDate } from '../lib/dates';
 import type { Diet, Shift, StockItem, StockMove } from './types';
 
 const now = '2026-10-26T10:00:00.000Z';
@@ -120,19 +121,29 @@ describe('Фураж — находки аудита, исправлены на 
   });
 });
 
-describe('Фураж — известные проблемы (аудит)', () => {
-  it.fails('Д3: две выдачи сена в одни местные сутки — один день расхода', () => {
+describe('даты — находка аудита Д3, исправлена на этапе 3', () => {
+  const inMoscow = (fn: () => void) => {
     const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
     const tz = env.TZ;
     env.TZ = 'Europe/Moscow';
     try {
-      const at = (local: string) => new Date(local).toISOString();
-      const moves = [mv('h1', 'hay', -5, 'hay', at('2026-10-26T01:00:00+03:00')), mv('h2', 'hay', -5, 'hay', at('2026-10-26T23:00:00+03:00'))];
-      expect(countPerDay(moves, 'hay', '2026-10-27')).toBe(10);
+      fn();
     } finally {
       env.TZ = tz;
     }
-  });
+  };
 
-  it.todo('Д3: запись в 00:30 по Москве показывается сегодняшней');
+  it('Д3: две выдачи сена в одни местные сутки — один день расхода', () =>
+    inMoscow(() => {
+      const at = (local: string) => new Date(local).toISOString();
+      const moves = [mv('h1', 'hay', -5, 'hay', at('2026-10-26T01:00:00+03:00')), mv('h2', 'hay', -5, 'hay', at('2026-10-26T23:00:00+03:00'))];
+      expect(countPerDay(moves, 'hay', '2026-10-27')).toBe(10);
+    }));
+
+  it('Д3: запись в 00:30 по Москве — сегодняшняя', () =>
+    inMoscow(() => {
+      const created = new Date('2026-10-26T00:30:00+03:00').toISOString(); // так её пишет приложение: 2026-10-25T21:30Z
+      expect(localDay(created)).toBe('2026-10-26');
+      expect(relDate(localDay(created), '2026-10-26')).toBe('сегодня');
+    }));
 });

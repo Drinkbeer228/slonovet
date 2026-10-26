@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { LEVEL_LABEL, METRIC_LABEL, SAFETY_CHECKS } from '../../domain/elephants';
-import { acceptShift } from '../../domain/actions';
+import { acceptShift, takeOverShift } from '../../domain/actions';
 import { acceptedBy, lastHanded, requestTodos, shiftFlags } from '../../domain/shift';
-import type { CurrentUser } from '../../domain/types';
+import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
-import { isoDate, longDate, relDate, timeOf } from '../../lib/dates';
+import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
 import { getSession } from '../../lib/auth';
 import { Button, Card, Chip, Section, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
@@ -24,20 +24,21 @@ const REMARKS = [
   'Нет воды',
 ];
 
-export function AcceptShift({ user }: { user: CurrentUser }) {
+/** takeover — смена, которую сдающий без связи не смог сдать: принимаем её без кода. */
+export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: Shift }) {
   const shifts = useRows('shifts');
   const requests = useRows('requests');
   const marks = useRows('request_marks');
   const last = lastHanded(shifts);
   // смену, которую уже кто-то принял, второй раз не принимаем по её коду
-  const prev = last && !acceptedBy(shifts, last) ? last : undefined;
+  const prev = takeover ?? (last && !acceptedBy(shifts, last) ? last : undefined);
   const [checks, setChecks] = useState<Record<string, boolean | undefined>>({});
   const [remarks, setRemarks] = useState('');
   const [code, setCode] = useState('');
   // каждый пункт: true — в порядке, false — не в порядке (уйдёт в замечания), нет ответа — пусто
   const allOk = SAFETY_CHECKS.every((c) => checks[c.key] !== undefined);
   const failed = SAFETY_CHECKS.filter((c) => checks[c.key] === false);
-  const needCode = Boolean(prev?.handover_code) && prev?.keeper_id !== user.id; // свою смену себе — без кода
+  const needCode = !takeover && Boolean(prev?.handover_code) && prev?.keeper_id !== user.id; // свою смену себе — без кода
   const ready = allOk && (!needCode || code.length === 4);
   const demo = getSession()?.mode === 'demo';
   const toggleRemark = (r: string) =>
@@ -52,8 +53,17 @@ export function AcceptShift({ user }: { user: CurrentUser }) {
     <div className="flex flex-col gap-6">
       <span className="-mt-2 px-1 text-[13px] font-semibold text-muted">{longDate(isoDate())}</span>
 
+      {takeover && (
+        <Card className="flex gap-2.5 p-3.5 ring-1 ring-amber/50">
+          <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber" />
+          <span className="text-[14px] font-semibold leading-snug text-ink2">
+            Без кода: у {takeover.keeper_name} нет связи. Его дежурство отметим сданным, в журнале останется «принято без кода». Его записи дойдут, когда его телефон выйдет на связь.
+          </span>
+        </Card>
+      )}
+
       {prev && (
-        <Section title="От прошлого дежурства" aside={`${prev.keeper_name} · ${relDate(prev.handed_at?.slice(0, 10) ?? prev.date)} ${timeOf(prev.handed_at)}`}>
+        <Section title="От прошлого дежурства" aside={`${prev.keeper_name} · ${relDate(prev.handed_at ? localDay(prev.handed_at) : prev.date)} ${timeOf(prev.handed_at)}`}>
           <Card className="flex flex-col gap-3 p-4">
             {prev.note ? (
               <p className="m-0 text-[16px] leading-relaxed">{prev.note}</p>
@@ -146,7 +156,9 @@ export function AcceptShift({ user }: { user: CurrentUser }) {
               return;
             }
             const all = [...failed.map((c) => `Не в порядке: ${c.label.toLowerCase()}`), remarks.trim()].filter(Boolean).join('. ');
-            await acceptShift(user, Object.fromEntries(SAFETY_CHECKS.map((c) => [c.key, checks[c.key] === true])), prev ? { id: prev.id, remarks: all } : null);
+            const safety = Object.fromEntries(SAFETY_CHECKS.map((c) => [c.key, checks[c.key] === true]));
+            if (takeover) await takeOverShift(takeover, user, safety, all);
+            else await acceptShift(user, safety, prev ? { id: prev.id, remarks: all } : null);
             toast(all ? 'Дежурство принято с замечаниями' : 'Дежурство принято');
           }}
         >

@@ -3,7 +3,7 @@ import { handOver, updateShift } from '../../domain/actions';
 import { FEED_TIMES, acceptedBy, currentShift, lastHanded, requestTodos, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
-import { isoDate, longDate, relDate, timeOf } from '../../lib/dates';
+import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
@@ -74,7 +74,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       <header className="flex flex-col gap-0.5 px-1">
         <span className="text-[13px] font-semibold text-muted">
           {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
-          {handed && ` · сдано ${relDate(shift.handed_at?.slice(0, 10) ?? shift.date)} в ${timeOf(shift.handed_at)}`}
+          {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
         </span>
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">
           {handed ? 'Прошлое дежурство' : 'Дежурство'} · {shift.keeper_name}
@@ -101,7 +101,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
       <JumpBar shift={shift} readOnly={readOnly} />
 
-      {someoneElses && !readOnly && <NotHandedHint shift={shift} />}
+      {someoneElses && !readOnly && <NotHandedHint shift={shift} user={user} />}
       <HandoverBanner shift={shift} from={from} myId={user.id} />
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">

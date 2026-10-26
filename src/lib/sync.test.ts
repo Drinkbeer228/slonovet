@@ -284,8 +284,8 @@ describe('синхронизация — находки аудита, испра
   });
 });
 
-describe('синхронизация — известные проблемы (аудит)', () => {
-  it.fails('Д2: смена, принятая без связи в ту же дату, не стирает отметки другого кипера', async () => {
+describe('смены без связи — находки аудита, исправлены на этапе 3', () => {
+  it('Д2: смена, принятая без связи в тот же день, не стирает отметки другого кипера', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-26T12:00:00+03:00'));
     server.write('shifts', shift('2026-10-26', { state: { Марго: { water: { level: 1, symptoms: ['пьёт мало'] } } }, feeds: { '07:00': { done: true } } }));
@@ -295,7 +295,37 @@ describe('синхронизация — известные проблемы (а
     await syncOnce(b);
     const s = serverRow<Shift>('shifts', '2026-10-26')!;
     expect(s.state.Марго?.water?.level).toBe(1);
+    const mine = server.rows('shifts').filter((r) => r.keeper_name === 'Кипер Б');
+    expect(mine).toHaveLength(1);
+    expect(String(mine[0].id)).toMatch(/^2026-10-26-[0-9a-z]{8}$/);
   });
 
-  it.todo('Д1: принять смену без кода, если у сдающего нет связи');
+  it('Д1: у сдающего нет связи — сменщик принимает без кода, потом записи сдающего доходят и сливаются', async () => {
+    server.write('shifts', shift('sA', { keeper_id: 'user-a', keeper_name: 'Кипер А' }));
+    const a = await phone(); // телефон кипера А
+    await syncOnce(a);
+    const b = await phone(); // телефон кипера Б
+    await syncOnce(b);
+    // А нажал «Сдать» без связи — до сервера не дошло
+    net.online = false;
+    await a.actions.handOver(a.store.getRow('shifts', 'sA')!, 'Одри не доела вечером');
+    net.online = true;
+    // Б не дождался кода и принял без него
+    const userB = { id: 'user-b', login: 'b', full_name: 'Кипер Б', role: 'keeper' as const };
+    signedIn(userB);
+    server.user = { id: 'user-b', name: 'Кипер Б', role: 'keeper' };
+    await b.actions.takeOverShift(b.store.getRow('shifts', 'sA')!, userB, { elephants: true }, '');
+    await syncOnce(b);
+    const taken = serverRow<Shift>('shifts', 'sA')!;
+    expect(taken.status).toBe('handed');
+    const fresh = server.rows('shifts').find((r) => r.keeper_name === 'Кипер Б') as unknown as Shift;
+    expect(fresh.status).toBe('open');
+    expect(fresh.accepted_from).toBe('sA');
+    expect(fresh.accept_remarks).toMatch(/без кода/);
+    // связь у А появилась: его заметка доходит, смена Б не тронута
+    server.user = { id: 'user-a', name: 'Кипер А', role: 'keeper' };
+    await syncOnce(a);
+    expect(serverRow<Shift>('shifts', 'sA')!.note).toBe('Одри не доела вечером');
+    expect((server.get('shifts', fresh.id) as unknown as Shift).status).toBe('open');
+  });
 });

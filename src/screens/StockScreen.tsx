@@ -6,7 +6,7 @@ import { currentShift } from '../domain/shift';
 import { STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
 import { newId, put, useRows } from '../lib/store';
-import { plural, relDate, timeOf } from '../lib/dates';
+import { localDay, plural, relDate, timeOf } from '../lib/dates';
 import { Button, Card, Chip, Confirm, Field, ReadOnlyNote, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
@@ -194,7 +194,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
                     <span className="text-[14px] font-bold">{nameOf(m.item_id)}</span>
                     <span className="text-[12px] font-semibold text-muted">
                       {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unit}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
-                      {m.note ? `: ${m.note}` : ''} · {relDate(m.created_at.slice(0, 10))} {timeOf(m.created_at)} · {m.author_name}
+                      {m.note ? `: ${m.note}` : ''} · {relDate(localDay(m.created_at))} {timeOf(m.created_at)} · {m.author_name}
                     </span>
                   </span>
                   <span className={`text-[15px] font-extrabold ${Number(m.delta) > 0 ? 'text-teal' : 'text-ink2'}`}>

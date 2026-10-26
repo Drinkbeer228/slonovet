@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { cancelHandOver } from '../../domain/actions';
-import type { Shift } from '../../domain/types';
+import type { CurrentUser, Shift } from '../../domain/types';
 import { syncNow } from '../../lib/sync';
-import { relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Confirm, Section } from '../../ui/kit';
+import { localDay, relDate, timeOf } from '../../lib/dates';
+import { Button, Card, Confirm, Section, Sheet } from '../../ui/kit';
+import { AcceptShift } from './AcceptShift';
 import { Icon } from '../../ui/Icon';
 import { WhyLink } from '../common/Why';
 
@@ -15,7 +16,7 @@ export function HandedShift({ shift, onAcceptOwn }: { shift: Shift; onAcceptOwn:
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <header className="flex flex-col gap-0.5 px-1">
         <span className="text-[13px] font-semibold text-muted">
-          сдана {relDate(shift.handed_at?.slice(0, 10) ?? shift.date)} в {timeOf(shift.handed_at)}
+          сдана {relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в {timeOf(shift.handed_at)}
         </span>
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Ждём дежурного</h1>
       </header>
@@ -77,14 +78,23 @@ export function HandoverBanner({ shift, from, myId }: { shift: Shift; from: Shif
 }
 
 /** Новый кипер пришёл, а смена ещё открыта у другого. */
-export function NotHandedHint({ shift }: { shift: Shift }) {
+export function NotHandedHint({ shift, user }: { shift: Shift; user: CurrentUser }) {
+  const [takeover, setTakeover] = useState(false);
   return (
     <Card className="flex flex-col gap-2 p-4">
       <p className="m-0 text-[15px] font-bold">Дежурит {shift.keeper_name}</p>
       <p className="m-0 text-[14px] text-ink2">Чтобы принять её, попроси его нажать «Сдать дежурство» внизу и продиктовать код.</p>
-      <button type="button" onClick={() => syncNow().catch(() => undefined)} className="self-start text-[13px] font-bold text-teal">
-        Он уже сдал? Обновить
-      </button>
+      <div className="flex flex-wrap gap-x-5">
+        <button type="button" onClick={() => syncNow().catch(() => undefined)} className="py-2 text-[13px] font-bold text-teal">
+          Он уже сдал? Обновить
+        </button>
+        <button type="button" onClick={() => setTakeover(true)} className="py-2 text-[13px] font-bold text-teal">
+          У него нет связи — принять без кода
+        </button>
+      </div>
+      <Sheet open={takeover} onClose={() => setTakeover(false)} title="Принять без кода">
+        <AcceptShift user={user} takeover={shift} />
+      </Sheet>
     </Card>
   );
 }

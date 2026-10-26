@@ -1,6 +1,6 @@
 import { ELEPHANTS, METRICS } from './elephants';
 import type { CurrentUser, ElephantName, Level, MetricKey, RequestMark, Shift, VetRequest } from './types';
-import { isoDate } from '../lib/dates';
+import { isoDate, localDay } from '../lib/dates';
 
 export const FEED_TIMES = ['07:00', '13:00', '17:00', '19:00'];
 
@@ -138,7 +138,7 @@ export const FREQ_LABEL: Record<VetRequest['frequency'], string> = {
 export function requestProgress(req: VetRequest, marks: RequestMark[], shifts: Shift[]) {
   const mine = marks.filter((m) => m.request_id === req.id);
   if (req.frequency === 'once') return { done: Math.min(1, mine.length), total: 1, last: lastMark(mine) };
-  const created = req.created_at.slice(0, 10);
+  const created = localDay(req.created_at);
   const relevant = shifts.filter((s) => s.date >= created && (!req.due_date || s.date <= req.due_date));
   const per = req.frequency === 'feeding' ? FEED_TIMES.length : 1;
   const doneShifts = relevant.filter((s) => mine.filter((m) => m.shift_id === s.id).length >= per).length;

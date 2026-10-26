@@ -3,7 +3,7 @@ import { logEvent } from '../lib/log';
 import { DAYS_ID, MOVE_SECTIONS, moveNeeds } from '../domain/move';
 import type { CurrentUser, MoveItem } from '../domain/types';
 import { getRow, newId, put, remove, useRows } from '../lib/store';
-import { shortDate, timeOf } from '../lib/dates';
+import { localDay, shortDate, timeOf } from '../lib/dates';
 import { Button, Card, Check, Chip, Confirm, Section, Stepper, inputCls, toast } from '../ui/kit';
 
 /** Переезд: сколько всего нужно на дорогу и общий чек-лист сборов — кто что собрал. */
@@ -76,7 +76,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
                       label={it.text}
                       sub={
                         r?.done_by
-                          ? `собрал ${r.done_by}, ${shortDate(r.done_at!.slice(0, 10))} ${timeOf(r.done_at)}`
+                          ? `собрал ${r.done_by}, ${shortDate(localDay(r.done_at!))} ${timeOf(r.done_at)}`
                           : need
                             ? `нужно: ${need.value}`
                             : isOwn
