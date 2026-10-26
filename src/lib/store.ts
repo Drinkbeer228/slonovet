@@ -88,8 +88,15 @@ export function useVersion() {
   return useSyncExternalStore(subscribe, () => version);
 }
 
+/** Запрет записи (режим «Посмотреть как…»): вернуть true — и put ничего не сохранит. */
+let blockWrites: (() => boolean) | null = null;
+export function setWriteBlock(fn: () => boolean) {
+  blockWrites = fn;
+}
+
 export async function put<K extends TableName>(table: K, row: Omit<TableMap[K], 'updated_at'> & { updated_at?: string }) {
   const full = { ...row, updated_at: new Date().toISOString() } as TableMap[K];
+  if (blockWrites?.()) return full;
   const prev = cache[table].get(full.id);
   cache[table].set(full.id, full);
   emit([table]);

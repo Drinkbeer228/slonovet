@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { refreshCurrentUser, resumeSession, useSession } from './lib/auth';
-import { initStore, useRows } from './lib/store';
-import { Toaster } from './ui/kit';
+import { initStore, setWriteBlock, useRows } from './lib/store';
+import { Toaster, toast } from './ui/kit';
 import { Login } from './screens/Login';
-import { BottomNav, MENU_TABS, MenuSheet, OfflineBanner, TABS_BY_ROLE, TopBar, type Tab } from './screens/Shell';
+import { BottomNav, MENU_TABS, MenuSheet, OfflineBanner, PreviewBanner, TABS_BY_ROLE, TopBar, type Tab } from './screens/Shell';
+import { getPreviewRole, usePreviewRole } from './lib/preview';
 import { ShiftScreen } from './screens/keeper/ShiftScreen';
 import { DietScreen } from './screens/DietScreen';
 import { StockScreen } from './screens/StockScreen';
@@ -45,9 +46,18 @@ export default function App() {
   );
 }
 
+// «Посмотреть как…»: пока админ смотрит глазами другой роли, в базу ничего не пишем
+setWriteBlock(() => {
+  if (!getPreviewRole()) return false;
+  toast('Режим просмотра — изменения не сохраняются', 'error');
+  return true;
+});
+
 function Main() {
   const session = useSession()!;
-  const user = session.user;
+  const previewRole = usePreviewRole();
+  // админ может посмотреть приложение глазами другой роли; всё остальное считается от неё
+  const user = previewRole && session.user.role === 'admin' ? { ...session.user, role: previewRole } : session.user;
   const profiles = useRows('profiles');
   const tabs = TABS_BY_ROLE[user.role];
   const allowed = [...tabs, ...MENU_TABS[user.role]];
@@ -84,6 +94,7 @@ function Main() {
       <TopBar user={user} tabs={tabs} tab={current} onTab={setTab} onMenu={() => setMenu(true)} />
       <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:pb-16">
         <OfflineBanner />
+        {previewRole && <PreviewBanner role={previewRole} />}
         <div className={current === 'shift' ? '' : 'mx-auto max-w-2xl'}>
           {current === 'shift' && <ShiftScreen user={user} />}
           {current === 'requests' && <RequestsScreen user={user} />}
@@ -97,8 +108,8 @@ function Main() {
         </div>
       </main>
       <BottomNav tabs={tabs} tab={current} onTab={setTab} />
-      <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} onTab={setTab} />
-      <Tour user={user} tab={current} onTab={setTab} />
+      <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} role={user.role} onTab={setTab} />
+      {!previewRole && <Tour user={user} tab={current} onTab={setTab} />}
     </div>
   );
 }

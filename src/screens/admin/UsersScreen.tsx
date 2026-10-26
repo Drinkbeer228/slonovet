@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Profile, Role } from '../../domain/types';
 import type { Session } from '../../lib/auth';
 import { getClient } from '../../lib/supabase';
+import { PreviewError, getPreviewRole } from '../../lib/preview';
 import { syncNow } from '../../lib/sync';
 import { newId, put, useRows } from '../../lib/store';
 import { Button, Card, Check, Chip, Field, ReadOnlyNote, Section, Sheet, inputCls, toast } from '../../ui/kit';
@@ -24,6 +25,7 @@ const MANAGES: Partial<Record<Role, Role[]>> = {
 };
 
 async function callAdmin(body: Record<string, string>) {
+  if (getPreviewRole()) throw new PreviewError();
   const client = getClient();
   if (!client) throw new Error('Сервер не подключён');
   const { data, error } = await client.functions.invoke('admin-users', { body });

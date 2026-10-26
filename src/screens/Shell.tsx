@@ -3,9 +3,11 @@ import type { CurrentUser, Role } from '../domain/types';
 import { logout, type Session } from '../lib/auth';
 import { syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Segmented, Sheet } from '../ui/kit';
+import { Button, Card, Chip, Segmented, Sheet } from '../ui/kit';
+import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
+import { startTour } from './Tour';
 
 export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
 
@@ -42,6 +44,20 @@ const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветв�
 
 export function Logo({ size = 32 }: { size?: number }) {
   return <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={size} height={size} className="rounded-[22%]" />;
+}
+
+/** Плашка «Посмотреть как»: чья роль на экране и как вернуться к себе. */
+export function PreviewBanner({ role }: { role: Role }) {
+  return (
+    <Card className="mb-4 flex items-center gap-3 p-3.5 ring-1 ring-teal/50">
+      <Icon name="users" size={20} className="shrink-0 text-teal" />
+      <span className="flex flex-1 flex-col">
+        <span className="text-[14px] font-bold">Вы смотрите как: {ROLE_LABEL[role]}</span>
+        <span className="text-[12px] font-semibold text-muted">только просмотр, изменения не сохраняются</span>
+      </span>
+      <Button onClick={() => setPreviewRole(null)}>Выйти</Button>
+    </Card>
+  );
 }
 
 /** Записи копятся на телефоне, а связи давно нет — сказать прямо, чтобы поймали Wi‑Fi. */
@@ -167,10 +183,24 @@ export function BottomNav({ tabs, tab, onTab }: { tabs: Tab[]; tab: Tab; onTab: 
   );
 }
 
-export function MenuSheet({ open, onClose, session, onTab }: { open: boolean; onClose: () => void; session: Session; onTab: (t: Tab) => void }) {
+export function MenuSheet({
+  open,
+  onClose,
+  session,
+  role,
+  onTab,
+}: {
+  open: boolean;
+  onClose: () => void;
+  session: Session;
+  /** роль, глазами которой сейчас смотрим (у админа в «Посмотреть как…» — чужая) */
+  role: Role;
+  onTab: (t: Tab) => void;
+}) {
   const s = useSyncStatus();
   const [busy, setBusy] = useState(false);
-  const extra = MENU_TABS[session.user.role];
+  const extra = MENU_TABS[role];
+  const preview = usePreviewRole();
   return (
     <Sheet open={open} onClose={onClose} title={session.user.full_name}>
       <div className="flex flex-col gap-4">
@@ -202,6 +232,29 @@ export function MenuSheet({ open, onClose, session, onTab }: { open: boolean; on
 
         <ThemeCard />
 
+        {session.user.role === 'admin' && (
+          // админу: посмотреть приложение глазами другой роли, не выходя из своего входа
+          <Card className="flex flex-col gap-2 p-4">
+            <span className="text-[15px] font-bold">Посмотреть как</span>
+            <div className="flex flex-wrap gap-2">
+              {(['keeper', 'vet', 'director', 'manager'] as Role[]).map((r) => (
+                <Chip
+                  key={r}
+                  on={preview === r}
+                  onClick={() => {
+                    setPreviewRole(preview === r ? null : r);
+                    onTab(TABS_BY_ROLE[r][0]);
+                    onClose();
+                  }}
+                >
+                  {ROLE_LABEL[r]}
+                </Chip>
+              ))}
+            </div>
+            <span className="text-[12px] font-semibold text-muted">Настоящие данные, только просмотр — изменения не сохраняются.</span>
+          </Card>
+        )}
+
         {extra.length > 0 && (
           <Card className="divide-y divide-surface2 overflow-hidden">
             {extra.map((t) => (
@@ -221,6 +274,17 @@ export function MenuSheet({ open, onClose, session, onTab }: { open: boolean; on
             ))}
           </Card>
         )}
+
+        <Button
+          icon="question"
+          full
+          onClick={() => {
+            onClose();
+            startTour();
+          }}
+        >
+          Показать подсказки
+        </Button>
 
         <Button
           kind="danger"

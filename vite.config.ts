@@ -11,6 +11,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // регистрируем сами (src/main.tsx): новая версия подхватывается сразу, без второго перезапуска
+      injectRegister: false,
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       workbox: {
         // запросы к Supabase не кэшируем — данные и так хранятся в IndexedDB

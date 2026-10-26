@@ -1,3 +1,4 @@
+import { PreviewError, getPreviewRole } from './preview';
 import { useEffect, useState } from 'react';
 import { idbAll, idbGet, idbPut } from './idb';
 import { getClient } from './supabase';
@@ -26,6 +27,7 @@ export async function compressImage(file: File, max = 1280, quality = 0.72): Pro
 }
 
 export async function savePhoto(file: File, folder: string, id: string): Promise<string> {
+  if (getPreviewRole()) throw new PreviewError();
   const blob = await compressImage(file);
   const path = `${folder}/${id}.jpg`;
   await idbPut('blobs', { path, blob, uploaded: false } satisfies BlobEntry);
