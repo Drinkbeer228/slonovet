@@ -49,12 +49,17 @@ function genPassword() {
   return `${tr[w]}${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
-export function UsersScreen({ session }: { session: Session }) {
+/** Логины видят только директор и системный админ — остальным в «Персонале» только имена. */
+const SEES_LOGINS: Role[] = ['director', 'admin'];
+
+export function UsersScreen({ session, role }: { session: Session; role: Role }) {
   const profiles = useRows('profiles');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const demo = session.mode === 'demo';
-  const manages = MANAGES[session.user.role] ?? [];
+  // role — чьими глазами смотрим (у админа в «Посмотреть как» — чужая)
+  const manages = MANAGES[role] ?? [];
+  const seesLogins = SEES_LOGINS.includes(role);
   const roles = ROLES.filter((r) => manages.includes(r.value));
 
   return (
@@ -87,11 +92,11 @@ export function UsersScreen({ session }: { session: Session }) {
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface2 text-[14px] font-extrabold">{p.full_name.slice(0, 1)}</span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className={`text-[15px] font-bold ${p.active ? '' : 'text-faint line-through'}`}>{p.full_name}</span>
-                    <span className="text-[12px] font-semibold text-muted">
-                      {p.login}
-                      {!p.active && ' · отключён'}
-                      {p.id === session.user.id && ' · это вы'}
-                    </span>
+                    {(seesLogins || !p.active || p.id === session.user.id) && (
+                      <span className="text-[12px] font-semibold text-muted">
+                        {[seesLogins && p.login, !p.active && 'отключён', p.id === session.user.id && 'это вы'].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
                   </span>
                   <Icon name="next" size={18} className="text-muted" />
                 </button>
@@ -106,7 +111,7 @@ export function UsersScreen({ session }: { session: Session }) {
         </p>
       )}
       <AddSheet open={adding} demo={demo} roles={roles} onClose={() => setAdding(false)} />
-      <EditSheet profile={editing} demo={demo} roles={roles} selfId={session.user.id} onClose={() => setEditing(null)} />
+      <EditSheet profile={editing} demo={demo} roles={roles} selfId={session.user.id} seesLogins={seesLogins} onClose={() => setEditing(null)} />
     </div>
   );
 }
@@ -222,12 +227,14 @@ function EditSheet({
   demo,
   roles,
   selfId,
+  seesLogins,
   onClose,
 }: {
   profile: Profile | null;
   demo: boolean;
   roles: typeof ROLES;
   selfId: string;
+  seesLogins: boolean;
   onClose: () => void;
 }) {
   const [name, setName] = useState('');
@@ -317,7 +324,7 @@ function EditSheet({
     >
       <div className="flex flex-col gap-5">
         {/* имя — как его видят в журнале и сменах; логин для входа не меняется */}
-        <Field label="Имя" hint={`логин для входа: ${profile.login} — не меняется`}>
+        <Field label="Имя" hint={seesLogins ? `логин для входа: ${profile.login} — не меняется` : 'логин для входа не меняется'}>
           <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
         </Field>
         <div className="flex flex-col gap-2">
@@ -359,7 +366,7 @@ function EditSheet({
             {confirmDelete ? (
               <>
                 <p className="m-0 px-1 text-[14px] font-semibold text-ink2">
-                  Удалить {profile.full_name} насовсем? Логин {profile.login} освободится. Его смены и записи в журнале останутся с именем.
+                  Удалить {profile.full_name} насовсем? {seesLogins ? `Логин ${profile.login} освободится.` : ''} Его смены и записи в журнале останутся с именем.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <Button onClick={() => setConfirmDelete(false)}>Отмена</Button>

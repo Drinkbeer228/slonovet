@@ -101,7 +101,7 @@ function Main() {
           {current === 'diet' && <DietScreen user={user} />}
           {current === 'stock' && <StockScreen user={user} />}
           {current === 'journal' && <JournalScreen />}
-          {current === 'users' && <UsersScreen session={session} />}
+          {current === 'users' && <UsersScreen session={session} role={user.role} />}
           {current === 'guide' && <GuideScreen role={user.role} />}
           {current === 'rating' && <RatingScreen user={user} />}
           {current === 'move' && <MoveScreen user={user} />}
