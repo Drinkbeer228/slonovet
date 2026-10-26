@@ -1,8 +1,8 @@
 // Фураж: списания по кормлению и остатки (локально, без сервера).
-// «Известные проблемы» — находки аудита 26.10.2026; как и в src/lib/sync.test.ts, записаны так, как должно работать.
+// Коды (Ф1, Д3…) — находки аудита 26.10.2026; ещё не исправленные помечены it.fails, как в src/lib/sync.test.ts.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { keeperA, phone } from '../test/app';
-import { balances, countPerDay } from './stock';
+import { balances, countPerDay, stockPerDay, stockView } from './stock';
 import type { Diet, Shift, StockItem, StockMove } from './types';
 
 const now = '2026-10-26T10:00:00.000Z';
@@ -57,14 +57,70 @@ describe('Фураж — работает', () => {
   });
 });
 
-describe('Фураж — известные проблемы (аудит)', () => {
-  it.fails('Ф2: рацион поменяли между галочкой и её снятием — списание по старому рациону тоже снимается', async () => {
+describe('Фураж — находки аудита, исправлены на этапе 2', () => {
+  it('Ф1: минус на складе виден, а не прячется за «закончилось»', () => {
+    const v = stockView(item('oats', 'Овёс', 'grain'), balances([mv('f1', 'oats', -12, 'feed')]).get('oats')!, 4);
+    expect(v.balance).toBe(-12);
+    expect(v.low).toBe(true);
+  });
+
+  it('Ф1, Ф6: пересчёт при минусе даёт ровно пересчитанное', async () => {
+    await p.store.put('stock_moves', mv('f1', 'oats', -12, 'feed'));
+    await p.actions.countStock('oats', 50, keeperA, null);
+    expect(balances(p.store.getRows('stock_moves')).get('oats')).toBe(50);
+  });
+
+  it('Ф2: рацион поменяли между галочкой и её снятием — списание по старому рациону тоже снимается', async () => {
     await p.actions.setFeedDone(s1(), '13:00', true, keeperA); // −2 кг ФормаМакс
     await p.store.put('diets', diet('optiform', 1.5)); // врач перевёл на ОптиФорм
     await p.actions.setFeedDone(s1(), '13:00', false, keeperA); // «не кормил»
     expect(activeFeed()).toEqual([]);
   });
 
+  it('Ф3: яблоки (их нет в рационе) попадают в «Заканчивается» по фактическим выдачам', () => {
+    const apple = item('apple', 'Яблоки', 'veg');
+    const day = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
+    const moves = [mv('in', 'apple', 20, 'in', day(4)), mv('x1', 'apple', -5, 'extra', day(3)), mv('x2', 'apple', -5, 'extra', day(2)), mv('x3', 'apple', -5, 'waste', day(1))];
+    const perDay = stockPerDay([apple], [], moves).get('apple')!;
+    expect(perDay).toBeCloseTo(15 / 7);
+    expect(stockView(apple, balances(moves).get('apple')!, perDay).low).toBe(true); // 5 кг — на 2 с лишним дня
+  });
+
+  it('Ф4: «вне рациона» входит в расход вместе с рационом', () => {
+    const potato = item('potato', 'Картофель', 'veg');
+    const diets = ['Претти', 'Марго', 'Одри'].map((id) => ({ ...diet('potato', 20, id), meals: [{ time: '19:00', title: 'Овощи', prep: '', items: [{ item: 'potato', name: 'Картофель', qty: 20, unit: 'кг' as const }] }] }));
+    const day = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
+    const moves = [1, 2, 3, 4, 5].map((d) => mv(`x${d}`, 'potato', -30, 'extra', day(d)));
+    expect(stockPerDay([potato], diets, moves).get('potato')).toBeCloseTo(60 + 150 / 7);
+  });
+
+  it('Ф5: приход по закупке с одним id — повтор не задваивает', async () => {
+    await p.actions.addStockMove('hay', 30, 'in', keeperA, null, 'in:purchase:p1');
+    await p.actions.addStockMove('hay', 30, 'in', keeperA, null, 'in:purchase:p1');
+    expect(balances(p.store.getRows('stock_moves')).get('hay')).toBe(30);
+  });
+
+  it('Ф6: чужое списание, сделанное до пересчёта и пришедшее позже, итог не меняет; сделанное после — меняет', () => {
+    const t = (min: number) => new Date(Date.parse('2026-10-26T10:00:00Z') + min * 60_000).toISOString();
+    const count = { ...mv('c', 'oats', -10, 'fix', t(10)), counted: 90 }; // телефон видел 100, пересчитали 90
+    const moves = [mv('in', 'oats', 100, 'in', t(0)), count, mv('other', 'oats', -10, 'feed', t(5))]; // чужое — в 10:05, до пересчёта
+    expect(balances(moves).get('oats')).toBe(90);
+    expect(balances([...moves, mv('later', 'oats', -10, 'feed', t(20))]).get('oats')).toBe(80);
+  });
+
+  it('Ф7: строка рациона «по весу» списывается по вписанным кг, без «тазов»', async () => {
+    await p.store.seedRows('stock_items', [item('pumpkin', 'Тыква', 'veg')]);
+    await p.store.put('diets', { ...diet('formamax', 2), meals: [{ time: '19:00', title: 'Овощи', prep: '', items: [{ item: 'pumpkin', name: 'Тыква', qty: null, unit: 'кг' }] }] });
+    await p.actions.setFeedDone(s1(), '19:00', true, keeperA);
+    expect(p.store.getRows('stock_moves').filter((m) => m.item_id === 'pumpkin')).toEqual([]); // сама не списывает
+    await p.actions.setFeedKg(s1(), '19:00', 'pumpkin', 12, keeperA);
+    expect(balances(p.store.getRows('stock_moves')).get('pumpkin')).toBe(-12);
+    await p.actions.setFeedDone(s1(), '19:00', false, keeperA);
+    expect(balances(p.store.getRows('stock_moves')).get('pumpkin') ?? 0).toBe(0);
+  });
+});
+
+describe('Фураж — известные проблемы (аудит)', () => {
   it.fails('Д3: две выдачи сена в одни местные сутки — один день расхода', () => {
     const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
     const tz = env.TZ;
@@ -78,10 +134,5 @@ describe('Фураж — известные проблемы (аудит)', () =
     }
   });
 
-  it.todo('Ф1: показывать минус на складе; «Поправить остаток» считать от настоящего остатка, а не от показанного нуля');
-  it.todo('Ф3: расход позиций вне рациона (яблоки, бананы) — по фактическим выдачам, чтобы работало «Заканчивается»');
-  it.todo('Ф4: «вне рациона» входит в «хватит на N дней»');
-  it.todo('Ф5: двойное «Привезли» и двойное «Выдали вне рациона» не задваивают движение');
-  it.todo('Ф6: пересчёт склада — факт «на складе N на такое-то время», а не разница с тем, что видит телефон');
   it.todo('Д3: запись в 00:30 по Москве показывается сегодняшней');
 });

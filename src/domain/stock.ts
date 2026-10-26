@@ -44,9 +44,31 @@ export function itemsWithoutQty(diets: Diet[]): Set<string> {
   return s;
 }
 
+/** Движение a раньше b: по времени записи, при равном — по id (одинаково на всех телефонах). */
+function before(a: StockMove, b: StockMove) {
+  const ta = Date.parse(a.created_at);
+  const tb = Date.parse(b.created_at);
+  return ta < tb || (ta === tb && a.id < b.id);
+}
+
+/**
+ * Остатки. Последний пересчёт позиции (counted) — точка отсчёта: остаток = пересчитанное + движения после него.
+ * Чужие списания, сделанные до пересчёта и пришедшие позже, итог не меняют. Без пересчёта — сумма всех движений.
+ */
 export function balances(moves: StockMove[]): Map<string, number> {
+  const lastCount = new Map<string, StockMove>();
+  for (const m of moves) {
+    if (m.counted == null) continue;
+    const c = lastCount.get(m.item_id);
+    if (!c || before(c, m)) lastCount.set(m.item_id, m);
+  }
   const out = new Map<string, number>();
-  for (const m of moves) out.set(m.item_id, (out.get(m.item_id) ?? 0) + Number(m.delta));
+  for (const [id, c] of lastCount) out.set(id, Number(c.counted));
+  for (const m of moves) {
+    const c = lastCount.get(m.item_id);
+    if (c && (m === c || before(m, c))) continue;
+    out.set(m.item_id, (out.get(m.item_id) ?? 0) + Number(m.delta));
+  }
   return out;
 }
 
@@ -65,6 +87,34 @@ export function weighedItem(diets: Diet[], time: string): string | null {
     if (it?.item) return it.item;
   }
   return null;
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Расход в сутки по каждой позиции — для «хватит на N дней» и «Заканчивается»:
+ * рацион (или выдачи «по весу», или тюки и мешки по счётчикам) плюс фактические «вне рациона» и брак за 7 дней.
+ * Так у яблок и бананов, которых нет в рационе, тоже есть расход.
+ */
+export function stockPerDay(items: StockItem[], diets: Diet[], moves: StockMove[], now = Date.now()): Map<string, number | null> {
+  const usage = dailyUsage(diets, items);
+  const noQty = itemsWithoutQty(diets);
+  const since = now - WEEK_MS;
+  const outside = new Map<string, number>();
+  for (const m of moves) {
+    if ((m.reason === 'extra' || m.reason === 'waste') && Date.parse(m.created_at) >= since) outside.set(m.item_id, (outside.get(m.item_id) ?? 0) - Number(m.delta));
+  }
+  const out = new Map<string, number | null>();
+  for (const it of items) {
+    if (it.kind === 'count') {
+      out.set(it.id, countPerDay(moves, it.id) || null);
+      continue;
+    }
+    const base = noQty.has(it.id) ? weighedPerDay(moves, it.id) : (usage.get(it.id) ?? 0);
+    const total = base + (outside.get(it.id) ?? 0) / 7;
+    out.set(it.id, total > 0 ? total : null);
+  }
+  return out;
 }
 
 /** Средний расход в сутки по фактическим выдачам «по весу» за 7 дней. */
@@ -156,6 +206,7 @@ export function deleteBlocker(item: StockItem, diets: Diet[]): string | null {
 
 export interface StockView {
   item: StockItem;
+  /** может быть меньше нуля — значит, не внесли приход или пересчёт */
   balance: number;
   perDay: number | null;
   daysLeft: number | null;
@@ -165,6 +216,7 @@ export interface StockView {
 }
 
 export function stockView(item: StockItem, balance: number, perDay: number | null): StockView {
+  // минус не прячем: он значит, что приход или пересчёт не внесли
   const b = Math.max(0, balance);
   const daysLeft = perDay && perDay > 0 ? b / perDay : null;
   let full = 0;
@@ -174,7 +226,7 @@ export function stockView(item: StockItem, balance: number, perDay: number | nul
     openFrac = (b - full * item.sack_kg) / item.sack_kg;
     if (openFrac < 0.01) openFrac = 0;
   }
-  return { item, balance: b, perDay, daysLeft, full, openFrac, low: daysLeft != null && daysLeft < item.low_days };
+  return { item, balance, perDay, daysLeft, full, openFrac, low: daysLeft != null && daysLeft < item.low_days };
 }
 
 export function fmtNum(n: number, digits = 1) {

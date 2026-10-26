@@ -56,7 +56,8 @@ function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase | null
   const unit = !it ? '' : it.kind === 'kg' ? 'кг' : it.kind === 'sack' ? packWords(it)[2] : countWords(it.id, it.unit)[2];
   const delta = !it ? 0 : it.kind === 'sack' ? n * (it.sack_kg ?? 0) : n;
   const finish = async (withStock: boolean) => {
-    if (withStock && it && delta > 0) await addStockMove(it.id, delta, 'in', user, currentShift(shifts)?.id ?? null);
+    // id прихода — по закупке: два нажатия или два телефона дают один приход, а не два
+    if (withStock && it && delta > 0) await addStockMove(it.id, delta, 'in', user, currentShift(shifts)?.id ?? null, `in:purchase:${p.id}`);
     await setStatus(p, 'done', user);
     if (withStock && it && delta > 0) toast(`${it.name}: +${fmtNum(n, it.kind === 'kg' ? 1 : 0)} ${unit} в фураж`);
     onClose();

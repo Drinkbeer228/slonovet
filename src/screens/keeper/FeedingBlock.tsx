@@ -2,7 +2,7 @@ import { ELEPHANTS } from '../../domain/elephants';
 import { cycleEaten, setFeedDone, setFeedGiven, setFeedKg, setHay } from '../../domain/actions';
 import { categoryOf, feedUsage, weighedItem } from '../../domain/stock';
 import { FEED_TIMES } from '../../domain/shift';
-import type { CurrentUser, Diet, Eaten, ElephantName, Shift } from '../../domain/types';
+import type { CurrentUser, Diet, Eaten, Shift } from '../../domain/types';
 import { useState } from 'react';
 import { useRows } from '../../lib/store';
 import { Card, DecimalInput, Section, Segmented, Sheet, Stepper, Tick } from '../../ui/kit';
@@ -33,7 +33,6 @@ export function mealTitle(diets: Diet[], time: string) {
 
 export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const diets = useRows('diets');
-  const items = useRows('stock_items');
   const doneCount = FEED_TIMES.filter((t) => shift.feeds[t]?.done).length;
   const [recipe, setRecipe] = useState<string | null>(null);
   return (
@@ -86,14 +85,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
                 </div>
               )}
               {done && <GivenRows shift={shift} time={t} diets={diets} user={user} />}
-              {done && weighedItem(diets, t) && (
-                <WeighRow
-                  kg={f?.kg ?? 0}
-                  fill={f?.fill}
-                  perBowl={items.find((i) => i.id === weighedItem(diets, t))?.kg_per_garets ?? null}
-                  onSave={(kg, fill) => setFeedKg(shift, t, weighedItem(diets, t)!, kg, user, fill)}
-                />
-              )}
+              {done && weighedItem(diets, t) && <WeighRow kg={f?.kg ?? 0} onSave={(kg) => setFeedKg(shift, t, weighedItem(diets, t)!, kg, user)} />}
             </div>
           );
         })}
@@ -153,64 +145,16 @@ function RecipeSheet({ time, onTime, diets }: { time: string | null; onTime: (t:
   );
 }
 
-const FILL_STEPS = [1, 0.75, 0.5, 0.25];
-const FILL_LABEL: Record<number, string> = { 1: 'вся', 0.75: '¾', 0.5: '½', 0.25: '¼' };
-
-/** Овощи: по образцу — наполнение таза у каждой (вес таза задаёт админ), или точным весом. */
-function WeighRow({
-  kg,
-  fill,
-  perBowl,
-  onSave,
-}: {
-  kg: number;
-  fill?: Partial<Record<ElephantName, number>>;
-  perBowl: number | null;
-  onSave: (kg: number, fill?: Partial<Record<ElephantName, number>>) => void;
-}) {
-  const [exact, setExact] = useState(false);
-  if (perBowl && !exact && (fill || !kg)) {
-    const cur = (el: ElephantName) => fill?.[el] ?? 1;
-    const next = (el: ElephantName) => {
-      const v = FILL_STEPS[(FILL_STEPS.indexOf(cur(el)) + 1) % FILL_STEPS.length];
-      const nf = { ...Object.fromEntries(ELEPHANTS.map((e) => [e, cur(e)])), [el]: v } as Record<ElephantName, number>;
-      onSave(ELEPHANTS.reduce((sum, e) => sum + nf[e], 0) * perBowl, nf);
-    };
-    return (
-      <div className="flex flex-col gap-1.5 px-4 pb-3">
-        <span className="text-[12px] font-bold text-muted">Порция овощей (~75 кг) — нажми, если дали не всю</span>
-        <div className="flex gap-2">
-          {ELEPHANTS.map((el) => (
-            <button
-              key={el}
-              type="button"
-              onClick={() => next(el)}
-              aria-label={`${el}: таз ${FILL_LABEL[cur(el)]}. Нажми, чтобы изменить`}
-              className={`flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border px-1 text-[13px] font-bold ${
-                cur(el) === 1 ? 'border-line bg-surface2 text-ink2' : 'border-amber bg-amber/15 text-amber'
-              }`}
-            >
-              <span className="relative h-4 w-3 overflow-hidden rounded-[3px] border border-current">
-                <span className="absolute inset-x-0 bottom-0 bg-current opacity-60" style={{ height: `${cur(el) * 100}%` }} />
-              </span>
-              {el} · {FILL_LABEL[cur(el)]}
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={() => setExact(true)} className="self-start py-2 text-[13px] font-bold text-teal">
-          взвесил — вписать кг
-        </button>
-      </div>
-    );
-  }
+/** Строка рациона «по весу» (без количества): кипер вписывает, сколько кг выдал, — столько и списывается. */
+function WeighRow({ kg, onSave }: { kg: number; onSave: (kg: number) => void }) {
   return (
     <div className="flex items-center gap-3 px-4 pb-3">
       <span className="flex flex-1 flex-col">
-        <span className="text-[14px] font-bold">Выдано овощей, кг</span>
-        <span className={`text-[12px] font-semibold ${kg ? 'text-muted' : 'text-amber'}`}>{kg ? 'списано из запаса' : 'взвесь тазы и впиши сумму'}</span>
+        <span className="text-[14px] font-bold">Выдано по весу, кг</span>
+        <span className={`text-[12px] font-semibold ${kg ? 'text-muted' : 'text-amber'}`}>{kg ? 'списано из запаса' : 'взвесь и впиши, сколько выдал'}</span>
       </span>
       <DecimalInput
-        label="Выдано овощей, кг"
+        label="Выдано по весу, кг"
         value={kg || null}
         placeholder="0"
         onCommit={(v) => onSave(Math.max(0, v ?? 0))}

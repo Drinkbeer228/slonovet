@@ -34,8 +34,6 @@ export interface FeedState {
   eaten?: Partial<Record<ElephantName, Eaten>>;
   /** сколько кг выдано — для кормлений «по весу» (овощи) */
   kg?: number;
-  /** овощи «по образцу»: наполнение таза у каждой (1 — полный, 0.75, 0.5, 0.25); кг = сумма × вес таза */
-  fill?: Partial<Record<ElephantName, number>>;
   /** сколько кг реально выдали по позиции, если не по рациону (картофель взяли 2 сетки вместо 3) */
   given?: Record<string, number>;
 }
@@ -146,6 +144,8 @@ export interface StockMove extends Base {
   author_name: string;
   /** повод для «вне рациона»: Манеж, Репетиция… */
   note?: string;
+  /** пересчёт: на складе ровно столько на created_at; остаток = это число + движения после (delta — для старых версий) */
+  counted?: number | null;
   created_at: string;
 }
 

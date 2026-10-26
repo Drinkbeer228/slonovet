@@ -20,8 +20,9 @@ describe('списание корма по рациону', () => {
     expect(u.get('monograss')).toBe(1.5);
   });
 
-  it('овощи «по образцу» по рецепту не списываются (их считает наполнение тазов)', () => {
-    expect(feedUsage(SEED_DIETS, '19:00', SEED_STOCK_ITEMS).has('veg')).toBe(false);
+  it('строка рациона без количества по рецепту не списывается — кипер вписывает кг', () => {
+    const diets = [{ ...SEED_DIETS[0], meals: [{ time: '19:00', title: 'Овощи', prep: '', items: [{ item: 'potato', name: 'Картофель', qty: null, unit: 'кг' as const }] }] }];
+    expect(feedUsage(diets, '19:00', SEED_STOCK_ITEMS).has('potato')).toBe(false);
   });
 
   it('гарец без заданного веса не превращается в ноль — просто не считается', () => {

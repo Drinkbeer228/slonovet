@@ -29,18 +29,37 @@ export function Button({
   kind?: BtnKind;
   icon?: IconName;
   children?: ReactNode;
-  onClick?: () => void;
+  onClick?: () => unknown;
   disabled?: boolean;
   big?: boolean;
   full?: boolean;
   type?: 'button' | 'submit';
   className?: string;
 }) {
+  // пока действие кнопки сохраняется — второе нажатие не проходит (иначе двойной тап = двойной приход)
+  const busy = useRef(false);
+  const [pending, setPending] = useState(false);
+  const click = () => {
+    if (busy.current) return;
+    const r: unknown = onClick?.();
+    if (r instanceof Promise) {
+      busy.current = true;
+      setPending(true);
+      const done = () => {
+        busy.current = false;
+        setPending(false);
+      };
+      r.then(done, (e: unknown) => {
+        done();
+        throw e;
+      });
+    }
+  };
   return (
     <button
       type={type}
-      onClick={onClick}
-      disabled={disabled}
+      onClick={click}
+      disabled={disabled || pending}
       className={`inline-flex items-center justify-center gap-2 rounded-xl border font-extrabold transition active:scale-[.98] disabled:opacity-40 ${
         big ? 'h-14 px-5 text-[17px] rounded-2xl' : 'h-11 px-4 text-[15px]'
       } ${full ? 'w-full' : ''} ${BTN[kind]} ${className}`}

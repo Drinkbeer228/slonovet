@@ -4,7 +4,7 @@ import { savePhoto } from '../lib/photos';
 import { logEvent } from '../lib/log';
 import { isoDate } from '../lib/dates';
 import { newHandoverCode, newShift } from './shift';
-import { feedUsage, weighedItem } from './stock';
+import { balances, feedUsage, weighedItem } from './stock';
 import type { CurrentUser, ElephantName, Level, MetricKey, Note, NoteKind, Shift, StockMove } from './types';
 
 function clone<T>(v: T): T {
@@ -81,7 +81,7 @@ export async function fillNorm(shift: Shift, els: ElephantName[], metrics: Metri
   });
 }
 
-/** Отметить кормление. Списываем со склада по рациону; снятие отметки возвращает. */
+/** Отметить кормление. Списываем со склада по рациону; снятие отметки возвращает всё, что за это кормление списали. */
 export async function setFeedDone(shift: Shift, time: string, done: boolean, user: CurrentUser) {
   logEvent('feed.toggle', { time, done });
   await updateShift(shift, (s) => {
@@ -90,19 +90,19 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
       ? { done: true, at: new Date().toISOString(), eaten: prev?.eaten ?? { Претти: 'all', Марго: 'all', Одри: 'all' }, kg: prev?.kg }
       : { done: false, kg: prev?.kg }; // кг помним: при повторной галочке они вернутся вместе со списанием
   });
-  // кормление «по весу» (овощи): списание по введённым кг
+  if (!done) {
+    // снимаем именно то, что записано за эту смену и это кормление, — даже если рацион с тех пор поменялся
+    const feedPrefix = `feed:${shift.id}:${time}:`;
+    for (const m of getRows('stock_moves')) {
+      if (m.id.startsWith(feedPrefix) || m.id === `veg:${shift.id}:${time}`) await put('stock_moves', { ...m, deleted: true });
+    }
+    return;
+  }
+  // кормление «по весу» (строка рациона без количества): списание по вписанным кг
   // (getRow не видит удалённые строки, поэтому при повторной галочке списание пересоздаём из кг смены)
-  const weighed = getRow('stock_moves', `veg:${shift.id}:${time}`);
   const kg = getRow('shifts', shift.id)?.feeds[time]?.kg ?? 0;
   const weighedId = weighedItem(getRows('diets'), time);
-  if (!done && weighed) await put('stock_moves', { ...weighed, deleted: true });
-  if (done && !weighed && kg > 0 && weighedId) await setFeedKg(shift, time, weighedId, kg, user);
-  // овощи по образцу: первая галочка сразу списывает по тазу на каждую слониху
-  const perBowl = weighedId ? getRow('stock_items', weighedId)?.kg_per_garets : null;
-  if (done && !weighed && kg === 0 && weighedId && perBowl) {
-    const fill = Object.fromEntries(ELEPHANTS.map((e) => [e, 1])) as Record<ElephantName, number>;
-    await setFeedKg(shift, time, weighedId, ELEPHANTS.length * perBowl, user, fill);
-  }
+  if (kg > 0 && weighedId && !getRow('stock_moves', `veg:${shift.id}:${time}`)) await setFeedKg(shift, time, weighedId, kg, user);
   const usage = feedUsage(getRows('diets'), time, getRows('stock_items'));
   // поправленное кипером (сетками) — важнее рациона
   const given = getRow('shifts', shift.id)?.feeds[time]?.given ?? {};
@@ -110,20 +110,16 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
   for (const [item, qty] of usage) {
     const id = `feed:${shift.id}:${time}:${item}`;
     const existing = getRow('stock_moves', id);
-    if (done) {
-      await put('stock_moves', {
-        id,
-        item_id: item,
-        delta: -qty,
-        reason: 'feed',
-        shift_id: shift.id,
-        author_name: user.full_name,
-        created_at: existing?.created_at ?? new Date().toISOString(),
-        deleted: false,
-      } satisfies Omit<StockMove, 'updated_at'>);
-    } else if (existing) {
-      await put('stock_moves', { ...existing, deleted: true });
-    }
+    await put('stock_moves', {
+      id,
+      item_id: item,
+      delta: -qty,
+      reason: 'feed',
+      shift_id: shift.id,
+      author_name: user.full_name,
+      created_at: existing?.created_at ?? new Date().toISOString(),
+      deleted: false,
+    } satisfies Omit<StockMove, 'updated_at'>);
   }
 }
 
@@ -155,21 +151,11 @@ export async function addStockMoveNote(item_id: string, delta: number, reason: '
   await put('stock_moves', { id: newId(), item_id, delta, reason, shift_id, author_name: user.full_name, note, created_at: new Date().toISOString() });
 }
 
-/** Кипер вписывает, сколько кг выдал (овощи). Списывается со склада. */
-export async function setFeedKg(
-  shift: Shift,
-  time: string,
-  itemId: string,
-  kg: number,
-  user: CurrentUser,
-  fill?: Partial<Record<ElephantName, number>>,
-) {
+/** Кипер вписывает, сколько кг выдал по строке рациона «по весу». Списывается со склада. */
+export async function setFeedKg(shift: Shift, time: string, itemId: string, kg: number, user: CurrentUser) {
   await updateShift(shift, (s) => {
     const f = s.feeds[time];
-    if (f) {
-      f.kg = kg;
-      f.fill = fill; // вписали кг руками — наполнение тазов больше не считаем
-    }
+    if (f) f.kg = kg;
   });
   const id = `veg:${shift.id}:${time}`;
   const existing = getRow('stock_moves', id);
@@ -274,14 +260,36 @@ export async function addNote(input: {
   await put('notes', note);
 }
 
-export async function addStockMove(item_id: string, delta: number, reason: StockMove['reason'], user: CurrentUser, shift_id: string | null) {
+/** Движение фуража. id — постоянный, если одно и то же действие могут повторить (приход по закупке): тогда без задвоения. */
+export async function addStockMove(item_id: string, delta: number, reason: StockMove['reason'], user: CurrentUser, shift_id: string | null, id = newId()) {
   logEvent('stock.move', { item: item_id, delta, reason });
   if (!delta) return;
+  await put('stock_moves', {
+    id,
+    item_id,
+    delta,
+    reason,
+    shift_id,
+    author_name: user.full_name,
+    created_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * Пересчитали: на складе ровно counted. Записываем факт пересчёта — остаток дальше считается от него
+ * (см. balances), а delta — разница с тем, что видел этот телефон, для старых версий приложения.
+ */
+export async function countStock(item_id: string, counted: number, user: CurrentUser, shift_id: string | null) {
+  const now = getRows('stock_moves').filter((m) => m.item_id === item_id);
+  const delta = Math.round((counted - (balances(now).get(item_id) ?? 0)) * 1000) / 1000;
+  if (!delta) return;
+  logEvent('stock.count', { item: item_id, counted, delta });
   await put('stock_moves', {
     id: newId(),
     item_id,
     delta,
-    reason,
+    counted,
+    reason: 'fix',
     shift_id,
     author_name: user.full_name,
     created_at: new Date().toISOString(),

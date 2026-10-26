@@ -1,9 +1,9 @@
 import { EDITORS, canEdit } from '../domain/access';
 import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
-import { addStockMove } from '../domain/actions';
+import { addStockMove, countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, packWords, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
+import { STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
 import { newId, put, useRows } from '../lib/store';
 import { plural, relDate, timeOf } from '../lib/dates';
@@ -30,6 +30,8 @@ function fracLabel(f: number) {
 
 function amountText(v: StockView) {
   const { item, balance } = v;
+  // минус — списали больше, чем внесли: приход или пересчёт не записан
+  if (balance < -0.05) return `минус ${fmtNum(-balance, item.kind === 'count' ? 0 : 1)} ${item.kind === 'count' ? countWords(item.id, item.unit)[2] : 'кг'} — не внесён приход?`;
   if (balance <= 0) return 'закончилось';
   if (item.kind === 'count') return `${fmtNum(balance, 0)} ${plural(Math.round(balance), ...countWords(item.id, item.unit))}`;
   if (item.kind === 'sack' && item.sack_kg) {
@@ -91,14 +93,8 @@ export function StockScreen({ user }: { user: CurrentUser }) {
 
   const views = useMemo(() => {
     const bal = balances(moves);
-    const usage = dailyUsage(diets, items);
-    const noQtyIds = itemsWithoutQty(diets);
-    const perDay = (it: StockItem) => {
-      if (it.kind === 'count') return countPerDay(moves, it.id) || null;
-      if (noQtyIds.has(it.id)) return weighedPerDay(moves, it.id) || null;
-      return usage.get(it.id) ?? null;
-    };
-    return new Map(items.map((it) => [it.id, stockView(it, bal.get(it.id) ?? 0, perDay(it))] as const));
+    const perDay = stockPerDay(items, diets, moves);
+    return new Map(items.map((it) => [it.id, stockView(it, bal.get(it.id) ?? 0, perDay.get(it.id) ?? null)] as const));
   }, [items, moves, diets]);
   const noQty = useMemo(() => itemsWithoutQty(diets), [diets]);
   const low = [...views.values()].filter((v) => v.low).sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
@@ -129,7 +125,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
           <span className="text-[12px] font-extrabold tracking-wide text-amber">ЗАКАНЧИВАЕТСЯ</span>
           {low.map((v) => (
             <span key={v.item.id} className="text-[15px] font-bold">
-              {v.item.name} — {v.balance <= 0 ? 'закончилось' : daysText(v, false)}
+              {v.item.name} — {v.balance <= 0 ? amountText(v) : daysText(v, false)}
             </span>
           ))}
         </Card>
@@ -197,7 +193,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-[14px] font-bold">{nameOf(m.item_id)}</span>
                     <span className="text-[12px] font-semibold text-muted">
-                      {MOVE_LABEL[m.reason] ?? 'поправка'}
+                      {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unit}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
                       {m.note ? `: ${m.note}` : ''} · {relDate(m.created_at.slice(0, 10))} {timeOf(m.created_at)} · {m.author_name}
                     </span>
                   </span>
@@ -230,9 +226,12 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   const [sackKg, setSackKg] = useState('');
   const [perGarets, setPerGarets] = useState('');
   const [openedFor, setOpenedFor] = useState<string | null>(null);
+  // остаток трогали — значит, пересчитали; иначе (переименовали) пересчёт не записываем
+  const [counted, setCounted] = useState(false);
 
   if (view && it && openedFor !== it.id) {
     setOpenedFor(it.id);
+    setCounted(false);
     setFull(view.full);
     setFrac(FRACTIONS.reduce((a, b) => (Math.abs(b.v - view.openFrac) < Math.abs(a.v - view.openFrac) ? b : a)).v);
     setValue(String(Math.round(view.balance * 10) / 10));
@@ -251,7 +250,10 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   const byKg = veg || it.kind !== 'sack' || !it.sack_kg;
   const num = (v: string) => Number(v.replace(',', '.')) || 0;
   const target = byKg ? num(value) : (full + frac) * it.sack_kg!;
-  const bump = (d: number) => setValue(String(Math.max(0, Math.round((num(value) + d) * 10) / 10)).replace('.', ','));
+  const bump = (d: number) => {
+    setCounted(true);
+    setValue(String(Math.max(0, Math.round((num(value) + d) * 10) / 10)).replace('.', ','));
+  };
   return (
     <Sheet
       open
@@ -263,8 +265,8 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
           big
           full
           onClick={async () => {
-            const delta = Math.round((target - view.balance) * 1000) / 1000;
-            await addStockMove(it.id, delta, 'fix', user, shiftId);
+            // пересчёт — факт «на складе столько»: остаток дальше считается от него, а не от того, что видел телефон
+            if (counted) await countStock(it.id, target, user, shiftId);
             // название и настройки — одной записью, чтобы одно не затёрло другое
             const next: StockItem = { ...it, name: name.trim() || it.name };
             if (it.kind === 'sack' && num(sackKg)) next.sack_kg = num(sackKg);
@@ -282,7 +284,10 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
         {veg ? (
           <div className="flex flex-col gap-2">
             <Field label="Сейчас, кг" hint={it.sack_kg ? `≈ ${countText(num(value) / it.sack_kg, packWords(it))} по ${fmtNum(it.sack_kg)} кг` : undefined}>
-              <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+              <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => {
+                  setCounted(true);
+                  setValue(e.target.value);
+                }} />
             </Field>
             <div className="grid grid-cols-4 gap-1.5">
               {[-10, -5, 5, 10].map((d) => (
@@ -297,7 +302,14 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
           <>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[15px] font-bold">Полных мешков</span>
-              <Stepper label="Полных мешков" value={full} onChange={setFull} />
+              <Stepper
+                label="Полных мешков"
+                value={full}
+                onChange={(v) => {
+                  setCounted(true);
+                  setFull(v);
+                }}
+              />
             </div>
             <div className="flex flex-col gap-2">
               <span className="text-[15px] font-bold">Открытый мешок</span>
@@ -307,7 +319,10 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
                     key={f.v}
                     type="button"
                     aria-pressed={frac === f.v}
-                    onClick={() => setFrac(f.v)}
+                    onClick={() => {
+                      setCounted(true);
+                      setFrac(f.v);
+                    }}
                     className={`flex h-20 flex-col items-center justify-end gap-1.5 rounded-xl border pb-2 text-[13px] font-bold ${
                       frac === f.v ? 'border-ink text-ink' : 'border-line text-muted'
                     }`}
@@ -326,7 +341,10 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
           </>
         ) : (
           <Field label={it.kind === 'count' ? `Сейчас ${countWords(it.id, it.unit)[2]}` : 'Сейчас, кг'}>
-            <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+            <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => {
+                  setCounted(true);
+                  setValue(e.target.value);
+                }} />
           </Field>
         )}
         {it.kind === 'sack' && (
@@ -527,7 +545,7 @@ function AddItemSheet({
             await put('stock_items', item);
             // сколько есть сейчас — первой поправкой, чтобы остаток сразу был виден
             const have = kind === 'sack' ? num(qty) * num(sackKg) : num(qty);
-            if (have > 0) await addStockMove(id, have, 'fix', user, shiftId);
+            if (have > 0) await countStock(id, have, user, shiftId);
             toast(`Добавлено: ${item.name}`);
             onClose();
           }}
