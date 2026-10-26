@@ -46,7 +46,7 @@ src/
     …          рацион, фураж, журнал, переезд, рейтинг, справка
   ui/          кнопки, шторки, иконки
 supabase/
-  migrations/  схема базы по порядку (001…010)
+  migrations/  схема базы по порядку (001…011)
   functions/   admin-users
 .github/workflows/
   deploy.yml   проверка, сборка и выкладка на сервер на каждый push в main

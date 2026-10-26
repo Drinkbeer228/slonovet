@@ -176,16 +176,12 @@ export function MenuSheet({ open, onClose, session, onTab }: { open: boolean; on
           {session.mode === 'demo' ? ' · пример без сервера' : ` · ${session.user.login}`}
         </span>
 
-        {session.mode === 'cloud' && (
+        {/* в обычной работе про отправку молчим; карточка — только если что-то не ушло */}
+        {session.mode === 'cloud' && (s.state === 'offline' || s.state === 'error' || s.pending > 0) && (
           <Card className="flex flex-col gap-2 p-4">
             <span className="text-[15px] font-bold">
-              {s.state === 'offline'
-                ? 'Нет сети — всё сохраняется на телефоне'
-                : s.pending
-                  ? `Ждут отправки: ${s.pending}`
-                  : 'Всё отправлено'}
+              {s.state === 'offline' ? 'Нет сети — всё сохраняется на телефоне' : `Ждут отправки: ${s.pending}`}
             </span>
-            {s.lastSync && <span className="text-[13px] font-semibold text-muted">Последняя синхронизация в {timeOf(s.lastSync)}</span>}
             {s.error && <span className="text-[13px] font-semibold text-coral">{s.error}</span>}
             <Button
               icon="refresh"
@@ -196,7 +192,7 @@ export function MenuSheet({ open, onClose, session, onTab }: { open: boolean; on
                 setBusy(false);
               }}
             >
-              Синхронизировать
+              Отправить сейчас
             </Button>
           </Card>
         )}

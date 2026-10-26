@@ -53,6 +53,7 @@ function RequestCard({ todo, onQuick, onDetailed }: { todo: RequestTodo; onQuick
         </span>
       </div>
       <p className="m-0 text-[15px] font-medium leading-snug">{req.text}</p>
+      {req.photo_path && <PhotoThumb path={req.photo_path} size={96} />}
       <span className="-mt-1.5 text-[12px] font-semibold text-muted">от {req.author_name}</span>
       {marks.length > 0 && (
         <div className="flex flex-col gap-1.5">
@@ -60,7 +61,7 @@ function RequestCard({ todo, onQuick, onDetailed }: { todo: RequestTodo; onQuick
             <div key={m.id} className="flex items-center gap-2 text-[13px] font-semibold text-muted">
               {m.photo_path && <PhotoThumb path={m.photo_path} size={36} />}
               <span className="flex-1">
-                ✓ {timeOf(m.done_at)} · {m.done_by}
+                Выполнил: {m.done_by}, {timeOf(m.done_at)}
                 {m.note ? ` — ${m.note}` : ''}
               </span>
               <button type="button" className="-my-2 px-2 py-3 text-[13px] font-bold text-muted underline" onClick={() => remove('request_marks', m.id)}>

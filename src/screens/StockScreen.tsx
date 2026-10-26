@@ -3,7 +3,7 @@ import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { PACK_SIZE, STOCK_CATEGORIES, balances, categoryOf, deleteBlocker, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
+import { STOCK_CATEGORIES, balances, categoryOf, deleteBlocker, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
 import { newId, put, useRows } from '../lib/store';
 import { plural, relDate, timeOf } from '../lib/dates';
@@ -373,16 +373,12 @@ function IncomingSheet({
   const [qty, setQty] = useState(1);
   const [kg, setKg] = useState('');
   const it = sorted.find((i) => i.id === itemId);
+  // килограммы и штуки вписывают числом (мешков для мусора бывает 25 и 50 в пачке), мешки корма — кнопками
+  const typed = it?.kind === 'kg' || it?.kind === 'count';
   const isKg = it?.kind === 'kg';
-  const pack = it ? PACK_SIZE[it.id] : undefined;
-  const amount = !it ? 0 : isKg ? Number(kg.replace(',', '.')) || 0 : it.kind === 'sack' ? qty * (it.sack_kg ?? 0) : qty * (pack ?? 1);
-  const unitWord = !it
-    ? ''
-    : pack
-      ? `${plural(qty, 'упаковка', 'упаковки', 'упаковок')} (${amount} шт.)`
-      : it.kind === 'count'
-        ? plural(qty, ...countWords(it.id, it.unit))
-        : plural(qty, 'мешок', 'мешка', 'мешков');
+  const typedNum = Number(kg.replace(',', '.')) || 0;
+  const amount = !it ? 0 : typed ? typedNum : qty * (it.sack_kg ?? 0);
+  const unitWord = !it ? '' : it.kind === 'count' ? plural(Math.round(typedNum), ...countWords(it.id, it.unit)) : plural(qty, 'мешок', 'мешка', 'мешков');
 
   return (
     <Sheet
@@ -398,7 +394,7 @@ function IncomingSheet({
           onClick={async () => {
             if (!it) return;
             await addStockMove(it.id, amount, 'in', user, shiftId);
-            toast(`${it.name}: +${isKg ? `${fmtNum(amount)} кг` : `${qty} ${unitWord}`}`);
+            toast(`${it.name}: +${isKg ? `${fmtNum(amount)} кг` : it.kind === 'count' ? `${fmtNum(amount, 0)} ${unitWord}` : `${qty} ${unitWord}`}`);
             setQty(1);
             setKg('');
             onClose();
@@ -422,8 +418,8 @@ function IncomingSheet({
             </button>
           ))}
         </div>
-        {isKg ? (
-          <Field label="Сколько, кг">
+        {typed ? (
+          <Field label={isKg ? 'Сколько, кг' : `Сколько, ${countWords(it!.id, it!.unit)[2]}`}>
             <input className={inputCls} type="text" inputMode="decimal" value={kg} onChange={(e) => setKg(e.target.value)} />
           </Field>
         ) : (

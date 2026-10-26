@@ -129,8 +129,6 @@ export function deleteBlocker(item: StockItem, diets: Diet[]): string | null {
   return null;
 }
 
-/** Что привозят упаковками: мешки для мусора — по 10 штук. */
-export const PACK_SIZE: Record<string, number> = { bags: 10 };
 
 export interface StockView {
   item: StockItem;

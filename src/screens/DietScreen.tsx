@@ -19,7 +19,7 @@ export function qtyText(qty: number | null, unit: MealUnit) {
   return `${fmtNum(qty)} ${unit}`;
 }
 
-export function DietScreen({ user, onGuide }: { user: CurrentUser; onGuide: () => void }) {
+export function DietScreen({ user }: { user: CurrentUser }) {
   const diets = useRows('diets');
   const [el, setEl] = useState<ElephantName>('Претти');
   const [editing, setEditing] = useState(false);
@@ -130,12 +130,6 @@ export function DietScreen({ user, onGuide }: { user: CurrentUser; onGuide: () =
               </div>
             </Card>
           ))}
-          <div className="flex items-center justify-between gap-3 px-1 text-[13px] font-semibold text-muted">
-            <span>1 гарец — мерный совок</span>
-            <button type="button" className="-my-3 py-3 pl-3 font-bold text-teal" onClick={onGuide}>
-              справка →
-            </button>
-          </div>
           {editing && (
             <div className="sticky bottom-24 flex gap-2 md:bottom-4">
               <Button full onClick={() => setEditing(false)} className="bg-bg">

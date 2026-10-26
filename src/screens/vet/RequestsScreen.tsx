@@ -4,8 +4,9 @@ import { ELEPHANTS } from '../../domain/elephants';
 import { ANSWER_PRESETS, FREQ_LABEL, requestProgress, whoLabel } from '../../domain/shift';
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
 import { newId, put, useRows } from '../../lib/store';
+import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, relDate, shortDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, Empty, Field, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, Empty, Field, FilePreview, PhotoPick, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { EDITORS, canEdit } from '../../domain/access';
 import { PurchasesView } from '../PurchasesView';
 
@@ -15,6 +16,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
   const requests = useRows('requests');
   const [creating, setCreating] = useState<ElephantName | 'all' | 'work' | null>(null);
   const [open, setOpen] = useState<VetRequest | null>(null);
+  const [buying, setBuying] = useState(false);
   const editable = canEdit('requests', user.role);
   // две вкладки: назначения киперам и закупки; кто не ставит назначений — сразу в закупках
   const [view, setViewState] = useState<'requests' | 'purchases'>(() => {
@@ -45,11 +47,17 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
           <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Заявки</h1>
-          {editable && view === 'requests' && (
-            <Button kind="primary" icon="plus" onClick={() => setCreating('Претти')}>
-              Новая
-            </Button>
-          )}
+          {view === 'requests'
+            ? editable && (
+                <Button kind="primary" icon="plus" onClick={() => setCreating('Претти')}>
+                  Новая
+                </Button>
+              )
+            : (
+                <Button kind="primary" icon="plus" onClick={() => setBuying(true)}>
+                  Купить
+                </Button>
+              )}
         </div>
         {!editable && view === 'requests' && <ReadOnlyNote who={EDITORS.requests.who} />}
       </header>
@@ -63,7 +71,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         ]}
       />
       {view === 'purchases' ? (
-        <PurchasesView user={user} />
+        <PurchasesView user={user} adding={buying} onAddClose={() => setBuying(false)} />
       ) : (
         <>
         <Section title="Активные" aside={active.length ? String(active.length) : undefined}>
@@ -101,7 +109,15 @@ export function RequestList({ list, onOpen }: { list: VetRequest[]; onOpen: (r: 
                 {closed ? 'закрыта' : `${FREQ_LABEL[r.frequency]}${r.due_date ? ` · до ${shortDate(r.due_date)}` : ''}`}
               </span>
             </div>
-            <span className="text-[15px] font-semibold leading-snug">{r.text}</span>
+            <span className="text-[15px] font-semibold leading-snug">
+              {r.text}
+              {r.photo_path && <span className="text-[12px] font-bold text-muted"> · фото</span>}
+            </span>
+            {closed && p.last && (
+              <span className="text-[12px] font-semibold text-teal">
+                Выполнил: {p.last.done_by}, {relDate(p.last.done_at.slice(0, 10))} {timeOf(p.last.done_at)}
+              </span>
+            )}
             {!closed && (
               <>
                 {r.frequency !== 'once' && (
@@ -112,7 +128,7 @@ export function RequestList({ list, onOpen }: { list: VetRequest[]; onOpen: (r: 
                 <span className="text-[12px] font-semibold text-muted">
                   {r.frequency === 'once'
                     ? p.done
-                      ? `выполнено ${relDate(p.last!.done_at.slice(0, 10))}, ${p.last!.done_by}`
+                      ? `Выполнил: ${p.last!.done_by}, ${relDate(p.last!.done_at.slice(0, 10))} ${timeOf(p.last!.done_at)}`
                       : 'ждёт отметки кипера'
                     : `${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}${p.last ? ` · последнее ${relDate(p.last.done_at.slice(0, 10))}, ${p.last.done_by}${p.last.photo_path ? ', с фото' : ''}` : ''}`}
                 </span>
@@ -159,6 +175,7 @@ function RequestDetail({ req, editable, onClose }: { req: VetRequest | null; edi
     >
       <div className="flex flex-col gap-4">
         <p className="m-0 text-[16px] font-medium leading-relaxed">{req.text}</p>
+        {req.photo_path && <PhotoThumb path={req.photo_path} size={140} />}
         <span className="text-[13px] font-semibold text-muted">
           {FREQ_LABEL[req.frequency]}
           {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
@@ -211,9 +228,11 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
   const [urgent, setUrgent] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [own, setOwn] = useState('');
+  const [authorPhoto, setAuthorPhoto] = useState<File | null>(null);
 
   useEffect(() => {
     if (initial) {
+      setAuthorPhoto(null);
       setWho(initial);
       setText('');
       setFreq('shift');
@@ -238,8 +257,11 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
           disabled={!text.trim()}
           onClick={async () => {
             logEvent('request.create', { who, text: text.trim().slice(0, 200), options: options.join(' / '), photo, urgent });
+            const id = newId();
+            const photo_path = authorPhoto ? await savePhoto(authorPhoto, 'requests', id) : null;
             await put('requests', {
-              id: newId(),
+              id,
+              photo_path,
               elephant: who,
               text: text.trim(),
               frequency: freq,
@@ -318,11 +340,12 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
           />
           {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кипер увидит кнопки: {options.join(' · ')}</span>}
         </div>
+        {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
         <Field label="До какого числа">
           <input type="date" className={inputCls} value={until} onChange={(e) => setUntil(e.target.value)} min={isoDate()} />
         </Field>
         <Card className="divide-y divide-surface2 overflow-hidden">
-          <Check on={photo} label="Нужно фото" onChange={setPhoto} />
+          <Check on={photo} label="Нужно фото в ответ" sub="кипер отметит выполнение с фото" onChange={setPhoto} />
           <Check on={urgent} label="Срочно" sub="наверху экрана у кипера" onChange={setUrgent} />
         </Card>
       </div>

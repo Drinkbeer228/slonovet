@@ -86,7 +86,7 @@ function Main() {
         <div className={current === 'shift' ? '' : 'mx-auto max-w-2xl'}>
           {current === 'shift' && <ShiftScreen user={user} />}
           {current === 'requests' && <RequestsScreen user={user} />}
-          {current === 'diet' && <DietScreen user={user} onGuide={() => setTab('guide')} />}
+          {current === 'diet' && <DietScreen user={user} />}
           {current === 'stock' && <StockScreen user={user} />}
           {current === 'journal' && <JournalScreen />}
           {current === 'users' && <UsersScreen session={session} />}

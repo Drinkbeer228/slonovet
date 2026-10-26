@@ -4,6 +4,9 @@ import type { CurrentUser, Purchase, PurchaseStatus } from '../domain/types';
 import { logEvent } from '../lib/log';
 import { newId, put, useRows } from '../lib/store';
 import { isoDate, relDate, shortDate, timeOf } from '../lib/dates';
+import { addStockMove } from '../domain/actions';
+import { currentShift } from '../domain/shift';
+import { countWords, fmtNum } from '../domain/stock';
 import { Button, Card, Check, Chip, Empty, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
@@ -30,23 +33,71 @@ async function setStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser,
     status_at: new Date().toISOString(),
     delivery_date: delivery === undefined ? (p.delivery_date ?? null) : delivery,
   });
-  toast(status === 'done' && p.item_id ? 'Привезли. Внесите приход в «Фураж» → «Привезли»' : `Отмечено: ${STATUS[status].label}`);
+  toast(`Отмечено: ${STATUS[status].label}`);
+}
+
+/** Первое число из «сколько»: «10 тюков» → 10. */
+function firstNumber(text: string): string {
+  const m = text.replace(',', '.').match(/\d+(\.\d+)?/);
+  return m ? m[0].replace('.', ',') : '';
+}
+
+/** «Привезли» по позиции фуража: сразу зачислить приход, чтобы не вводить второй раз в «Фураже». */
+function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
+  const items = useRows('stock_items');
+  const shifts = useRows('shifts');
+  const [qty, setQty] = useState('');
+  useEffect(() => {
+    if (p) setQty(firstNumber(p.amount));
+  }, [p]);
+  if (!p) return null;
+  const it = items.find((i) => i.id === p.item_id);
+  const n = Number(qty.replace(',', '.')) || 0;
+  const unit = !it ? '' : it.kind === 'kg' ? 'кг' : it.kind === 'sack' ? 'мешков' : countWords(it.id, it.unit)[2];
+  const delta = !it ? 0 : it.kind === 'sack' ? n * (it.sack_kg ?? 0) : n;
+  const finish = async (withStock: boolean) => {
+    if (withStock && it && delta > 0) await addStockMove(it.id, delta, 'in', user, currentShift(shifts)?.id ?? null);
+    await setStatus(p, 'done', user);
+    if (withStock && it && delta > 0) toast(`${it.name}: +${fmtNum(n, it.kind === 'kg' ? 1 : 0)} ${unit} в фураж`);
+    onClose();
+  };
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title={`Привезли: ${p.title}`}
+      footer={
+        <div className="flex flex-col gap-2">
+          <Button kind="primary" big full disabled={!it || delta <= 0} onClick={() => finish(true)}>
+            Зачислить в фураж
+          </Button>
+          <Button full onClick={() => finish(false)}>
+            Без прихода
+          </Button>
+        </div>
+      }
+    >
+      {it ? (
+        <Field label={`Сколько привезли, ${unit}`} hint={it.kind === 'sack' && it.sack_kg ? `мешок ${fmtNum(it.sack_kg)} кг` : undefined}>
+          <input className={inputCls} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
+        </Field>
+      ) : (
+        <p className="m-0 text-[15px] text-ink2">Этой позиции уже нет в фураже — заявка просто закроется.</p>
+      )}
+    </Sheet>
+  );
 }
 const byNewest = (a: Purchase, b: Purchase) => (a.created_at < b.created_at ? 1 : -1);
 
-/** Закупки целиком: что просили купить, что заказано, что уже привезли. */
-export function PurchasesView({ user }: { user: CurrentUser }) {
+/** Закупки целиком: что просили купить, что заказано, что уже привезли. Кнопка «Купить» — в шапке «Заявок». */
+export function PurchasesView({ user, adding, onAddClose }: { user: CurrentUser; adding: boolean; onAddClose: () => void }) {
   const all = useRows('purchases');
-  const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<Purchase | null>(null);
   const active = all.filter(isActive).sort((a, b) => Number(b.urgent) - Number(a.urgent) || byNewest(a, b));
   const closed = all.filter((p) => !isActive(p)).sort(byNewest).slice(0, 20);
 
   return (
     <div className="flex flex-col gap-6">
-      <Button kind="primary" big full icon="plus" onClick={() => setCreating(true)}>
-        Нужно купить
-      </Button>
       <Section title="Активные" aside={active.length ? String(active.length) : undefined}>
         {active.length ? <PurchaseList list={active} user={user} onOpen={setOpen} /> : <Empty>Ничего не просили купить</Empty>}
       </Section>
@@ -55,7 +106,7 @@ export function PurchasesView({ user }: { user: CurrentUser }) {
           <PurchaseList list={closed} user={user} onOpen={setOpen} />
         </Section>
       )}
-      <NewPurchaseSheet open={creating} user={user} onClose={() => setCreating(false)} />
+      <NewPurchaseSheet open={adding} user={user} onClose={onAddClose} />
       <PurchaseDetail purchase={open} user={user} onClose={() => setOpen(null)} />
     </div>
   );
@@ -82,6 +133,8 @@ export function PurchasesBlock({ user }: { user: CurrentUser }) {
 function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentUser; onOpen: (p: Purchase) => void }) {
   const buyer = canEdit('purchases', user.role);
   const [ordering, setOrdering] = useState<Purchase | null>(null);
+  const [arriving, setArriving] = useState<Purchase | null>(null);
+  const arrived = (p: Purchase) => (p.item_id ? setArriving(p) : setStatus(p, 'done', user));
   return (
     <Card className="divide-y divide-surface2 overflow-hidden">
       {list.map((p) => (
@@ -106,7 +159,7 @@ function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentU
               </button>
             )}
             {buyer && isActive(p) && (
-              <button type="button" onClick={() => setStatus(p, 'done', user)} className="h-9 rounded-full border border-line px-3.5 text-[13px] font-bold text-ink2">
+              <button type="button" onClick={() => arrived(p)} className="h-9 rounded-full border border-line px-3.5 text-[13px] font-bold text-ink2">
                 Привезли
               </button>
             )}
@@ -114,6 +167,7 @@ function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentU
         </div>
       ))}
       <OrderSheet purchase={ordering} user={user} onClose={() => setOrdering(null)} />
+      <ArriveSheet purchase={arriving} user={user} onClose={() => setArriving(null)} />
     </Card>
   );
 }
@@ -237,6 +291,7 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
 
 function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
   const [ordering, setOrdering] = useState(false);
+  const [arriving, setArriving] = useState(false);
   if (!p) return null;
   const buyer = canEdit('purchases', user.role);
   const mine = p.author_id === user.id;
@@ -260,7 +315,7 @@ function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | n
               </Button>
             )}
             {buyer && active && (
-              <Button kind={p.status === 'ordered' ? 'primary' : 'light'} big full onClick={() => mark('done')}>
+              <Button kind={p.status === 'ordered' ? 'primary' : 'light'} big full onClick={() => (p.item_id ? setArriving(true) : mark('done'))}>
                 Привезли
               </Button>
             )}
@@ -290,6 +345,14 @@ function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | n
         </span>
         {!buyer && <span className="text-[13px] font-semibold text-muted">«Заказано» и «Привезли» отмечает администратор или директор.</span>}
       </div>
+      <ArriveSheet
+        purchase={arriving ? p : null}
+        user={user}
+        onClose={() => {
+          setArriving(false);
+          onClose();
+        }}
+      />
       <OrderSheet
         purchase={ordering ? p : null}
         user={user}

@@ -89,6 +89,8 @@ export interface VetRequest extends Base {
   urgent: boolean;
   /** варианты ответа кипера кнопками (например «всё / половину / отказ»); пусто — просто «Выполнено» */
   options?: string[] | null;
+  /** фото от автора: что сделать или что не так (машина сена, неубранный проход) */
+  photo_path?: string | null;
   author_id: string | null;
   author_name: string;
   status: 'active' | 'closed';
