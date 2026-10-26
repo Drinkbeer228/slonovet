@@ -1,7 +1,7 @@
 # Копия базы вне сервера раз в неделю — сама, без участия людей.
-# Сервер каждую ночь делает свою копию (/opt/slonovet/backup.sh, хранит 14 дней). Отсюда раз в неделю
-# свежая копия забирается, шифруется паролем (BACKUP_PASSPHRASE) и хранится 90 дней в Actions → «Резервная копия»,
-# чтобы данные пережили даже потерю сервера. Репозиторий может быть открытым — без пароля файл бесполезен.
+# Сервер каждую ночь делает свою копию (server/backup.sh: база — 14 дней, фото — зеркало). Отсюда раз в неделю
+# свежая копия базы забирается, шифруется паролем (BACKUP_PASSPHRASE) и хранится 90 дней в Actions → «Резервная копия»,
+# чтобы люди и записи пережили даже потерю сервера. Фото сюда не идут — места на GitHub мало, они в зеркале на сервере.
 # Расшифровать: gpg -d slonovet-backup.tar.gz.gpg | tar xz
 # Восстановить базу: pg_restore --clean --if-exists -U postgres -d postgres db-latest.dump (в контейнере supabase-db)
 name: Резервная копия
@@ -26,7 +26,7 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           echo "159.194.208.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYsLfZgNv9gecQxSwvJjbbUYqMitmvS1ncpKJHqr3sE" > ~/.ssh/known_hosts
           mkdir backup
-          rsync -L -e "ssh -i ~/.ssh/deploy" deploy@159.194.208.29:/opt/slonovet/backups/db-latest.dump deploy@159.194.208.29:/opt/slonovet/backups/photos-latest.tar.gz backup/
+          rsync -L -e "ssh -i ~/.ssh/deploy" deploy@159.194.208.29:/opt/slonovet/backups/db-latest.dump backup/
           ls -l backup
           test -s backup/db-latest.dump
       - name: Зашифровать

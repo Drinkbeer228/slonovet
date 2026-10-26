@@ -80,6 +80,6 @@ Push в `main` → GitHub Actions проверяет (lint, тесты), соб�
 
 ## Резервные копии
 
-- **Каждую ночь** (03:30) сервер делает копию всей базы и файлов фото (`/opt/slonovet/backup.sh`), хранит 14 дней в `/opt/slonovet/backups`.
-- **Раз в неделю** `backup.yml` забирает свежую копию, шифрует (секрет `BACKUP_PASSPHRASE`) и хранит 90 дней в Actions → «Резервная копия». Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`.
+- **Каждую ночь** (03:30) сервер копирует всю базу (хранит 14 дней) и дописывает новые фото в зеркало — `server/backup.sh`, на сервере `/opt/slonovet/backup.sh`, копии в `/opt/slonovet/backups`.
+- **Раз в неделю** `backup.yml` забирает свежую копию базы (без фото), шифрует (секрет `BACKUP_PASSPHRASE`) и хранит 90 дней в Actions → «Резервная копия». Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`.
 - Восстановить базу: `pg_restore --clean --if-exists -U postgres -d postgres db-latest.dump` в контейнере `supabase-db`.
