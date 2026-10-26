@@ -51,17 +51,16 @@ function DaysView() {
   const byDay = new Map<string, Shift[]>();
   for (const s of shifts) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s]);
   const selected = day ?? shifts[0]?.date ?? isoDate();
-  const days = [...byDay.keys()].sort().reverse();
-  const dayIdx = days.indexOf(selected);
   /** Открыть день: календарь сам перелистывается к нему. */
   const jump = (to: string) => {
     setDay(to);
     const weeksBack = Math.floor((parseIso(isoDate()).getTime() - parseIso(to).getTime()) / 86400000 / 7);
     if (to < start || to > end) setPage(Math.max(0, Math.floor(weeksBack / WEEKS)));
   };
+  /** Стрелки — на день назад или вперёд, дальше сегодня не листаем. */
   const step = (d: number) => {
-    const to = days[dayIdx + d];
-    if (to) jump(to);
+    const to = addDays(selected, -d);
+    if (to <= isoDate()) jump(to);
   };
 
   // последняя колонка — неделя с сегодняшним днём (или раньше, если листали)
@@ -75,11 +74,11 @@ function DaysView() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <IconButton icon="back" label="Дежурство раньше" onClick={() => step(1)} className={!days[dayIdx + 1] ? 'opacity-30' : ''} />
+        <IconButton icon="back" label="День раньше" onClick={() => step(1)} />
         <DateJump value={selected} onPick={jump} className="h-11 flex-1 rounded-xl border border-line text-[15px] font-extrabold">
           {longDate(selected)}
         </DateJump>
-        <IconButton icon="next" label="Дежурство позже" onClick={() => step(-1)} className={!days[dayIdx - 1] ? 'opacity-30' : ''} />
+        <IconButton icon="next" label="День позже" onClick={() => step(-1)} className={selected >= isoDate() ? 'opacity-30' : ''} />
       </div>
       <Card className="flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between px-1">
@@ -112,7 +111,7 @@ function DaysView() {
                     <button
                       key={d}
                       type="button"
-                      disabled={!list}
+                      disabled={future}
                       onClick={() => setDay(d)}
                       aria-label={`${shortDate(d)}${list ? `, дежурный ${list.map((x) => x.keeper_name).join(', ')}` : ', дежурства нет'}`}
                       className={`aspect-square w-full rounded-[3px] ${
