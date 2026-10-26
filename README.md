@@ -32,7 +32,7 @@
 
 - **Фронтенд:** React 19, Vite, Tailwind 4, TypeScript. PWA (vite-plugin-pwa), ставится на главный экран.
 - **Данные на телефоне:** IndexedDB + очередь отправки (`src/lib/store.ts`). Смены отправляются патчами: только изменённые поля (`src/lib/patch.ts`, функция `apply_shift_patch` в базе).
-- **Сервер:** Supabase — Postgres с правами по ролям (RLS), вход по логину без почты (`login@slonovet.local`), приватное хранилище фото, функция `admin-users` для заведения людей.
+- **Сервер:** свой VPS у Beget (Россия). На нём nginx с HTTPS (Let's Encrypt, продлевается сам) и свой Supabase в Docker на `api.slonovet.ru`: Postgres с правами по ролям (RLS), вход по логину без почты (`login@slonovet.local`), приватное хранилище фото, функция `admin-users` для заведения людей. Наружу открыты только нужные приложению пути API, панель Supabase — через SSH-туннель.
 - **Журнал действий:** что нажимают и где падает приложение — таблица `events`, читают админ и директор.
 
 ```
@@ -49,8 +49,8 @@ supabase/
   migrations/  схема базы по порядку (001…007)
   functions/   admin-users
 .github/workflows/
-  deploy.yml   сборка и выкладка на каждый push в main
-  backup.yml   еженедельная зашифрованная копия базы
+  deploy.yml   проверка, сборка и выкладка на сервер на каждый push в main
+  backup.yml   еженедельная зашифрованная копия базы вне сервера
 ```
 
 ## Запустить у себя
@@ -68,16 +68,18 @@ npm run dev
 
 ## Выкладка
 
-Push в `main` → GitHub Actions проверяет, собирает и публикует сайт на slonovet.ru (файл `public/CNAME`).
+Push в `main` → GitHub Actions проверяет (lint, тесты), собирает и по SSH кладёт сайт на сервер в `/var/www/slonovet` (пользователь `deploy`, ключ — секрет `DEPLOY_SSH_KEY`). Адрес и публичный ключ API — в `.env.production`.
 
 ## Новая база с нуля
 
-1. Supabase → SQL Editor → выполнить файлы из `supabase/migrations/` по порядку.
-2. Authentication → Email: выключить «Confirm email» и самостоятельную регистрацию.
-3. Задеплоить функцию `supabase/functions/admin-users`.
-4. Завести первого пользователя (`<логин>@slonovet.local`) и дать ему роль `admin` в таблице `profiles`.
+1. Поднять Supabase (официальная сборка для Docker, `setup.sh`), в `.env`: `SITE_URL`, `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL`, `DISABLE_SIGNUP=true`, `ENABLE_EMAIL_AUTOCONFIRM=true`.
+2. Выполнить файлы из `supabase/migrations/` по порядку.
+3. Положить функцию `supabase/functions/admin-users` в `volumes/functions/admin-users/`.
+4. Завести первого пользователя (`<логин>@slonovet.local`) и дать ему роль `admin` и `active = true` в таблице `profiles`.
 5. Остальных людей заводят в приложении: меню → «Люди».
 
 ## Резервные копии
 
-`backup.yml` каждый понедельник выгружает все таблицы, шифрует их и хранит 90 дней в Actions → «Резервная копия». Нужны секреты репозитория `SUPABASE_TOKEN` и `BACKUP_PASSPHRASE`. Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`. Фото в копию не входят.
+- **Каждую ночь** (03:30) сервер делает копию всей базы и файлов фото (`/opt/slonovet/backup.sh`), хранит 14 дней в `/opt/slonovet/backups`.
+- **Раз в неделю** `backup.yml` забирает свежую копию, шифрует (секрет `BACKUP_PASSPHRASE`) и хранит 90 дней в Actions → «Резервная копия». Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`.
+- Восстановить базу: `pg_restore --clean --if-exists -U postgres -d postgres db-latest.dump` в контейнере `supabase-db`.
