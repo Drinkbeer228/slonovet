@@ -3,7 +3,7 @@ import type { Note } from '../../domain/types';
 import { relDate, timeOf } from '../../lib/dates';
 import { Card, PhotoThumb } from '../../ui/kit';
 
-const KIND: Record<Note['kind'], string> = { observation: '', procedure: 'процедура', medication: 'препарат' };
+const KIND: Record<Note['kind'], string> = { observation: '', procedure: '💉 процедура', medication: '💊 препарат' };
 
 export function NotesList({ notes, showElephant = true, showDate = false }: { notes: Note[]; showElephant?: boolean; showDate?: boolean }) {
   return (

@@ -64,6 +64,9 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const handed = shift.status !== 'open';
+  // назначения и записи о лечении — не только кипер: директор сам обработал Претти — отмечает, врач видит
+  const keeper = user.role === 'keeper';
+  const canMark = !readOnly || !keeper;
   const stale = !handed && shift.date < isoDate();
 
   return (
@@ -76,7 +79,11 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">
           {handed ? 'Прошлое дежурство' : 'Дежурство'} · {shift.keeper_name}
         </h1>
-        {readOnly && !accept && <span className="text-[13px] font-semibold text-muted">Только просмотр — отмечает дежурный кипер</span>}
+        {readOnly && !accept && (
+          <span className="text-[13px] font-semibold text-muted">
+            {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
+          </span>
+        )}
         {stale && (
           <span className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-bold text-amber">
             <Icon name="alert" size={16} />
@@ -99,9 +106,13 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         {/* inert — смотреть можно, нажимать нельзя */}
-        <div className="flex flex-col gap-6" inert={readOnly}>
-          <RequestsBlock shift={shift} user={user} />
-          <StateMatrix shift={shift} onNote={setNoteDraft} />
+        <div className="flex flex-col gap-6">
+          <div inert={!canMark}>
+            <RequestsBlock shift={shift} user={user} />
+          </div>
+          <div inert={readOnly}>
+            <StateMatrix shift={shift} onNote={setNoteDraft} />
+          </div>
         </div>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-6" inert={readOnly}>
@@ -110,10 +121,10 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
           </div>
           <Section id="sec-notes" title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
             {notes.length > 0 && <NotesList notes={[...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} />}
-            {/* наблюдение может оставить любой — врач, директор, администратор */}
-            {!handed && (
-              <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: 'observation' })}>
-                Запись или фото
+            {/* запись может оставить любой; не кипер — и после сдачи (процедуру сделали, когда никто не дежурит) */}
+            {(!handed || !keeper) && (
+              <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}>
+                {keeper ? 'Запись или фото' : 'Запись о лечении или фото'}
               </Button>
             )}
             {handed && !notes.length && <Card className="px-4 py-3 text-[15px] text-muted">Записей нет</Card>}
