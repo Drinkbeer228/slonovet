@@ -46,8 +46,13 @@ src/
     …          рацион, фураж, журнал, переезд, рейтинг, справка
   ui/          кнопки, шторки, иконки
 supabase/
-  migrations/  схема базы по порядку (001…014)
+  migrations/  схема базы по порядку (001…015), учёт применённых — server/migrate.sh
   functions/   admin-users
+server/
+  migrate.sh        что из миграций применено на сервере, накатить недостающие
+  backup.sh         ночная копия базы и зеркало фото (на сервере /opt/slonovet/backup.sh)
+  restore-check.sh  проверка, что из копии база поднимается (временная база, рабочую не трогает)
+  slonovet.cron     расписание на сервере
 .github/workflows/
   deploy.yml   проверка, сборка и выкладка на сервер на каждый push в main
   backup.yml   еженедельная зашифрованная копия базы вне сервера
@@ -70,16 +75,26 @@ npm run dev
 
 Push в `main` → GitHub Actions проверяет (lint, тесты), собирает и по SSH кладёт сайт на сервер в `/var/www/slonovet` (пользователь `deploy`, ключ — секрет `DEPLOY_SSH_KEY`). Адрес и публичный ключ API — в `.env.production`.
 
+Ключ выкладки на сервере ограничен: в `~deploy/.ssh/authorized_keys` у него `command="/usr/bin/rrsync -wo /var/www/slonovet"` — только запись в папку сайта, без команд и без доступа к копиям. Путь в `deploy.yml` поэтому относительный, а перед выкладкой она проверяет, что ограничение на месте, и без него останавливается.
+
 ## Новая база с нуля
 
-1. Поднять Supabase (официальная сборка для Docker, `setup.sh`), в `.env`: `SITE_URL`, `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL`, `DISABLE_SIGNUP=true`, `ENABLE_EMAIL_AUTOCONFIRM=true`.
-2. Выполнить файлы из `supabase/migrations/` по порядку.
+1. Поднять Supabase (официальная сборка для Docker, `setup.sh`), в `.env`: `SITE_URL`, `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL`, `DISABLE_SIGNUP=true`, `ENABLE_EMAIL_AUTOCONFIRM=true`. Дождаться, пока запустятся все сервисы: таблицы хранилища фото создаёт сервис storage.
+2. Накатить миграции: `./server/migrate.sh apply` (свой адрес — через `SLONOVET_SSH`, см. начало скрипта).
 3. Положить функцию `supabase/functions/admin-users` в `volumes/functions/admin-users/`.
 4. Завести первого пользователя (`<логин>@slonovet.local`) и дать ему роль `admin` и `active = true` в таблице `profiles`.
 5. Остальных людей заводят в приложении: меню → «Персонал».
 
+## Миграции
+
+- `./server/migrate.sh` — какие файлы из `supabase/migrations/` применены на сервере, какие ждут, какие изменены после применения.
+- `./server/migrate.sh apply` — свежая копия базы, затем недостающие миграции по порядку. Каждая вместе с записью в учёт — одна транзакция: упала — не применилось ничего.
+- Учёт — таблица `slonovet.migrations` на сервере (схема закрыта от приложения).
+- Правила: миграции только добавляющие и повторяемые (`if not exists`, `drop … if exists`); применённый файл не правим — новую правку оформляем новым файлом.
+
 ## Резервные копии
 
-- **Каждую ночь** (03:30) сервер копирует всю базу (хранит 14 дней) и дописывает новые фото в зеркало — `server/backup.sh`, на сервере `/opt/slonovet/backup.sh`, копии в `/opt/slonovet/backups`.
-- **Раз в неделю** `backup.yml` забирает свежую копию базы (без фото), шифрует (секрет `BACKUP_PASSPHRASE`) и хранит 90 дней в Actions → «Резервная копия». Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`.
-- Восстановить базу: `pg_restore --clean --if-exists -U postgres -d postgres db-latest.dump` в контейнере `supabase-db`.
+- **Каждую ночь** (03:30) сервер копирует всю базу (хранит 14 дней) и дописывает новые фото в зеркало — `server/backup.sh`, на сервере `/opt/slonovet/backup.sh`, копии в `/opt/slonovet/backups` (читает только пользователь `slonovet-backup`).
+- **Раз в неделю** `backup.yml` забирает свежую копию базы (без фото) своим ключом (секрет `BACKUP_SSH_KEY`, на сервере — `rrsync -ro`, только чтение копий), проверяет, что ей меньше двух суток, шифрует (секрет `BACKUP_PASSPHRASE`) и хранит 90 дней в Actions → «Резервная копия». Расшифровать: `gpg -d slonovet-backup.tar.gz.gpg | tar xz`.
+- **Проверка восстановления:** `/opt/slonovet/restore-check.sh` поднимает временный Postgres того же образа без сети, заливает копию и сверяет с рабочей базой число строк, права и функции. 26.10.2026: все таблицы совпали; ошибки только по двум служебным ролям Supabase (realtime, webhooks), которых нет в голом образе.
+- **Восстановить на сервере:** поднять Supabase как в «Новая база с нуля» (шаг 1), затем в контейнере `supabase-db`: `pg_restore --clean --if-exists -U supabase_admin -d postgres db-latest.dump` (`postgres` в этом образе не суперпользователь) и вернуть фото: `rsync -a /opt/slonovet/backups/photos/ /opt/supabase/volumes/storage/`.

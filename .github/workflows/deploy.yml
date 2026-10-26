@@ -35,4 +35,10 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           # ключ сервера записан здесь, чтобы не подключиться к подменённому
           echo "159.194.208.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYsLfZgNv9gecQxSwvJjbbUYqMitmvS1ncpKJHqr3sE" > ~/.ssh/known_hosts
-          rsync -rlz --delete-after -e "ssh -i ~/.ssh/deploy" dist/ deploy@159.194.208.29:/var/www/slonovet/
+          # На сервере ключ ограничен: rrsync пускает только запись в /var/www/slonovet, и путь ниже — внутри неё.
+          # Ключ без ограничения выполнил бы любую команду, а путь указал бы на домашнюю папку deploy — тогда стоп.
+          if ssh -i ~/.ssh/deploy -o BatchMode=yes deploy@159.194.208.29 true 2>/dev/null; then
+            echo "::error::Ключ выкладки на сервере не ограничен rrsync — выкладка остановлена"
+            exit 1
+          fi
+          rsync -rlz --delete-after -e "ssh -i ~/.ssh/deploy" dist/ deploy@159.194.208.29:

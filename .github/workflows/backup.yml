@@ -2,8 +2,9 @@
 # Сервер каждую ночь делает свою копию (server/backup.sh: база — 14 дней, фото — зеркало). Отсюда раз в неделю
 # свежая копия базы забирается, шифруется паролем (BACKUP_PASSPHRASE) и хранится 90 дней в Actions → «Резервная копия»,
 # чтобы люди и записи пережили даже потерю сервера. Фото сюда не идут — места на GitHub мало, они в зеркале на сервере.
+# Ключ — свой (BACKUP_SSH_KEY, пользователь slonovet-backup): на сервере он может только читать папку копий.
 # Расшифровать: gpg -d slonovet-backup.tar.gz.gpg | tar xz
-# Восстановить базу: pg_restore --clean --if-exists -U postgres -d postgres db-latest.dump (в контейнере supabase-db)
+# Восстановить базу — см. README, раздел «Резервные копии».
 name: Резервная копия
 
 on:
@@ -20,15 +21,22 @@ jobs:
     steps:
       - name: Забрать копию с сервера
         env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          BACKUP_SSH_KEY: ${{ secrets.BACKUP_SSH_KEY }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$BACKUP_SSH_KEY" > ~/.ssh/backup && chmod 600 ~/.ssh/backup
           echo "159.194.208.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYsLfZgNv9gecQxSwvJjbbUYqMitmvS1ncpKJHqr3sE" > ~/.ssh/known_hosts
           mkdir backup
-          rsync -L -e "ssh -i ~/.ssh/deploy" deploy@159.194.208.29:/opt/slonovet/backups/db-latest.dump backup/
+          # путь — внутри папки копий (ключ ограничен rrsync); -t сохраняет время копии для проверки ниже
+          rsync -t -e "ssh -i ~/.ssh/backup" slonovet-backup@159.194.208.29:db-latest.dump backup/
           ls -l backup
           test -s backup/db-latest.dump
+      - name: Копия свежая
+        run: |
+          # ночная копия делается в 03:30; старше двух суток — значит, на сервере она перестала делаться
+          age=$(( $(date +%s) - $(stat -c %Y backup/db-latest.dump) ))
+          echo "Копии $((age / 3600)) ч"
+          if [ "$age" -gt 172800 ]; then echo "::error::Копия базы старше двух суток — ночное копирование на сервере не работает"; exit 1; fi
       - name: Зашифровать
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}

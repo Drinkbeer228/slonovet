@@ -1,0 +1,5 @@
+# Расписание СлоноВета на сервере: /etc/cron.d/slonovet-backup (время московское)
+# Каждую ночь — копия базы и зеркало фото
+30 3 * * * root /opt/slonovet/backup.sh >> /var/log/slonovet-backup.log 2>&1
+# Каждое воскресенье — проверка, что из последней копии база поднимается (временная база без сети, рабочую не трогает)
+15 4 * * 0 root /opt/slonovet/restore-check.sh >> /var/log/slonovet-restore-check.log 2>&1
