@@ -76,7 +76,7 @@ Push в `main` → GitHub Actions проверяет (lint, тесты), соб�
 2. Выполнить файлы из `supabase/migrations/` по порядку.
 3. Положить функцию `supabase/functions/admin-users` в `volumes/functions/admin-users/`.
 4. Завести первого пользователя (`<логин>@slonovet.local`) и дать ему роль `admin` и `active = true` в таблице `profiles`.
-5. Остальных людей заводят в приложении: меню → «Люди».
+5. Остальных людей заводят в приложении: меню → «Персонал».
 
 ## Резервные копии
 
