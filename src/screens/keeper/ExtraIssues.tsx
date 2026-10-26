@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { addStockMoveNote } from '../../domain/actions';
-import { fmtNum, pickWords } from '../../domain/stock';
+import { categoryOf, fmtNum } from '../../domain/stock';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { remove, useRows } from '../../lib/store';
-import { plural, timeOf } from '../../lib/dates';
-import { Button, Card, Chip, Field, Sheet, Stepper, inputCls, toast } from '../../ui/kit';
+import { timeOf } from '../../lib/dates';
+import { Button, Card, Chip, Field, Sheet, inputCls, toast } from '../../ui/kit';
 
 /** Поводы выдачи вне рациона: бананы и яблоки на манеже и репетициях, овощи на шоу. */
 const REASONS = ['Манеж', 'Репетиция', 'Шоу', 'Доп. кормление', 'Другое'];
@@ -53,14 +53,12 @@ function ExtraSheet({ open, shift, user, onClose }: { open: boolean; shift: Shif
   const items = useRows('stock_items');
   const [reason, setReason] = useState('Манеж');
   const [itemId, setItemId] = useState<string | null>(null);
-  const [n, setN] = useState(1);
   const [kg, setKg] = useState('');
   const [openedAt, setOpenedAt] = useState(false);
   if (open && !openedAt) {
     setOpenedAt(true);
     setReason('Манеж');
     setItemId(null);
-    setN(1);
     setKg('');
   }
   if (!open && openedAt) setOpenedAt(false);
@@ -68,10 +66,9 @@ function ExtraSheet({ open, shift, user, onClose }: { open: boolean; shift: Shif
   // сначала овощи и фрукты (их и выдают вне рациона), потом остальное, кроме мешков для мусора
   const choices = items
     .filter((i) => i.id !== 'bags')
-    .sort((a, b) => Number(Boolean(b.pick_unit)) - Number(Boolean(a.pick_unit)) || a.sort - b.sort);
+    .sort((a, b) => Number(categoryOf(b) === 'veg') - Number(categoryOf(a) === 'veg') || a.sort - b.sort);
   const it = items.find((i) => i.id === itemId);
-  const words = it ? pickWords(it) : null;
-  const amount = it && words && it.kg_per_garets ? n * it.kg_per_garets : Number(kg.replace(',', '.')) || 0;
+  const amount = Number(kg.replace(',', '.')) || 0;
 
   return (
     <Sheet
@@ -109,32 +106,27 @@ function ExtraSheet({ open, shift, user, onClose }: { open: boolean; shift: Shif
               <Chip
                 key={i.id}
                 on={itemId === i.id}
-                onClick={() => {
-                  setItemId(i.id);
-                  setN(1);
-                }}
+                onClick={() => setItemId(i.id)}
               >
                 {i.name}
               </Chip>
             ))}
           </div>
         </div>
-        {it &&
-          (words && it.kg_per_garets ? (
-            <div className="flex items-center justify-between gap-3">
-              <span className="flex flex-col">
-                <span className="text-[15px] font-bold">
-                  {n} {plural(n, ...words)}
-                </span>
-                <span className="text-[13px] font-semibold text-muted">≈ {fmtNum(amount)} кг</span>
-              </span>
-              <Stepper label={`Сколько, ${words[2]}`} value={n} min={1} onChange={setN} />
+        {it && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              {[5, 10, 20].map((v) => (
+                <Chip key={v} on={amount === v} onClick={() => setKg(String(v))}>
+                  {v} кг
+                </Chip>
+              ))}
             </div>
-          ) : (
             <Field label="Сколько, кг">
               <input className={inputCls} inputMode="decimal" value={kg} onChange={(e) => setKg(e.target.value)} placeholder="0" />
             </Field>
-          ))}
+          </div>
+        )}
       </div>
     </Sheet>
   );

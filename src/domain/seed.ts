@@ -14,12 +14,12 @@ export const SEED_STOCK_ITEMS: StockItem[] = [
   { id: 'oats', category: 'grain', name: 'Овёс', kind: 'sack', unit: 'кг', sack_kg: 40, kg_per_garets: 2, low_days: 3, sort: 8, updated_at: t },
   { id: 'corn', category: 'grain', name: 'Кукуруза', kind: 'sack', unit: 'кг', sack_kg: 45, kg_per_garets: 3.2, low_days: 3, sort: 9, updated_at: t },
   { id: 'seeds', category: 'grain', name: 'Семечки', kind: 'sack', unit: 'кг', sack_kg: 25, kg_per_garets: 1.9, low_days: 3, sort: 10, updated_at: t },
-  { id: 'potato', category: 'veg', name: 'Картофель', kind: 'sack', unit: 'мешок', sack_kg: 40, kg_per_garets: 20, pick_unit: 'сетка', low_days: 3, sort: 20, updated_at: t },
-  { id: 'carrot', category: 'veg', name: 'Морковь', kind: 'sack', unit: 'мешок', sack_kg: 40, kg_per_garets: 20, pick_unit: 'сетка', low_days: 3, sort: 21, updated_at: t },
-  { id: 'beet', category: 'veg', name: 'Свёкла', kind: 'sack', unit: 'мешок', sack_kg: 40, kg_per_garets: 20, pick_unit: 'сетка', low_days: 3, sort: 22, updated_at: t },
-  { id: 'cabbage', category: 'veg', name: 'Капуста', kind: 'sack', unit: 'сетка', sack_kg: 30, kg_per_garets: 20, pick_unit: 'сетка', low_days: 3, sort: 23, updated_at: t },
-  { id: 'apple', category: 'veg', name: 'Яблоки', kind: 'sack', unit: 'ящик', sack_kg: 20, kg_per_garets: 10, pick_unit: 'ведро', low_days: 3, sort: 24, updated_at: t },
-  { id: 'banana', category: 'veg', name: 'Бананы', kind: 'sack', unit: 'ящик', sack_kg: 18, kg_per_garets: 6, pick_unit: 'гроздь', low_days: 3, sort: 25, updated_at: t },
+  { id: 'potato', category: 'veg', name: 'Картофель', kind: 'sack', unit: 'мешок', sack_kg: 40, kg_per_garets: null, low_days: 3, sort: 20, updated_at: t },
+  { id: 'carrot', category: 'veg', name: 'Морковь', kind: 'sack', unit: 'мешок', sack_kg: 40, kg_per_garets: null, low_days: 3, sort: 21, updated_at: t },
+  { id: 'beet', category: 'veg', name: 'Свёкла', kind: 'sack', unit: 'мешок', sack_kg: 40, kg_per_garets: null, low_days: 3, sort: 22, updated_at: t },
+  { id: 'cabbage', category: 'veg', name: 'Капуста', kind: 'sack', unit: 'сетка', sack_kg: 30, kg_per_garets: null, low_days: 3, sort: 23, updated_at: t },
+  { id: 'apple', category: 'veg', name: 'Яблоки', kind: 'sack', unit: 'ящик', sack_kg: 20, kg_per_garets: null, low_days: 3, sort: 24, updated_at: t },
+  { id: 'banana', category: 'veg', name: 'Бананы', kind: 'sack', unit: 'ящик', sack_kg: 18, kg_per_garets: null, low_days: 3, sort: 25, updated_at: t },
   { id: 'bags', category: 'household', name: 'Мешки для мусора 240 л', kind: 'count', unit: 'шт', sack_kg: null, kg_per_garets: null, low_days: 3, sort: 11, updated_at: t },
 ];
 
@@ -31,7 +31,7 @@ const porridge = (item: string, name: string, qty: number) => [
 const veg = () => ({
   time: '19:00',
   title: 'Овощи',
-  prep: 'мыть, крупная нарезка · по сетке каждого на слониху',
+  prep: 'мыть, крупная нарезка',
   items: [
     { item: 'potato', name: 'Картофель', qty: 20, unit: 'кг' as const },
     { item: 'carrot', name: 'Морковь', qty: 20, unit: 'кг' as const },

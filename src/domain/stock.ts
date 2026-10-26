@@ -102,11 +102,6 @@ export function packWords(item: StockItem): [string, string, string] {
   return WORDS[item.unit] ?? WORDS['мешок'];
 }
 
-/** Как берут в работу: сетка, ведро, гроздь — или null, если считают просто кг/совком. */
-export function pickWords(item: StockItem): [string, string, string] | null {
-  return item.pick_unit ? (WORDS[item.pick_unit] ?? [item.pick_unit, item.pick_unit, item.pick_unit]) : null;
-}
-
 /** «3 мешка», «4,5 мешка», «5 мешков»: дробное — всегда «мешка». */
 export function countText(n: number, words: [string, string, string]): string {
   const r = Math.round(n * 10) / 10;

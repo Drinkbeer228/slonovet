@@ -1,6 +1,6 @@
 import { ELEPHANTS } from '../../domain/elephants';
 import { cycleEaten, setFeedDone, setFeedGiven, setFeedKg, setHay } from '../../domain/actions';
-import { countText, feedUsage, fmtNum, pickWords, weighedItem } from '../../domain/stock';
+import { categoryOf, feedUsage, weighedItem } from '../../domain/stock';
 import { FEED_TIMES } from '../../domain/shift';
 import type { CurrentUser, Diet, Eaten, ElephantName, Shift } from '../../domain/types';
 import { useState } from 'react';
@@ -105,7 +105,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
           <Stepper label="Сено" value={shift.hay_bales} onChange={(v) => setHay(shift, v, user)} />
         </div>
       </Card>
-      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда ставишь галочку. Овощи — сетками, поправь, если взяли иначе.</p>}
+      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда ставишь галочку. Овощи — по рациону в кг, поправь, если дали иначе.</p>}
       <RecipeSheet time={recipe} onTime={setRecipe} diets={diets} />
     </Section>
   );
@@ -220,38 +220,30 @@ function WeighRow({
   );
 }
 
-/**
- * Овощи и фрукты сетками: списано по рациону, кипер поправляет, сколько сеток реально взял.
- * Показывается только для позиций, которые берут в работу сетками/вёдрами.
- */
+/** Овощи и фрукты: списано по рациону в кг; дали больше или меньше — поправь число. */
 function GivenRows({ shift, time, diets, user }: { shift: Shift; time: string; diets: Diet[]; user: CurrentUser }) {
   const items = useRows('stock_items');
   const usage = feedUsage(diets, time, items);
   const rows = [...usage.keys()]
     .map((id) => items.find((i) => i.id === id))
-    .filter((i): i is NonNullable<typeof i> => Boolean(i?.pick_unit && i.kg_per_garets));
+    .filter((i): i is NonNullable<typeof i> => Boolean(i && categoryOf(i) === 'veg'));
   if (!rows.length) return null;
   const given = shift.feeds[time]?.given ?? {};
   return (
     <div className="flex flex-col gap-1.5 px-4 pb-3">
-      <span className="text-[12px] font-bold text-muted">Списано по рациону — поправь, если взяли иначе</span>
-      {rows.map((it) => {
-        const kg = given[it.id] ?? usage.get(it.id) ?? 0;
-        const step = it.kg_per_garets!;
-        const n = Math.round((kg / step) * 10) / 10;
-        const words = pickWords(it)!;
-        return (
-          <div key={it.id} className="flex items-center gap-3">
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-[14px] font-bold">{it.name}</span>
-              <span className="text-[12px] font-semibold text-muted">
-                {countText(n, words)} · {fmtNum(kg)} кг
-              </span>
-            </span>
-            <Stepper label={`${it.name}, ${words[2]}`} value={n} onChange={(v) => setFeedGiven(shift, time, it.id, Math.max(0, v) * step, user)} />
-          </div>
-        );
-      })}
+      <span className="text-[12px] font-bold text-muted">Списано по рациону, кг — поправь, если дали иначе</span>
+      {rows.map((it) => (
+        <div key={it.id} className="flex items-center gap-3">
+          <span className="flex-1 text-[14px] font-bold">{it.name}</span>
+          <DecimalInput
+            label={`${it.name}, кг`}
+            value={given[it.id] ?? usage.get(it.id) ?? 0}
+            placeholder="0"
+            onCommit={(v) => setFeedGiven(shift, time, it.id, Math.max(0, v ?? 0), user)}
+            className="w-24 py-2 text-right text-[16px] font-extrabold"
+          />
+        </div>
+      ))}
     </div>
   );
 }

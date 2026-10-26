@@ -3,7 +3,7 @@ import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, packWords, pickWords, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
+import { STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, packWords, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
 import { newId, put, useRows } from '../lib/store';
 import { plural, relDate, timeOf } from '../lib/dates';
@@ -34,7 +34,7 @@ function amountText(v: StockView) {
   if (item.kind === 'count') return `${fmtNum(balance, 0)} ${plural(Math.round(balance), ...countWords(item.id, item.unit))}`;
   if (item.kind === 'sack' && item.sack_kg) {
     const parts = [];
-    if (item.pick_unit) return `${fmtNum(balance)} кг · ${countText(balance / item.sack_kg, packWords(item))}`;
+    if (categoryOf(item) === 'veg') return `${fmtNum(balance)} кг · ${countText(balance / item.sack_kg, packWords(item))}`;
     if (v.full > 0) parts.push(`${v.full} ${plural(v.full, ...packWords(item))}`);
     if (v.openFrac > 0) parts.push(v.full > 0 ? `+ ${fracLabel(v.openFrac)}` : `${fracLabel(v.openFrac)} мешка`);
     return parts.join(' ');
@@ -178,7 +178,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       )}
 
       <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
-        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — сетками в 19:00 (по рациону, кипер поправляет), мешки — по счётчику «Мешков взяли». Фрукты и овощи на манеже и шоу — «Вне рациона» в дежурстве, гниль — «Списать брак» в карточке.
+        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по рациону в 19:00, мешки — по счётчику «Мешков взяли». Фрукты и овощи на манеже и шоу — «Вне рациона» в дежурстве, остальные расхождения — поправка остатка.
         {canWrite && ' Нажми на позицию, чтобы поправить остаток, переименовать или удалить.'}
       </p>
 
@@ -225,7 +225,6 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   const [value, setValue] = useState('');
   const [sackKg, setSackKg] = useState('');
   const [perGarets, setPerGarets] = useState('');
-  const [waste, setWaste] = useState('');
   const [openedFor, setOpenedFor] = useState<string | null>(null);
 
   if (view && it && openedFor !== it.id) {
@@ -236,7 +235,6 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
     setSackKg(String(it.sack_kg ?? ''));
     setName(it.name);
     setPerGarets(String(it.kg_per_garets ?? ''));
-    setWaste('');
   }
   const close = () => {
     setOpenedFor(null);
@@ -244,11 +242,11 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   };
   if (!view || !it) return null;
 
-  // овощи и фрукты считаем в кг (их берут сетками и вёдрами, мешки не «открывают»), крупы — мешками
-  const byKg = Boolean(it.pick_unit) || it.kind !== 'sack' || !it.sack_kg;
+  // овощи и фрукты поправляют в кг (мешки не «открывают»), крупы — мешками
+  const veg = categoryOf(it) === 'veg';
+  const byKg = veg || it.kind !== 'sack' || !it.sack_kg;
   const num = (v: string) => Number(v.replace(',', '.')) || 0;
   const target = byKg ? num(value) : (full + frac) * it.sack_kg!;
-  const pick = pickWords(it);
   const bump = (d: number) => setValue(String(Math.max(0, Math.round((num(value) + d) * 10) / 10)).replace('.', ','));
   return (
     <Sheet
@@ -277,7 +275,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
       }
     >
       <div className="flex flex-col gap-5">
-        {byKg && it.pick_unit ? (
+        {veg ? (
           <div className="flex flex-col gap-2">
             <Field label="Сейчас, кг" hint={it.sack_kg ? `≈ ${countText(num(value) / it.sack_kg, packWords(it))} по ${fmtNum(it.sack_kg)} кг` : undefined}>
               <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
@@ -327,43 +325,16 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
           </Field>
         )}
-        {pick && (
-          // брак и гниль при переборке — списание мимо рациона, чтобы склад не расходился с приложением
-          <div className="flex flex-col gap-2 border-t border-line pt-4">
-            <span className="text-[15px] font-bold">Списать брак / гниль</span>
-            <div className="flex flex-wrap gap-2">
-              {[it.kg_per_garets ? { kg: it.kg_per_garets, label: `1 ${pick[0]} · ${fmtNum(it.kg_per_garets)} кг` } : null, { kg: 5, label: '5 кг' }, { kg: 10, label: '10 кг' }]
-                .filter((x): x is { kg: number; label: string } => Boolean(x))
-                .map((x) => (
-                  <Chip key={x.label} on={num(waste) === x.kg} onClick={() => setWaste(String(x.kg))}>
-                    {x.label}
-                  </Chip>
-                ))}
-            </div>
-            <div className="flex gap-2">
-              <input className={inputCls} type="text" inputMode="decimal" value={waste} onChange={(e) => setWaste(e.target.value)} placeholder="кг" aria-label="Брак, кг" />
-              <Button
-                className="shrink-0"
-                disabled={!num(waste)}
-                onClick={async () => {
-                  await addStockMove(it.id, -num(waste), 'waste', user, shiftId);
-                  toast(`Списан брак: ${fmtNum(num(waste))} кг`);
-                  close();
-                }}
-              >
-                Списать
-              </Button>
-            </div>
-          </div>
-        )}
         {it.kind === 'sack' && (
           <div className="grid grid-cols-2 gap-3 border-t border-line pt-4">
             <Field label={`Вес: 1 ${packWords(it)[0]}, кг`}>
               <input className={inputCls} type="text" inputMode="decimal" value={sackKg} onChange={(e) => setSackKg(e.target.value)} />
             </Field>
-            <Field label={pick ? `1 ${pick[0]}, кг` : 'В совке, кг'} hint={pick ? 'сколько берут в работу за раз' : 'полный мерный совок'}>
-              <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
-            </Field>
+            {!veg && (
+              <Field label="В совке, кг" hint="полный мерный совок">
+                <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
+              </Field>
+            )}
           </div>
         )}
         <div className="flex flex-col gap-3 border-t border-line pt-4">

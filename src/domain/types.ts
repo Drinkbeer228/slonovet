@@ -129,9 +129,9 @@ export interface StockItem extends Base {
   kind: 'count' | 'kg' | 'sack';
   unit: string;
   sack_kg: number | null;
-  /** сколько кг в единице выдачи: для зерна — мерный совок (гарец), для овощей — сетка, для фруктов — ведро */
+  /** для зерна — кг в мерном совке (гарце) */
   kg_per_garets: number | null;
-  /** как берут в работу: «сетка», «ведро», «гроздь»; пусто — совок (для зерна) */
+  /** не используется: овощи и фрукты считаются в кг, как крупы (колонка в базе осталась) */
   pick_unit?: string | null;
   low_days: number;
   sort: number;
