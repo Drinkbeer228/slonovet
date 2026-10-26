@@ -28,9 +28,9 @@ function fracLabel(f: number) {
 
 function amountText(v: StockView) {
   const { item, balance } = v;
+  if (balance <= 0) return 'закончилось';
   if (item.kind === 'count') return `${fmtNum(balance, 0)} ${plural(Math.round(balance), ...countWords(item.id, item.unit))}`;
   if (item.kind === 'sack' && item.sack_kg) {
-    if (balance <= 0) return 'пусто';
     const parts = [];
     if (v.full > 0) parts.push(`${v.full} ${plural(v.full, 'мешок', 'мешка', 'мешков')}`);
     if (v.openFrac > 0) parts.push(v.full > 0 ? `+ ${fracLabel(v.openFrac)}` : `${fracLabel(v.openFrac)} мешка`);
@@ -40,6 +40,8 @@ function amountText(v: StockView) {
 }
 
 function daysText(v: StockView, noQty: boolean) {
+  // корма нет совсем — «на сколько хватит» не пишем, «закончилось» уже сказано в остатке
+  if (v.balance <= 0) return '';
   if (v.daysLeft == null) return noQty ? 'расход появится после первых выдач' : '';
   if (v.daysLeft < 1) return 'меньше дня';
   const d = Math.floor(v.daysLeft);
@@ -124,7 +126,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
           <span className="text-[12px] font-extrabold tracking-wide text-amber">ЗАКАНЧИВАЕТСЯ</span>
           {low.map((v) => (
             <span key={v.item.id} className="text-[15px] font-bold">
-              {v.item.name} — {daysText(v, false)}
+              {v.item.name} — {v.balance <= 0 ? 'закончилось' : daysText(v, false)}
             </span>
           ))}
         </Card>
