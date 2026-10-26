@@ -1,4 +1,5 @@
 import { EDITORS, canEdit } from '../domain/access';
+import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
@@ -136,6 +137,8 @@ export function StockScreen({ user }: { user: CurrentUser }) {
           ))}
         </Card>
       )}
+
+      <PurchasesBlock user={user} />
 
       {GROUPS.map((g) => (
         <Section key={g.title} title={g.title}>

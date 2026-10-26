@@ -169,6 +169,23 @@ export interface MoveItem extends Base {
   created_by: string;
 }
 
+export type PurchaseStatus = 'new' | 'ordered' | 'done' | 'cancelled';
+
+/** Закупка: кто-то просит купить; администратор/директор отмечает «заказано» и «привезли». */
+export interface Purchase extends Base {
+  item_id: string | null;
+  title: string;
+  amount: string;
+  note: string;
+  urgent: boolean;
+  status: PurchaseStatus;
+  author_id: string;
+  author_name: string;
+  status_by: string | null;
+  status_at: string | null;
+  created_at: string;
+}
+
 export interface TableMap {
   profiles: Profile;
   shifts: Shift;
@@ -179,6 +196,7 @@ export interface TableMap {
   stock_moves: StockMove;
   diets: Diet;
   move_items: MoveItem;
+  purchases: Purchase;
 }
 
 export type TableName = keyof TableMap;
@@ -193,6 +211,7 @@ export const TABLES: TableName[] = [
   'stock_moves',
   'diets',
   'move_items',
+  'purchases',
 ];
 
 export interface CurrentUser {

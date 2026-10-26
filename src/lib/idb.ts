@@ -3,7 +3,7 @@ import { TABLES } from '../domain/types';
 /** Минимальная обёртка над IndexedDB — без сторонних библиотек. */
 
 const DB_NAME = 'slonovet';
-const DB_VERSION = 3; // 2 — move_items (переезд); 3 — была доска задач, номер не откатываем
+const DB_VERSION = 4; // 2 — move_items (переезд); 3 — была доска задач, номер не откатываем; 4 — purchases (закупки)
 export const EXTRA_STORES = ['outbox', 'blobs', 'meta'] as const;
 
 let dbPromise: Promise<IDBDatabase> | null = null;

@@ -5,14 +5,35 @@ import { ANSWER_PRESETS, FREQ_LABEL, requestProgress, whoLabel } from '../../dom
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
 import { newId, put, useRows } from '../../lib/store';
 import { addDays, isoDate, relDate, shortDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, Empty, Field, PhotoThumb, ReadOnlyNote, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, Empty, Field, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { EDITORS, canEdit } from '../../domain/access';
+import { PurchasesView } from '../PurchasesView';
+
+const VIEW_KEY = 'slonovet_requests_view';
 
 export function RequestsScreen({ user }: { user: CurrentUser }) {
   const requests = useRows('requests');
   const [creating, setCreating] = useState<ElephantName | 'all' | 'work' | null>(null);
   const [open, setOpen] = useState<VetRequest | null>(null);
   const editable = canEdit('requests', user.role);
+  // две вкладки: назначения киперам и закупки; кто не ставит назначений — сразу в закупках
+  const [view, setViewState] = useState<'requests' | 'purchases'>(() => {
+    try {
+      const v = localStorage.getItem(VIEW_KEY);
+      if (v === 'requests' || v === 'purchases') return v;
+    } catch {
+      /* без хранилища — по роли */
+    }
+    return editable ? 'requests' : 'purchases';
+  });
+  const setView = (v: 'requests' | 'purchases') => {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* не запомнится — не беда */
+    }
+  };
   const active = requests.filter((r) => r.status === 'active').sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const closed = requests
     .filter((r) => r.status === 'closed')
@@ -24,21 +45,36 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
           <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Заявки</h1>
-          {editable && (
+          {editable && view === 'requests' && (
             <Button kind="primary" icon="plus" onClick={() => setCreating('Претти')}>
               Новая
             </Button>
           )}
         </div>
-        {!editable && <ReadOnlyNote who={EDITORS.requests.who} />}
+        {!editable && view === 'requests' && <ReadOnlyNote who={EDITORS.requests.who} />}
       </header>
-      <Section title="Активные" aside={active.length ? String(active.length) : undefined}>
-        {active.length === 0 ? <Empty>Активных заявок нет</Empty> : <RequestList list={active} onOpen={setOpen} />}
-      </Section>
-      {closed.length > 0 && (
-        <Section title="Закрытые">
-          <RequestList list={closed} onOpen={setOpen} />
+      <Segmented
+        label="Вид заявок"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'requests', label: 'Назначения' },
+          { value: 'purchases', label: 'Закупки' },
+        ]}
+      />
+      {view === 'purchases' ? (
+        <PurchasesView user={user} />
+      ) : (
+        <>
+        <Section title="Активные" aside={active.length ? String(active.length) : undefined}>
+          {active.length === 0 ? <Empty>Активных заявок нет</Empty> : <RequestList list={active} onOpen={setOpen} />}
         </Section>
+        {closed.length > 0 && (
+          <Section title="Закрытые">
+            <RequestList list={closed} onOpen={setOpen} />
+          </Section>
+        )}
+        </>
       )}
       <NewRequestSheet initial={creating} user={user} onClose={() => setCreating(null)} />
       <RequestDetail req={open} editable={editable} onClose={() => setOpen(null)} />

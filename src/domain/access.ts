@@ -10,6 +10,8 @@ export const EDITORS = {
   diet: { roles: ['vet', 'admin'], who: 'врач' },
   stock: { roles: ['keeper', 'manager', 'admin'], who: 'киперы и администратор' },
   users: { roles: ['director', 'manager', 'admin'], who: 'директор и администратор' },
+  // просить купить может любой; «заказано» и «привезли» отмечают они
+  purchases: { roles: ['director', 'manager', 'admin'], who: 'администратор и директор' },
 } satisfies Record<string, { roles: Role[]; who: string }>;
 
 export type OwnedSection = keyof typeof EDITORS;
