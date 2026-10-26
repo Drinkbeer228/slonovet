@@ -126,18 +126,6 @@ export async function seedDemo() {
         });
       }
     }
-    const vegKg = 40 + (i % 4) * 2;
-    feeds['19:00'].kg = vegKg;
-    moves.push({
-      id: `veg:${date}:19:00`,
-      item_id: 'veg',
-      delta: -vegKg,
-      reason: 'feed',
-      shift_id: date,
-      author_name: keeper.full_name,
-      created_at: ts(date, '19:00'),
-      updated_at: now,
-    });
   }
 
   // приход 15 дней назад = остаток на сегодня + всё, что выдали за 14 смен
@@ -146,7 +134,12 @@ export async function seedDemo() {
   for (const m of moves) used.set(m.item_id, (used.get(m.item_id) ?? 0) - m.delta);
   const left: [string, number][] = [
     ['hay', 34],
-    ['veg', 140],
+    ['potato', 180],
+    ['carrot', 120],
+    ['beet', 150],
+    ['cabbage', 60],
+    ['apple', 40],
+    ['banana', 30],
     ['formamax', 75],
     ['optiform', 40],
     ['monograss', 7],

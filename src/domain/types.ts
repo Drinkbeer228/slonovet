@@ -36,6 +36,8 @@ export interface FeedState {
   kg?: number;
   /** овощи «по образцу»: наполнение таза у каждой (1 — полный, 0.75, 0.5, 0.25); кг = сумма × вес таза */
   fill?: Partial<Record<ElephantName, number>>;
+  /** сколько кг реально выдали по позиции, если не по рациону (картофель взяли 2 сетки вместо 3) */
+  given?: Record<string, number>;
 }
 
 export interface Quests {
@@ -127,8 +129,10 @@ export interface StockItem extends Base {
   kind: 'count' | 'kg' | 'sack';
   unit: string;
   sack_kg: number | null;
-  /** для зерна — кг в мерном совке (гарце); для овощей — кг в обычном тазу */
+  /** сколько кг в единице выдачи: для зерна — мерный совок (гарец), для овощей — сетка, для фруктов — ведро */
   kg_per_garets: number | null;
+  /** как берут в работу: «сетка», «ведро», «гроздь»; пусто — совок (для зерна) */
+  pick_unit?: string | null;
   low_days: number;
   sort: number;
 }
@@ -136,9 +140,12 @@ export interface StockItem extends Base {
 export interface StockMove extends Base {
   item_id: string;
   delta: number;
-  reason: 'in' | 'feed' | 'hay' | 'fix';
+  /** extra — выдали вне рациона (манеж, репетиция, шоу); waste — брак, гниль при переборке */
+  reason: 'in' | 'feed' | 'hay' | 'fix' | 'extra' | 'waste';
   shift_id: string | null;
   author_name: string;
+  /** повод для «вне рациона»: Манеж, Репетиция… */
+  note?: string;
   created_at: string;
 }
 

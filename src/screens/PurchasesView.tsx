@@ -6,7 +6,7 @@ import { newId, put, useRows } from '../lib/store';
 import { isoDate, relDate, shortDate, timeOf } from '../lib/dates';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { countWords, fmtNum } from '../domain/stock';
+import { categoryOf, countWords, fmtNum, packWords } from '../domain/stock';
 import { Button, Card, Check, Chip, DateInput, Empty, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
@@ -53,7 +53,7 @@ function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase | null
   if (!p) return null;
   const it = items.find((i) => i.id === p.item_id);
   const n = Number(qty.replace(',', '.')) || 0;
-  const unit = !it ? '' : it.kind === 'kg' ? 'кг' : it.kind === 'sack' ? 'мешков' : countWords(it.id, it.unit)[2];
+  const unit = !it ? '' : it.kind === 'kg' ? 'кг' : it.kind === 'sack' ? packWords(it)[2] : countWords(it.id, it.unit)[2];
   const delta = !it ? 0 : it.kind === 'sack' ? n * (it.sack_kg ?? 0) : n;
   const finish = async (withStock: boolean) => {
     if (withStock && it && delta > 0) await addStockMove(it.id, delta, 'in', user, currentShift(shifts)?.id ?? null);
@@ -206,9 +206,6 @@ function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null;
   );
 }
 
-/** Овощи и фрукты заказывают конкретно; при «Привезли» они зачисляются в общую позицию «Овощи» (кг). */
-const PRODUCE = ['Морковь', 'Свёкла', 'Капуста', 'Яблоки', 'Бананы'];
-
 function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: CurrentUser; onClose: () => void }) {
   const items = useRows('stock_items');
   const [itemId, setItemId] = useState<string | null>(null);
@@ -227,10 +224,10 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
     }
   }, [open]);
 
-  const produce = itemId?.startsWith('p:') ? itemId.slice(2) : null;
-  const vegItem = items.find((i) => i.id === 'veg');
-  const item = produce ? vegItem : items.find((i) => i.id === itemId);
-  const title = itemId === 'other' ? other.trim() : (produce ?? item?.name ?? '');
+  const item = items.find((i) => i.id === itemId);
+  const title = itemId === 'other' ? other.trim() : (item?.name ?? '');
+  const sorted = [...items].sort((a, b) => a.sort - b.sort);
+  const produce = sorted.filter((i) => categoryOf(i) === 'veg');
 
   return (
     <Sheet
@@ -271,9 +268,8 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
         <div className="flex flex-col gap-2">
           <span className="px-1 text-[14px] font-bold text-muted">Что</span>
           <div className="flex flex-wrap gap-2">
-            {items
-              .filter((i) => i.id !== 'veg')
-              .sort((a, b) => a.sort - b.sort)
+            {sorted
+              .filter((i) => categoryOf(i) !== 'veg')
               .map((i) => (
                 <Chip key={i.id} on={itemId === i.id} onClick={() => setItemId(i.id)}>
                   {i.name}
@@ -282,9 +278,9 @@ function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: Curren
           </div>
           <span className="px-1 pt-1 text-[13px] font-bold text-muted">Овощи и фрукты</span>
           <div className="flex flex-wrap gap-2">
-            {PRODUCE.map((name) => (
-              <Chip key={name} on={itemId === `p:${name}`} onClick={() => setItemId(`p:${name}`)}>
-                {name}
+            {produce.map((i) => (
+              <Chip key={i.id} on={itemId === i.id} onClick={() => setItemId(i.id)}>
+                {i.name}
               </Chip>
             ))}
             <Chip on={itemId === 'other'} onClick={() => setItemId('other')}>

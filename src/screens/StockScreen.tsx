@@ -3,12 +3,14 @@ import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
 import { addStockMove } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { STOCK_CATEGORIES, balances, categoryOf, deleteBlocker, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
+import { STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, packWords, pickWords, countPerDay, countWords, dailyUsage, fmtNum, itemsWithoutQty, stockView, weighedPerDay, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
 import { newId, put, useRows } from '../lib/store';
 import { plural, relDate, timeOf } from '../lib/dates';
 import { Button, Card, Chip, Confirm, Field, ReadOnlyNote, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
+
+const MOVE_LABEL: Partial<Record<string, string>> = { in: 'приход', fix: 'поправка', waste: 'брак', extra: 'вне рациона' };
 
 const FRACTIONS = [
   { v: 0, label: 'пусто' },
@@ -32,7 +34,8 @@ function amountText(v: StockView) {
   if (item.kind === 'count') return `${fmtNum(balance, 0)} ${plural(Math.round(balance), ...countWords(item.id, item.unit))}`;
   if (item.kind === 'sack' && item.sack_kg) {
     const parts = [];
-    if (v.full > 0) parts.push(`${v.full} ${plural(v.full, 'мешок', 'мешка', 'мешков')}`);
+    if (item.pick_unit) return `${fmtNum(balance)} кг · ${countText(balance / item.sack_kg, packWords(item))}`;
+    if (v.full > 0) parts.push(`${v.full} ${plural(v.full, ...packWords(item))}`);
     if (v.openFrac > 0) parts.push(v.full > 0 ? `+ ${fracLabel(v.openFrac)}` : `${fracLabel(v.openFrac)} мешка`);
     return parts.join(' ');
   }
@@ -100,7 +103,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
   const noQty = useMemo(() => itemsWithoutQty(diets), [diets]);
   const low = [...views.values()].filter((v) => v.low).sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
   const history = [...moves]
-    .filter((m) => m.reason === 'in' || m.reason === 'fix')
+    .filter((m) => m.reason === 'in' || m.reason === 'fix' || m.reason === 'waste' || m.reason === 'extra')
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
     .slice(0, 15);
   const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
@@ -175,12 +178,12 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       )}
 
       <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
-        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по наполнению тазов в 19:00, мешки — по счётчику «Мешков взяли». Остальное считается вручную: «Привезли» и поправка остатка.
+        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — сетками в 19:00 (по рациону, кипер поправляет), мешки — по счётчику «Мешков взяли». Фрукты и овощи на манеже и шоу — «Вне рациона» в дежурстве, гниль — «Списать брак» в карточке.
         {canWrite && ' Нажми на позицию, чтобы поправить остаток, переименовать или удалить.'}
       </p>
 
       {history.length > 0 && (
-        <Section title="Приход и поправки">
+        <Section title="Приход, выдачи и брак">
           <Card className="divide-y divide-surface2 overflow-hidden">
             {history.map((m) => {
               const it = items.find((i) => i.id === m.item_id);
@@ -190,7 +193,8 @@ export function StockScreen({ user }: { user: CurrentUser }) {
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-[14px] font-bold">{nameOf(m.item_id)}</span>
                     <span className="text-[12px] font-semibold text-muted">
-                      {m.reason === 'in' ? 'приход' : 'поправка'} · {relDate(m.created_at.slice(0, 10))} {timeOf(m.created_at)} · {m.author_name}
+                      {MOVE_LABEL[m.reason] ?? 'поправка'}
+                      {m.note ? `: ${m.note}` : ''} · {relDate(m.created_at.slice(0, 10))} {timeOf(m.created_at)} · {m.author_name}
                     </span>
                   </span>
                   <span className={`text-[15px] font-extrabold ${Number(m.delta) > 0 ? 'text-teal' : 'text-ink2'}`}>
@@ -221,6 +225,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   const [value, setValue] = useState('');
   const [sackKg, setSackKg] = useState('');
   const [perGarets, setPerGarets] = useState('');
+  const [waste, setWaste] = useState('');
   const [openedFor, setOpenedFor] = useState<string | null>(null);
 
   if (view && it && openedFor !== it.id) {
@@ -231,6 +236,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
     setSackKg(String(it.sack_kg ?? ''));
     setName(it.name);
     setPerGarets(String(it.kg_per_garets ?? ''));
+    setWaste('');
   }
   const close = () => {
     setOpenedFor(null);
@@ -238,8 +244,12 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   };
   if (!view || !it) return null;
 
-  const target = it.kind === 'sack' && it.sack_kg ? (full + frac) * it.sack_kg : Number(value.replace(',', '.')) || 0;
-
+  // овощи и фрукты считаем в кг (их берут сетками и вёдрами, мешки не «открывают»), крупы — мешками
+  const byKg = Boolean(it.pick_unit) || it.kind !== 'sack' || !it.sack_kg;
+  const num = (v: string) => Number(v.replace(',', '.')) || 0;
+  const target = byKg ? num(value) : (full + frac) * it.sack_kg!;
+  const pick = pickWords(it);
+  const bump = (d: number) => setValue(String(Math.max(0, Math.round((num(value) + d) * 10) / 10)).replace('.', ','));
   return (
     <Sheet
       open
@@ -253,18 +263,11 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
           onClick={async () => {
             const delta = Math.round((target - view.balance) * 1000) / 1000;
             await addStockMove(it.id, delta, 'fix', user, shiftId);
-            if (name.trim() && name.trim() !== it.name) await put('stock_items', { ...it, name: name.trim() });
-            if (it.id === 'veg') {
-              const g = Number(perGarets.replace(',', '.'));
-              if (perGarets && g !== it.kg_per_garets) await put('stock_items', { ...it, kg_per_garets: g || null } as StockItem);
-            }
-            if (it.kind === 'sack') {
-              const s = Number(sackKg.replace(',', '.'));
-              const g = Number(perGarets.replace(',', '.'));
-              if ((s && s !== it.sack_kg) || (perGarets && g !== it.kg_per_garets)) {
-                await put('stock_items', { ...it, sack_kg: s || it.sack_kg, kg_per_garets: perGarets ? g : it.kg_per_garets } as StockItem);
-              }
-            }
+            // название и настройки — одной записью, чтобы одно не затёрло другое
+            const next: StockItem = { ...it, name: name.trim() || it.name };
+            if (it.kind === 'sack' && num(sackKg)) next.sack_kg = num(sackKg);
+            if (perGarets) next.kg_per_garets = num(perGarets) || null;
+            if (next.name !== it.name || next.sack_kg !== it.sack_kg || next.kg_per_garets !== it.kg_per_garets) await put('stock_items', next);
             toast('Сохранено');
             close();
           }}
@@ -274,7 +277,21 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
       }
     >
       <div className="flex flex-col gap-5">
-        {it.kind === 'sack' && it.sack_kg ? (
+        {byKg && it.pick_unit ? (
+          <div className="flex flex-col gap-2">
+            <Field label="Сейчас, кг" hint={it.sack_kg ? `≈ ${countText(num(value) / it.sack_kg, packWords(it))} по ${fmtNum(it.sack_kg)} кг` : undefined}>
+              <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+            </Field>
+            <div className="grid grid-cols-4 gap-1.5">
+              {[-10, -5, 5, 10].map((d) => (
+                <button key={d} type="button" onClick={() => bump(d)} className="h-11 rounded-xl border border-line text-[15px] font-bold text-ink2">
+                  {d > 0 ? '+' : '−'}
+                  {Math.abs(d)} кг
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : !byKg ? (
           <>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[15px] font-bold">Полных мешков</span>
@@ -302,7 +319,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
               </div>
             </div>
             <span className="text-[13px] font-semibold text-muted">
-              ≈ {fmtNum(target)} кг · мешок {fmtNum(it.sack_kg)} кг
+              ≈ {fmtNum(target)} кг · мешок {fmtNum(it.sack_kg ?? 0)} кг
             </span>
           </>
         ) : (
@@ -310,19 +327,41 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             <input className={inputCls} type="text" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
           </Field>
         )}
-        {it.id === 'veg' && (
-          <div className="border-t border-line pt-4">
-            <Field label="Порция овощей на слониху, кг" hint="Обычно 70–80 кг: база 60 (картофель, морковь, свёкла по 20) + сезонное 10–15. Кипер отмечает, всю ли порцию дал.">
-              <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
-            </Field>
+        {pick && (
+          // брак и гниль при переборке — списание мимо рациона, чтобы склад не расходился с приложением
+          <div className="flex flex-col gap-2 border-t border-line pt-4">
+            <span className="text-[15px] font-bold">Списать брак / гниль</span>
+            <div className="flex flex-wrap gap-2">
+              {[it.kg_per_garets ? { kg: it.kg_per_garets, label: `1 ${pick[0]} · ${fmtNum(it.kg_per_garets)} кг` } : null, { kg: 5, label: '5 кг' }, { kg: 10, label: '10 кг' }]
+                .filter((x): x is { kg: number; label: string } => Boolean(x))
+                .map((x) => (
+                  <Chip key={x.label} on={num(waste) === x.kg} onClick={() => setWaste(String(x.kg))}>
+                    {x.label}
+                  </Chip>
+                ))}
+            </div>
+            <div className="flex gap-2">
+              <input className={inputCls} type="text" inputMode="decimal" value={waste} onChange={(e) => setWaste(e.target.value)} placeholder="кг" aria-label="Брак, кг" />
+              <Button
+                className="shrink-0"
+                disabled={!num(waste)}
+                onClick={async () => {
+                  await addStockMove(it.id, -num(waste), 'waste', user, shiftId);
+                  toast(`Списан брак: ${fmtNum(num(waste))} кг`);
+                  close();
+                }}
+              >
+                Списать
+              </Button>
+            </div>
           </div>
         )}
         {it.kind === 'sack' && (
           <div className="grid grid-cols-2 gap-3 border-t border-line pt-4">
-            <Field label="Вес мешка, кг">
+            <Field label={`Вес: 1 ${packWords(it)[0]}, кг`}>
               <input className={inputCls} type="text" inputMode="decimal" value={sackKg} onChange={(e) => setSackKg(e.target.value)} />
             </Field>
-            <Field label="В совке, кг" hint="полный мерный совок">
+            <Field label={pick ? `1 ${pick[0]}, кг` : 'В совке, кг'} hint={pick ? 'сколько берут в работу за раз' : 'полный мерный совок'}>
               <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
             </Field>
           </div>
@@ -380,7 +419,7 @@ function IncomingSheet({
   const isKg = it?.kind === 'kg';
   const typedNum = Number(kg.replace(',', '.')) || 0;
   const amount = !it ? 0 : typed ? typedNum : qty * (it.sack_kg ?? 0);
-  const unitWord = !it ? '' : it.kind === 'count' ? plural(Math.round(typedNum), ...countWords(it.id, it.unit)) : plural(qty, 'мешок', 'мешка', 'мешков');
+  const unitWord = !it ? '' : it.kind === 'count' ? plural(Math.round(typedNum), ...countWords(it.id, it.unit)) : plural(qty, ...packWords(it));
 
   return (
     <Sheet

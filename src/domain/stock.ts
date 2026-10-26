@@ -89,6 +89,35 @@ export function countWords(itemId: string, unit = 'шт.'): [string, string, str
   return COUNT_WORDS[itemId] ?? [unit, unit, unit];
 }
 
+const WORDS: Record<string, [string, string, string]> = {
+  мешок: ['мешок', 'мешка', 'мешков'],
+  ящик: ['ящик', 'ящика', 'ящиков'],
+  сетка: ['сетка', 'сетки', 'сеток'],
+  ведро: ['ведро', 'ведра', 'вёдер'],
+  гроздь: ['гроздь', 'грозди', 'гроздей'],
+};
+
+/** Как хранится: мешок, ящик, сетка (у старых круп в unit записано «кг» — значит мешок). */
+export function packWords(item: StockItem): [string, string, string] {
+  return WORDS[item.unit] ?? WORDS['мешок'];
+}
+
+/** Как берут в работу: сетка, ведро, гроздь — или null, если считают просто кг/совком. */
+export function pickWords(item: StockItem): [string, string, string] | null {
+  return item.pick_unit ? (WORDS[item.pick_unit] ?? [item.pick_unit, item.pick_unit, item.pick_unit]) : null;
+}
+
+/** «3 мешка», «4,5 мешка», «5 мешков»: дробное — всегда «мешка». */
+export function countText(n: number, words: [string, string, string]): string {
+  const r = Math.round(n * 10) / 10;
+  if (!Number.isInteger(r)) return `${fmtNum(r, 1)} ${words[1]}`;
+  const [one, few, many] = words;
+  const m10 = r % 10;
+  const m100 = r % 100;
+  const w = m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+  return `${r} ${w}`;
+}
+
 /** Группы фуража по порядку на экране. */
 export const STOCK_CATEGORIES: { id: StockCategory; title: string }[] = [
   { id: 'feed', title: 'Корма' },

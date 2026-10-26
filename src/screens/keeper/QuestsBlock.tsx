@@ -5,6 +5,7 @@ import type { CurrentUser, ElephantName, Quests, Shift } from '../../domain/type
 import { Card, Check, Chip, DecimalInput, Section, Segmented, Stepper, inputCls } from '../../ui/kit';
 import { Icon, type IconName } from '../../ui/Icon';
 import { WhyLink } from '../common/Why';
+import { ExtraIssues } from './ExtraIssues';
 import { nowTime } from '../../lib/dates';
 import { logEvent } from '../../lib/log';
 
@@ -188,6 +189,8 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
           />
         </div>
       </Card>
+
+      <ExtraIssues shift={shift} user={user} />
 
       <WashCard shift={shift} />
     </Section>

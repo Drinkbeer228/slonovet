@@ -104,6 +104,9 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
     await setFeedKg(shift, time, weighedId, ELEPHANTS.length * perBowl, user, fill);
   }
   const usage = feedUsage(getRows('diets'), time, getRows('stock_items'));
+  // поправленное кипером (сетками) — важнее рациона
+  const given = getRow('shifts', shift.id)?.feeds[time]?.given ?? {};
+  for (const [item, kg] of Object.entries(given)) usage.set(item, kg);
   for (const [item, qty] of usage) {
     const id = `feed:${shift.id}:${time}:${item}`;
     const existing = getRow('stock_moves', id);
@@ -122,6 +125,34 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
       await put('stock_moves', { ...existing, deleted: true });
     }
   }
+}
+
+/** Кипер поправил, сколько выдал по позиции (например, картофеля 2 сетки вместо 3). Списание пересчитывается. */
+export async function setFeedGiven(shift: Shift, time: string, itemId: string, kg: number, user: CurrentUser) {
+  logEvent('feed.given', { time, item: itemId, kg });
+  await updateShift(shift, (s) => {
+    const f = s.feeds[time];
+    if (f) f.given = { ...(f.given ?? {}), [itemId]: kg };
+  });
+  const id = `feed:${shift.id}:${time}:${itemId}`;
+  const existing = getRow('stock_moves', id);
+  await put('stock_moves', {
+    id,
+    item_id: itemId,
+    delta: -kg,
+    reason: 'feed',
+    shift_id: shift.id,
+    author_name: user.full_name,
+    created_at: existing?.created_at ?? new Date().toISOString(),
+    deleted: false,
+  } satisfies Omit<StockMove, 'updated_at'>);
+}
+
+/** Выдали вне рациона (манеж, репетиция, шоу) или списали брак — отдельное движение со своим поводом. */
+export async function addStockMoveNote(item_id: string, delta: number, reason: 'extra' | 'waste', note: string, user: CurrentUser, shift_id: string | null) {
+  logEvent('stock.move', { item: item_id, delta, reason, note });
+  if (!delta) return;
+  await put('stock_moves', { id: newId(), item_id, delta, reason, shift_id, author_name: user.full_name, note, created_at: new Date().toISOString() });
 }
 
 /** Кипер вписывает, сколько кг выдал (овощи). Списывается со склада. */
