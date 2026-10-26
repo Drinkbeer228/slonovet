@@ -6,7 +6,8 @@ import type { Role } from './types';
  * Права в базе (RLS) совпадают с этим списком; дежурство — только кипер (см. ShiftScreen).
  */
 export const EDITORS = {
-  requests: { roles: ['vet', 'director', 'admin'], who: 'врач и директор' },
+  // задачи ставят все; закрывать чужие — врач, директор, администратор, админ (своё — автор)
+  requests: { roles: ['vet', 'director', 'manager', 'admin'], who: 'автор, врач, директор или администратор' },
   diet: { roles: ['vet', 'admin'], who: 'врач' },
   stock: { roles: ['keeper', 'director', 'manager', 'admin'], who: 'киперы, директор и администратор' },
   users: { roles: ['director', 'manager', 'admin'], who: 'директор и администратор' },
@@ -17,3 +18,6 @@ export const EDITORS = {
 export type OwnedSection = keyof typeof EDITORS;
 
 export const canEdit = (section: OwnedSection, role: Role) => (EDITORS[section].roles as Role[]).includes(role);
+
+/** Закрыть или вернуть в работу задачу: автор или те, кто ведёт задачи. */
+export const canCloseRequest = (req: { author_id: string | null }, user: { id: string; role: Role }) => req.author_id === user.id || canEdit('requests', user.role);

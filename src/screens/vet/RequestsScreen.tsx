@@ -7,7 +7,7 @@ import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, relDate, shortDate, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Confirm, Empty, Field, FilePreview, PhotoPick, PhotoThumb, ReadOnlyNote, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
-import { EDITORS, canEdit } from '../../domain/access';
+import { canCloseRequest } from '../../domain/access';
 import { PurchasesView } from '../PurchasesView';
 
 const VIEW_KEY = 'slonovet_requests_view';
@@ -17,7 +17,6 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
   const [creating, setCreating] = useState<ElephantName | 'all' | 'work' | null>(null);
   const [open, setOpen] = useState<VetRequest | null>(null);
   const [buying, setBuying] = useState(false);
-  const editable = canEdit('requests', user.role);
   // две вкладки: назначения киперам и закупки; кто не ставит назначений — сразу в закупках
   const [view, setViewState] = useState<'requests' | 'purchases'>(() => {
     try {
@@ -26,7 +25,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
     } catch {
       /* без хранилища — по роли */
     }
-    return editable ? 'requests' : 'purchases';
+    return user.role === 'manager' ? 'purchases' : 'requests';
   });
   const setView = (v: 'requests' | 'purchases') => {
     setViewState(v);
@@ -47,19 +46,16 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
           <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Заявки</h1>
-          {view === 'requests'
-            ? editable && (
-                <Button kind="primary" icon="plus" onClick={() => setCreating('Претти')}>
-                  Новая
-                </Button>
-              )
-            : (
+          {view === 'requests' ? (
+            <Button kind="primary" icon="plus" onClick={() => setCreating('Претти')}>
+              Новая
+            </Button>
+          ) : (
                 <Button kind="primary" icon="plus" onClick={() => setBuying(true)}>
                   Купить
                 </Button>
               )}
         </div>
-        {!editable && view === 'requests' && <ReadOnlyNote who={EDITORS.requests.who} />}
       </header>
       <Segmented
         label="Вид заявок"
@@ -85,7 +81,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         </>
       )}
       <NewRequestSheet initial={creating} user={user} onClose={() => setCreating(null)} />
-      <RequestDetail req={open} editable={editable} onClose={() => setOpen(null)} />
+      <RequestDetail req={open} user={user} onClose={() => setOpen(null)} />
     </div>
   );
 }
@@ -141,7 +137,7 @@ export function RequestList({ list, onOpen }: { list: VetRequest[]; onOpen: (r: 
   );
 }
 
-function RequestDetail({ req, editable, onClose }: { req: VetRequest | null; editable: boolean; onClose: () => void }) {
+function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: CurrentUser; onClose: () => void }) {
   const marks = useRows('request_marks');
   const [confirm, setConfirm] = useState(false);
   if (!req) return null;
@@ -152,7 +148,7 @@ function RequestDetail({ req, editable, onClose }: { req: VetRequest | null; edi
       onClose={onClose}
       title={whoLabel(req.elephant)}
       footer={
-        editable && (
+        canCloseRequest(req, user) && (
           <div className="flex gap-2">
             {req.status === 'active' ? (
               <Button full onClick={() => setConfirm(true)}>
