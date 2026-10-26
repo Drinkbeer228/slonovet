@@ -6,7 +6,9 @@ import { logEvent } from '../lib/log';
 import { Button, toast } from '../ui/kit';
 import type { Tab } from './Shell';
 
-/* ---------- кто что уже видел (на этом телефоне) и запуск заново из Справки ---------- */
+/* ---------- кто что уже видел (на этом телефоне) и запуск заново из Справки ----------
+ * Сами по себе показываются один раз — знакомство при первом входе с телефона.
+ * Рассказы о разделах — только по кнопке в Справке. */
 
 type TourKey = 'intro' | TourTab;
 
@@ -111,26 +113,6 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
     }, 300);
   }, [replayed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // первый заход в раздел — рассказ о нём (после знакомства); дежурство — когда оно открыто
-  useEffect(() => {
-    if (active || !seen(user.id, 'intro')) return;
-    const k = tab as TourKey;
-    const t = sectionTour(tab, user.role);
-    if (!t || seen(user.id, k)) return;
-    const check = () => {
-      if (!t.when || findVisible(t.when)) {
-        window.clearInterval(timer);
-        begin(k, t.steps);
-      }
-    };
-    const timer = window.setInterval(check, 1500);
-    const first = window.setTimeout(check, 500);
-    return () => {
-      window.clearInterval(timer);
-      window.clearTimeout(first);
-    };
-  }, [active, tab]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // перед показом отсеиваем шаги, чьего места нет на экране (иначе «2 из 9» → «7 из 9»)
   useEffect(() => {
     if (!active || active.ready) return;
@@ -147,6 +129,11 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
     }, 300);
     return () => window.clearTimeout(t);
   }, [active, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // показали — значит увидел: закрыл приложение посреди подсказок — заново не покажем
+  useEffect(() => {
+    if (active?.ready) markSeen(user.id, active.key);
+  }, [active?.ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = active?.ready ? active.steps : null;
   const step = steps?.[pos];
