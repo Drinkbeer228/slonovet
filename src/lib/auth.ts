@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { CurrentUser, Profile, Role } from '../domain/types';
 import { LOGIN_DOMAIN } from './config';
+import { diag } from './diag';
 import { getClient } from './supabase';
 import { purgeDemo, setCloudMode, setOwner, wipeAll } from './store';
 import { startSync, stopSync, syncNow } from './sync';
@@ -88,6 +89,7 @@ export async function loginCloud(login: string, password: string): Promise<void>
   const clean = login.trim().toLowerCase();
   const { data, error } = await client.auth.signInWithPassword({ email: `${clean}@${LOGIN_DOMAIN}`, password });
   if (error || !data.user) throw new Error('Неверный логин или пароль');
+  diag('login-token');
   const { data: profile, error: pErr } = await client.from('profiles').select('*').eq('id', data.user.id).single();
   if (pErr || !profile) throw new Error('Профиль не найден. Попросите администратора проверить учётную запись.');
   const p = profile as Profile;
@@ -97,6 +99,7 @@ export async function loginCloud(login: string, password: string): Promise<void>
   }
   if (session?.mode === 'demo' || load()?.mode === 'demo') await wipeAll();
   else await purgeDemo();
+  diag('login-profile');
   set({ mode: 'cloud', user: { id: p.id, login: p.login, full_name: p.full_name, role: p.role } });
   setCloudMode(true);
   startSync();
