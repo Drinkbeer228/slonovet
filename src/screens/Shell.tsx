@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
@@ -7,6 +7,9 @@ import { Button, Card, Chip, Confirm, Segmented, Sheet, toast } from '../ui/kit'
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
+import { useRows } from '../lib/store';
+import { currentShift, requestTodos } from '../domain/shift';
+import { balances, stockPerDay, stockView } from '../domain/stock';
 import { startTour } from './Tour';
 import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
@@ -127,6 +130,7 @@ export function TopBar({
   onTab: (t: Tab) => void;
   onMenu: () => void;
 }) {
+  const badges = useBadges();
   return (
     <header className="sticky top-0 z-30 border-b border-surface2 bg-bg/95 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
@@ -143,6 +147,7 @@ export function TopBar({
               className={`h-9 rounded-xl px-3.5 text-[14px] font-bold ${t === tab ? 'bg-surface text-ink' : 'text-muted hover:text-ink'}`}
             >
               {TAB_META[t].label}
+              {badges[t] ? <span className="ml-1.5 rounded-full bg-amber px-1.5 py-0.5 text-[11px] font-extrabold text-bg">{badges[t]}</span> : null}
             </button>
           ))}
         </nav>
@@ -163,7 +168,41 @@ export function TopBar({
   );
 }
 
+/**
+ * Цифры на разделах — чтобы не открывать вкладку проверять: на «Дежурстве» — сколько назначений ждёт
+ * ответа в открытом дежурстве, на «Фураже» — сколько позиций заканчивается (как в плашке «Заканчивается»).
+ */
+export function useBadges(): Partial<Record<Tab, number>> {
+  const requests = useRows('requests');
+  const marks = useRows('request_marks');
+  const shifts = useRows('shifts');
+  const items = useRows('stock_items');
+  const moves = useRows('stock_moves');
+  const diets = useRows('diets');
+  const shift = currentShift(shifts);
+  const left = shift ? requestTodos(requests, marks, shift).filter((t) => !t.done).length : 0;
+  const low = useMemo(() => {
+    const bal = balances(moves);
+    const perDay = stockPerDay(items, diets, moves);
+    return items.filter((it) => stockView(it, bal.get(it.id) ?? 0, perDay.get(it.id) ?? null).low).length;
+  }, [items, moves, diets]);
+  return { shift: left, stock: low };
+}
+
+function Badge({ n, urgent }: { n?: number; urgent?: boolean }) {
+  if (!n) return null;
+  return (
+    <span
+      aria-label={`${n} требуют внимания`}
+      className={`absolute -right-2.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-extrabold leading-none text-bg ${urgent ? 'bg-coral' : 'bg-amber'}`}
+    >
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
+
 export function BottomNav({ tabs, tab, onTab }: { tabs: Tab[]; tab: Tab; onTab: (t: Tab) => void }) {
+  const badges = useBadges();
   return (
     <nav
       aria-label="Разделы"
@@ -181,7 +220,10 @@ export function BottomNav({ tabs, tab, onTab }: { tabs: Tab[]; tab: Tab; onTab: 
             onClick={() => onTab(t)}
             className={`flex flex-col items-center gap-1 py-1.5 text-[12px] ${on ? 'font-extrabold text-teal' : 'font-bold text-muted'}`}
           >
-            <Icon name={TAB_META[t].icon} size={22} />
+            <span className="relative">
+              <Icon name={TAB_META[t].icon} size={22} />
+              <Badge n={badges[t]} />
+            </span>
             {TAB_META[t].label}
           </button>
         );
