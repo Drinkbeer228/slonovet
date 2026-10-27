@@ -9,14 +9,23 @@ import { initTheme } from './lib/theme';
 import { captureErrors } from './lib/log';
 import { registerSW } from 'virtual:pwa-register';
 
+/** До показа приложения ничто не должно уронить запуск (иначе на iPhone — чёрный экран): ошибку — в диагностику и дальше. */
+function safe(name: string, fn: () => void) {
+  try {
+    fn();
+  } catch (e) {
+    diag('boot-error', `${name}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 // ошибки ловит встроенный скрипт в index.html (с самого начала, ещё до загрузки модулей); здесь — «приложение загрузилось»
 diag('boot');
-initTheme();
-captureErrors();
+safe('theme', initTheme);
+safe('errors', captureErrors);
 
 // новая версия сайта: скачалась — сразу включаем (страница перезагрузится, отметки уже сохранены в телефоне).
 // Плюс проверяем обновления при возвращении в приложение — его днями держат открытым; не чаще раза в минуту.
-registerSW({
+safe('sw', () => registerSW({
   immediate: true,
   onRegisteredSW(_url, reg) {
     if (!reg) return;
@@ -27,7 +36,7 @@ registerSW({
       reg.update().catch(() => undefined);
     });
   },
-});
+}));
 
 /** Упало при показе — не чёрный экран, а понятное сообщение и кнопка перезапуска (и отметка в диагностике). */
 class Crash extends Component<{ children: ReactNode }, { error: Error | null }> {

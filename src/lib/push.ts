@@ -25,15 +25,26 @@ function keyBytes(b64: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-const supported = () => Boolean(VAPID_PUBLIC) && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const supported = () => {
+  try {
+    return Boolean(VAPID_PUBLIC) && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  } catch {
+    return false;
+  }
+};
+
+/** Обращения к service worker на iPhone иногда не отвечают вовсе — не ждём дольше 5 с. */
+function within<T>(p: Promise<T>, ms = 5000): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Телефон не ответил — попробуйте ещё раз')), ms))]);
+}
 
 export async function pushState(): Promise<PushState> {
   // на iPhone уведомления есть только у приложения, поставленного на экран «Домой»
   if (platform() === 'ios' && !isStandalone()) return 'need-install';
   if (!supported()) return 'unsupported';
   if (Notification.permission === 'denied') return 'denied';
-  const reg = await navigator.serviceWorker.getRegistration();
-  const sub = await reg?.pushManager.getSubscription();
+  const reg = await within(navigator.serviceWorker.getRegistration());
+  const sub = await within(reg?.pushManager.getSubscription() ?? Promise.resolve(null));
   return sub && Notification.permission === 'granted' ? 'on' : 'off';
 }
 
@@ -43,7 +54,7 @@ export async function enablePush(): Promise<PushState> {
   if (now !== 'off' && now !== 'on') return now;
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'off';
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await within(navigator.serviceWorker.ready);
   const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID_PUBLIC!) }));
   const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
   const { error } = await getClient()!.rpc('save_push_subscription', { p_endpoint: json.endpoint, p_p256dh: json.keys.p256dh, p_auth: json.keys.auth });
@@ -54,8 +65,8 @@ export async function enablePush(): Promise<PushState> {
 /** Выключить на этом телефоне (и при выходе — чтобы уведомления не шли следующему, кто войдёт). */
 export async function disablePush(): Promise<void> {
   if (!supported()) return;
-  const reg = await navigator.serviceWorker.getRegistration();
-  const sub = await reg?.pushManager.getSubscription();
+  const reg = await within(navigator.serviceWorker.getRegistration());
+  const sub = await within(reg?.pushManager.getSubscription() ?? Promise.resolve(null));
   if (!sub) return;
   await getClient()?.rpc('delete_push_subscription', { p_endpoint: sub.endpoint });
   await sub.unsubscribe();

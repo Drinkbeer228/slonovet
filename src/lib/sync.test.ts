@@ -53,6 +53,19 @@ describe('синхронизация — работает', () => {
     expect(p.store.pendingCount()).toBe(0);
   });
 
+  it('комментарий к заявке уходит на сервер, ответ врача приходит на телефон', async () => {
+    server.write('requests', request('r1'));
+    server.write('request_comments', { id: 'c-vet', request_id: 'r1', author_id: 'vet', author_name: 'Врач', text: 'по миске', created_at: at });
+    const p = await phone();
+    const { addComment } = await import('../domain/actions');
+    await syncOnce(p);
+    await addComment('r1', keeperA, '  как считать?  ');
+    await syncOnce(p);
+    const mine = [...(server.tables.get('request_comments')?.values() ?? [])].find((r) => r.author_id === keeperA.id);
+    expect(mine?.text).toBe('как считать?');
+    expect(p.store.getRow('request_comments', 'c-vet')?.text).toBe('по миске');
+  });
+
   it('без сети всё сохраняется на телефоне и уходит при появлении связи', async () => {
     const p = await phone();
     net.online = false;

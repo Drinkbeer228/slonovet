@@ -45,6 +45,11 @@ describe('права: экран = база = сервер', () => {
     expect(db.get('requests.update')).toEqual(sorted(EDITORS.requests.roles));
   });
 
+  it('обсуждение: писать и править — только свой комментарий', () => {
+    const sql = Object.entries(files).find(([n]) => n.includes('018_'))![1];
+    for (const p of ['insert', 'update']) expect(sql).toMatch(new RegExp(`create policy "${p}" on public\\.request_comments[\\s\\S]*?author_id = auth\\.uid\\(\\)`));
+  });
+
   it('закупки: «Заказано» и «Привезли» — те же роли, что на экране', () => {
     expect(db.get('purchases.update')).toEqual(sorted(EDITORS.purchases.roles));
   });

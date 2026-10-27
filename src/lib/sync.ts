@@ -195,6 +195,7 @@ const WHAT: Record<TableName, string> = {
   shifts: 'Дежурство',
   requests: 'Задача',
   request_marks: 'Отметка задачи',
+  request_comments: 'Комментарий',
   notes: 'Запись',
   stock_items: 'Позиция фуража',
   stock_moves: 'Движение фуража',

@@ -9,6 +9,7 @@ import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { useRows } from '../lib/store';
 import { currentShift, requestTodos } from '../domain/shift';
+import { unreadRequests, useReadMarks } from '../lib/comments';
 import { balances, stockPerDay, stockView } from '../domain/stock';
 import { startTour } from './Tour';
 import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
@@ -130,7 +131,7 @@ export function TopBar({
   onTab: (t: Tab) => void;
   onMenu: () => void;
 }) {
-  const badges = useBadges();
+  const badges = useBadges(user, tabs);
   return (
     <header className="sticky top-0 z-30 border-b border-surface2 bg-bg/95 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
@@ -170,15 +171,18 @@ export function TopBar({
 
 /**
  * Цифры на разделах — чтобы не открывать вкладку проверять: на «Дежурстве» — сколько назначений ждёт
- * ответа в открытом дежурстве, на «Фураже» — сколько позиций заканчивается (как в плашке «Заканчивается»).
+ * ответа в открытом дежурстве, на «Фураже» — сколько позиций заканчивается (как в плашке «Заканчивается»),
+ * на «Заявках» — в скольких заявках новое в обсуждении (у кого «Заявок» нет — прибавляем к «Дежурству»).
  */
-export function useBadges(): Partial<Record<Tab, number>> {
+export function useBadges(user: CurrentUser, tabs: Tab[]): Partial<Record<Tab, number>> {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
   const shifts = useRows('shifts');
   const items = useRows('stock_items');
   const moves = useRows('stock_moves');
   const diets = useRows('diets');
+  const comments = useRows('request_comments');
+  const read = useReadMarks(user.id);
   const shift = currentShift(shifts);
   const left = shift ? requestTodos(requests, marks, shift).filter((t) => !t.done).length : 0;
   const low = useMemo(() => {
@@ -186,7 +190,9 @@ export function useBadges(): Partial<Record<Tab, number>> {
     const perDay = stockPerDay(items, diets, moves);
     return items.filter((it) => stockView(it, bal.get(it.id) ?? 0, perDay.get(it.id) ?? null).low).length;
   }, [items, moves, diets]);
-  return { shift: left, stock: low };
+  const active = new Set(requests.filter((r) => r.status === 'active' && !r.deleted).map((r) => r.id));
+  const talk = unreadRequests(comments, user.id, read, active);
+  return tabs.includes('requests') ? { shift: left, stock: low, requests: talk } : { shift: left + talk, stock: low };
 }
 
 function Badge({ n, urgent }: { n?: number; urgent?: boolean }) {
@@ -201,8 +207,8 @@ function Badge({ n, urgent }: { n?: number; urgent?: boolean }) {
   );
 }
 
-export function BottomNav({ tabs, tab, onTab }: { tabs: Tab[]; tab: Tab; onTab: (t: Tab) => void }) {
-  const badges = useBadges();
+export function BottomNav({ user, tabs, tab, onTab }: { user: CurrentUser; tabs: Tab[]; tab: Tab; onTab: (t: Tab) => void }) {
+  const badges = useBadges(user, tabs);
   return (
     <nav
       aria-label="Разделы"
@@ -222,7 +228,7 @@ export function BottomNav({ tabs, tab, onTab }: { tabs: Tab[]; tab: Tab; onTab: 
           >
             <span className="relative">
               <Icon name={TAB_META[t].icon} size={22} />
-              <Badge n={badges[t]} />
+              <Badge n={badges[t]} urgent={t === 'requests'} />
             </span>
             {TAB_META[t].label}
           </button>

@@ -103,7 +103,7 @@ export interface RequestTodo {
 
 export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift: Shift): RequestTodo[] {
   return requests
-    .filter((r) => r.status === 'active' && (!r.due_date || r.due_date >= shift.date))
+    .filter((r) => r.status === 'active' && (!r.due_date || r.due_date >= shift.date) && (!r.on_date || r.on_date <= shift.date))
     .map((req) => {
       const allMarks = marks.filter((m) => m.request_id === req.id);
       const here = allMarks.filter((m) => m.shift_id === shift.id);
@@ -112,7 +112,35 @@ export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift
       return { req, marks: here, allMarks, needed, done };
     })
     .filter((t) => !(t.req.frequency === 'once' && t.done && t.marks.length === 0))
-    .sort((a, b) => Number(a.done) - Number(b.done) || Number(b.req.urgent) - Number(a.req.urgent));
+    .sort((a, b) => Number(a.done) - Number(b.done) || Number(b.req.urgent) - Number(a.req.urgent) || byWhen(a.req, b.req));
+}
+
+/** Порядок по времени: сначала задачи на день и час (раньше — выше), потом остальные. */
+const whenKey = (r: VetRequest) => (r.on_date ? `${r.on_date} ${r.at_time?.slice(0, 5) ?? '99:99'}` : '9999');
+const byWhen = (a: VetRequest, b: VetRequest) => {
+  const x = whenKey(a);
+  const y = whenKey(b);
+  return x < y ? -1 : x > y ? 1 : 0;
+};
+
+/**
+ * Разовая задача на день просрочена: день прошёл, а отметки нет, или сегодня — и время уже наступило.
+ * Без даты — не бывает просроченной (у регулярных есть только «до какого дня»).
+ */
+export function overdue(req: VetRequest, done: boolean, now = new Date()): boolean {
+  if (done || req.frequency !== 'once' || !req.on_date) return false;
+  const today = isoDate(now);
+  if (req.on_date < today) return true;
+  if (req.on_date > today || !req.at_time) return false;
+  const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return hm >= req.at_time.slice(0, 5);
+}
+
+/** «26.10 · к 16:00», «сегодня к 16:00» — для карточки; пусто, если дня нет. */
+export function whenLabel(req: VetRequest, today = isoDate()): string {
+  if (!req.on_date) return '';
+  const day = req.on_date === today ? 'сегодня' : req.on_date.slice(8, 10) + '.' + req.on_date.slice(5, 7);
+  return req.at_time ? `${day} к ${req.at_time.slice(0, 5)}` : day;
 }
 
 /** Готовые наборы ответов для заявки врача */

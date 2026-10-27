@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { logEvent } from '../../lib/log';
 import { ELEPHANTS } from '../../domain/elephants';
-import { ANSWER_PRESETS, FREQ_LABEL, requestProgress, whoLabel } from '../../domain/shift';
+import { ANSWER_PRESETS, FREQ_LABEL, overdue, requestProgress, whenLabel, whoLabel } from '../../domain/shift';
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
@@ -9,6 +9,8 @@ import { addDays, isoDate, localDay, relDate, shortDate, timeOf } from '../../li
 import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest } from '../../domain/access';
 import { PurchasesView } from '../PurchasesView';
+import { DiscussionThread } from '../Discussion';
+import { unreadCount, useReadMarks } from '../../lib/comments';
 
 const VIEW_KEY = 'slonovet_requests_view';
 
@@ -73,11 +75,11 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       ) : (
         <>
         <Section id="requests-active" title="Активные" aside={active.length ? String(active.length) : undefined}>
-          {active.length === 0 ? <Empty>Активных заявок нет</Empty> : <RequestList list={active} onOpen={setOpen} />}
+          {active.length === 0 ? <Empty>Активных заявок нет</Empty> : <RequestList list={active} user={user} onOpen={setOpen} />}
         </Section>
         {closed.length > 0 && (
           <Section title="Закрытые">
-            <RequestList list={closed} onOpen={setOpen} />
+            <RequestList list={closed} user={user} onOpen={setOpen} />
           </Section>
         )}
         </>
@@ -88,29 +90,41 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
   );
 }
 
-export function RequestList({ list, onOpen }: { list: VetRequest[]; onOpen: (r: VetRequest) => void }) {
+export function RequestList({ list, user, onOpen }: { list: VetRequest[]; user: CurrentUser; onOpen: (r: VetRequest) => void }) {
   const marks = useRows('request_marks');
   const shifts = useRows('shifts');
+  const comments = useRows('request_comments');
+  const read = useReadMarks(user.id);
   return (
     <Card className="divide-y divide-surface2 overflow-hidden">
       {list.map((r) => {
         const p = requestProgress(r, marks, shifts);
         const closed = r.status === 'closed';
+        const late = !closed && overdue(r, p.done > 0);
+        const talk = comments.filter((c) => c.request_id === r.id && !c.deleted).length;
+        const fresh = unreadCount(comments, r.id, user.id, read[r.id]);
         return (
           <button key={r.id} type="button" onClick={() => onOpen(r)} className={`flex w-full flex-col gap-1.5 px-4 py-3 text-left ${closed ? 'opacity-60' : ''}`}>
             <div className="flex justify-between gap-2">
               <span className={`text-[13px] font-extrabold ${closed ? 'text-muted' : 'text-amber'}`}>
                 {whoLabel(r.elephant)}
                 {r.urgent && !closed && <span className="ml-2 rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">СРОЧНО</span>}
+                {late && <span className="ml-2 rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">ПРОСРОЧЕНО</span>}
               </span>
               <span className="text-[12px] font-semibold text-muted">
-                {closed ? 'закрыта' : `${FREQ_LABEL[r.frequency]}${r.due_date ? ` · до ${shortDate(r.due_date)}` : ''}`}
+                {closed ? 'закрыта' : `${whenLabel(r) || FREQ_LABEL[r.frequency]}${r.due_date ? ` · до ${shortDate(r.due_date)}` : ''}`}
               </span>
             </div>
             <span className="text-[15px] font-semibold leading-snug">
               {r.text}
               {r.photo_path && <span className="text-[12px] font-bold text-muted"> · фото</span>}
             </span>
+            {talk > 0 && (
+              <span className={`text-[12px] font-bold ${fresh ? 'text-coral' : 'text-muted'}`}>
+                Обсуждение · {talk}
+                {fresh ? ` · новых ${fresh}` : ''}
+              </span>
+            )}
             {closed && p.last && (
               <span className="text-[12px] font-semibold text-teal">
                 Выполнил: {p.last.done_by}, {relDate(localDay(p.last.done_at))} {timeOf(p.last.done_at)}
@@ -175,7 +189,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
         <p className="m-0 text-[16px] font-medium leading-relaxed">{req.text}</p>
         {req.photo_path && <PhotoThumb path={req.photo_path} size={140} />}
         <span className="text-[13px] font-semibold text-muted">
-          {FREQ_LABEL[req.frequency]}
+          {whenLabel(req) || FREQ_LABEL[req.frequency]}
           {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
           {req.needs_photo ? ' · с фото' : ''} · {req.author_name}, {relDate(localDay(req.created_at))}
         </span>
@@ -197,6 +211,9 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
               ))}
             </div>
           )}
+        </Section>
+        <Section title="Обсуждение">
+          <DiscussionThread req={req} user={user} />
         </Section>
       </div>
       <Confirm
@@ -222,6 +239,8 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
   const [text, setText] = useState('');
   const [freq, setFreq] = useState<RequestFrequency>('shift');
   const [until, setUntil] = useState(addDays(isoDate(), 3));
+  const [onDate, setOnDate] = useState(isoDate());
+  const [atTime, setAtTime] = useState('');
   const [photo, setPhoto] = useState(false);
   const [urgent, setUrgent] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
@@ -235,6 +254,8 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
       setText('');
       setFreq('shift');
       setUntil(addDays(isoDate(), 3));
+      setOnDate(isoDate());
+      setAtTime('');
       setPhoto(false);
       setUrgent(false);
       setOptions([]);
@@ -263,7 +284,10 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
               elephant: who,
               text: text.trim(),
               frequency: freq,
-              due_date: until || null,
+              // разовая — на конкретный день (и час); регулярная — «до какого числа»
+              due_date: freq === 'once' ? null : until || null,
+              on_date: freq === 'once' ? onDate || isoDate() : null,
+              at_time: freq === 'once' && atTime ? atTime : null,
               needs_photo: photo,
               urgent,
               options: options.length ? options : null,
@@ -339,9 +363,20 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
           {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кипер увидит кнопки: {options.join(' · ')}</span>}
         </div>
         {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
-        <Field label="До какого числа">
-          <DateInput value={until} onChange={setUntil} min={isoDate()} label="До какого числа" />
-        </Field>
+        {freq === 'once' ? (
+          <div className="grid grid-cols-[1fr_auto] gap-3">
+            <Field label="В какой день">
+              <DateInput value={onDate} onChange={setOnDate} min={isoDate()} label="В какой день" />
+            </Field>
+            <Field label="Ко времени">
+              <input type="time" value={atTime} onChange={(e) => setAtTime(e.target.value)} aria-label="Ко времени, необязательно" className={`${inputCls} w-32`} />
+            </Field>
+          </div>
+        ) : (
+          <Field label="До какого числа">
+            <DateInput value={until} onChange={setUntil} min={isoDate()} label="До какого числа" />
+          </Field>
+        )}
         <Card className="divide-y divide-surface2 overflow-hidden">
           <Check on={photo} label="Нужно фото в ответ" sub="кипер отметит выполнение с фото" onChange={setPhoto} />
           <Check on={urgent} label="Срочно" sub="наверху экрана у кипера" onChange={setUrgent} />

@@ -253,6 +253,13 @@ export async function addMark(requestId: string, shift: Shift, user: CurrentUser
   });
 }
 
+export async function addComment(requestId: string, user: CurrentUser, text: string) {
+  const clean = text.trim();
+  if (!clean) return;
+  logEvent('request.comment', { request: requestId, text: clean.slice(0, 200) });
+  await put('request_comments', { id: newId(), request_id: requestId, author_id: user.id, author_name: user.full_name, text: clean, created_at: new Date().toISOString() });
+}
+
 export async function addNote(input: {
   shift_id: string;
   elephant: ElephantName;

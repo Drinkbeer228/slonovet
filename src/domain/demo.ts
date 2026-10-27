@@ -195,6 +195,22 @@ export async function seedDemo() {
       updated_at: now,
     },
     {
+      id: 'demo-r4',
+      elephant: 'work',
+      text: 'Забрать таблетки в аптеке на Садовой.',
+      frequency: 'once',
+      due_date: null,
+      on_date: today,
+      at_time: '16:00',
+      needs_photo: false,
+      urgent: false,
+      author_id: 'demo-vet',
+      author_name: 'Иванова',
+      status: 'active',
+      created_at: ts(today, '07:30'),
+      updated_at: now,
+    },
+    {
       id: 'demo-r3',
       elephant: 'Претти',
       text: 'Обработать левую височную железу.',
@@ -277,6 +293,10 @@ export async function seedDemo() {
   await seedRows('stock_moves', moves);
   await seedRows('requests', requests);
   await seedRows('request_marks', marks);
+  await seedRows('request_comments', [
+    { id: 'demo-c1', request_id: 'demo-r2', author_id: 'demo-keeper2', author_name: 'Орлов', text: 'Считать по мискам или по весу? Миску она вылизала, но часть рассыпала.', created_at: ts(today, '13:20'), updated_at: now },
+    { id: 'demo-c2', request_id: 'demo-r2', author_id: 'demo-vet', author_name: 'Иванова', text: 'По миске: рассыпанное не считаем. Если рассыпала больше трети — «половину».', created_at: ts(today, '13:35'), updated_at: now },
+  ]);
   await seedRows('notes', notes);
 
 }

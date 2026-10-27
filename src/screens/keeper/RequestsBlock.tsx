@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { addMark } from '../../domain/actions';
-import { FREQ_LABEL, requestTodos, whoLabel, type RequestTodo } from '../../domain/shift';
-import type { CurrentUser, Shift } from '../../domain/types';
+import { FREQ_LABEL, overdue, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import type { CurrentUser, Shift, VetRequest } from '../../domain/types';
+import { DiscussionButton, DiscussionSheet } from '../Discussion';
 import { remove, useRows } from '../../lib/store';
 import { shortDate, timeOf } from '../../lib/dates';
 import { Button, Card, Chip, FilePreview, IconButton, PhotoPick, PhotoThumb, Section, Sheet, inputCls, toast } from '../../ui/kit';
@@ -12,6 +13,7 @@ export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser
   const todos = requestTodos(requests, marks, shift);
   const left = todos.filter((t) => !t.done).length;
   const [marking, setMarking] = useState<{ todo: RequestTodo; answer: string } | null>(null);
+  const [talk, setTalk] = useState<VetRequest | null>(null);
 
   return (
     <Section id="sec-requests" title="Назначения и задачи" aside={todos.length === 0 ? undefined : left > 0 ? `${left} к выполнению` : 'всё выполнено'}>
@@ -20,6 +22,8 @@ export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser
         <RequestCard
           key={t.req.id}
           todo={t}
+          user={user}
+          onTalk={() => setTalk(t.req)}
           onQuick={async (answer = '') => {
             if (t.req.needs_photo) {
               setMarking({ todo: t, answer });
@@ -31,24 +35,40 @@ export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser
           onDetailed={() => setMarking({ todo: t, answer: '' })}
         />
       ))}
+      <DiscussionSheet req={talk} user={user} onClose={() => setTalk(null)} />
       <MarkSheet todo={marking?.todo ?? null} answer={marking?.answer ?? ''} shift={shift} user={user} onClose={() => setMarking(null)} />
     </Section>
   );
 }
 
-function RequestCard({ todo, onQuick, onDetailed }: { todo: RequestTodo; onQuick: (answer?: string) => void; onDetailed: () => void }) {
+function RequestCard({
+  todo,
+  user,
+  onQuick,
+  onDetailed,
+  onTalk,
+}: {
+  todo: RequestTodo;
+  user: CurrentUser;
+  onQuick: (answer?: string) => void;
+  onDetailed: () => void;
+  onTalk: () => void;
+}) {
   const { req, marks, needed, done } = todo;
+  const late = overdue(req, done);
+  const when = whenLabel(req);
   const multi = needed > 1;
   const who = whoLabel(req.elephant);
   return (
-    <Card className={`flex flex-col gap-2.5 p-3.5 ${done ? 'opacity-60' : req.urgent ? 'ring-1 ring-coral/60' : 'ring-1 ring-amber/35'}`}>
+    <Card className={`flex flex-col gap-2.5 p-3.5 ${done ? 'opacity-60' : req.urgent || late ? 'ring-1 ring-coral/60' : 'ring-1 ring-amber/35'}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-[13px] font-extrabold text-amber">
           {who}
           {req.urgent && !done && <span className="rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">СРОЧНО</span>}
+          {late && <span className="rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">ПРОСРОЧЕНО</span>}
         </span>
-        <span className="text-[12px] font-semibold text-muted">
-          {FREQ_LABEL[req.frequency]}
+        <span className={`text-[12px] ${when ? 'font-extrabold text-ink' : 'font-semibold text-muted'}`}>
+          {when || FREQ_LABEL[req.frequency]}
           {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
         </span>
       </div>
@@ -96,6 +116,7 @@ function RequestCard({ todo, onQuick, onDetailed }: { todo: RequestTodo; onQuick
         )
       )}
       {req.needs_photo && !done && <span className="text-[12px] font-semibold text-muted">врач просит фото</span>}
+      <DiscussionButton req={req} user={user} onOpen={onTalk} />
     </Card>
   );
 }

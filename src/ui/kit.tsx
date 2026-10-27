@@ -420,6 +420,51 @@ export const inputCls =
 
 /* ---------- Нижняя шторка / диалог ---------- */
 
+/** Свайп вниз по шапке шторки: дальше 80 px или резким рывком — закрыть, иначе вернуть на место. */
+function useSheetDrag(open: boolean, onClose: () => void) {
+  const [dy, setDy] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const start = useRef<{ y: number; t: number; id: number } | null>(null);
+  useEffect(() => {
+    if (open) {
+      setDy(0);
+      setLeaving(false);
+    }
+  }, [open]);
+  const end = (y: number) => {
+    const s = start.current;
+    start.current = null;
+    if (!s) return;
+    const d = Math.max(0, y - s.y);
+    const speed = d / Math.max(1, performance.now() - s.t);
+    if (d > 80 || (d > 20 && speed > 0.6)) {
+      setLeaving(true);
+      window.setTimeout(onClose, 180);
+    } else setDy(0);
+  };
+  return {
+    style:
+      dy || leaving
+        ? { transform: leaving ? 'translateY(100%)' : `translateY(${dy}px)`, transition: start.current ? 'none' : 'transform 0.18s ease-out' }
+        : undefined,
+    handlers: {
+      onPointerDown: (e: React.PointerEvent) => {
+        if ((e.target as HTMLElement).closest('button')) return; // крестик и кнопки в шапке нажимаются как обычно
+        start.current = { y: e.clientY, t: performance.now(), id: e.pointerId };
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      },
+      onPointerMove: (e: React.PointerEvent) => {
+        if (start.current?.id === e.pointerId) setDy(Math.max(0, e.clientY - start.current.y));
+      },
+      onPointerUp: (e: React.PointerEvent) => end(e.clientY),
+      onPointerCancel: () => {
+        start.current = null;
+        setDy(0);
+      },
+    },
+  };
+}
+
 export function Sheet({
   open,
   onClose,
@@ -444,6 +489,7 @@ export function Sheet({
       document.body.style.overflow = prev;
     };
   }, [open, onClose]);
+  const drag = useSheetDrag(open, onClose);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center" onClick={onClose}>
@@ -451,9 +497,14 @@ export function Sheet({
         role="dialog"
         aria-modal="true"
         className="animate-sheet flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-3xl border border-line bg-bg md:rounded-3xl"
+        style={drag.style}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 px-5 pb-2 pt-4">
+        {/* потянуть шапку вниз — закрыть, как в привычных приложениях */}
+        <div className="flex touch-none justify-center pt-2.5 md:hidden" {...drag.handlers}>
+          <span className="h-1.5 w-10 rounded-full bg-line" aria-hidden="true" />
+        </div>
+        <div className="flex touch-none items-center gap-3 px-5 pb-2 pt-2 md:pt-4" {...drag.handlers}>
           <h2 className="m-0 flex-1 text-[19px] font-extrabold">{title}</h2>
           <IconButton icon="x" label="Закрыть" onClick={onClose} className="border-transparent" />
         </div>

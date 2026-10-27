@@ -144,7 +144,7 @@ function Main() {
           {current === 'move' && <MoveScreen user={user} />}
         </div>
       </main>
-      <BottomNav tabs={tabs} tab={current} onTab={setTab} />
+      <BottomNav user={user} tabs={tabs} tab={current} onTab={setTab} />
       <InstallSheet />
       <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} role={user.role} onTab={setTab} />
       <Tour key={user.role} user={user} tab={current} onTab={setTab} preview={!!previewRole} />

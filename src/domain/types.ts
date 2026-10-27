@@ -94,6 +94,19 @@ export interface VetRequest extends Base {
   author_id: string | null;
   author_name: string;
   status: 'active' | 'closed';
+  /** разовая задача на конкретный день (due_date — «до какого дня» у регулярных) */
+  on_date?: string | null;
+  /** к которому часу, «16:00» — необязательно */
+  at_time?: string | null;
+  created_at: string;
+}
+
+/** Комментарий в обсуждении заявки — вместо общего чата разговор всегда про конкретную задачу. */
+export interface RequestComment extends Base {
+  request_id: string;
+  author_id: string;
+  author_name: string;
+  text: string;
   created_at: string;
 }
 
@@ -205,6 +218,7 @@ export interface TableMap {
   shifts: Shift;
   requests: VetRequest;
   request_marks: RequestMark;
+  request_comments: RequestComment;
   notes: Note;
   stock_items: StockItem;
   stock_moves: StockMove;
@@ -220,6 +234,7 @@ export const TABLES: TableName[] = [
   'shifts',
   'requests',
   'request_marks',
+  'request_comments',
   'notes',
   'stock_items',
   'stock_moves',
