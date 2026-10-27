@@ -6,7 +6,6 @@ export const THEME_LABEL: Record<Theme, string> = { dark: 'Тёмная', light:
 const META_COLOR: Record<Theme, string> = { dark: '#0b1217', light: '#f3f6f7', pixel: '#5c94fc' };
 
 const KEY_THEME = 'slonovet.theme';
-const FONT_URL = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
 
 function read(key: string): string | null {
   try {
@@ -34,13 +33,8 @@ function apply() {
   root.dataset.theme = current;
   root.style.colorScheme = current === 'dark' ? 'dark' : 'light';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', META_COLOR[current]);
-  if (current === 'pixel' && !document.getElementById('skin-font')) {
-    const l = document.createElement('link');
-    l.id = 'skin-font';
-    l.rel = 'stylesheet';
-    l.href = FONT_URL;
-    document.head.appendChild(l);
-  }
+  // пиксельный шрифт — тоже свой, и только когда выбрана эта тема
+  if (current === 'pixel') import('@fontsource/press-start-2p/400.css').catch(() => undefined);
 }
 
 export function initTheme() {

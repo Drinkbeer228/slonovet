@@ -2,6 +2,8 @@ import { Component, StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { diag } from './lib/diag';
+// шрифт — со своего сервера (в сборке), без Google: при «белых списках» внешние адреса режут, и страница висела пустой
+import '@fontsource-variable/manrope';
 import './index.css';
 import { initTheme } from './lib/theme';
 import { captureErrors } from './lib/log';

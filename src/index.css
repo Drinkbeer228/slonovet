@@ -23,7 +23,7 @@
   --color-empty: #1a2730;
   --color-toast-ok: #0e2a27;
   --color-toast-err: #2a1614;
-  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 /* Светлая тема: для улицы днём */
@@ -74,7 +74,7 @@
   --color-empty: #d6d0c0;
   --color-toast-ok: #d7f5d0;
   --color-toast-err: #ffd9d4;
-  --font-pixel: 'Press Start 2P', 'Manrope', monospace;
+  --font-pixel: 'Press Start 2P', 'Manrope Variable', monospace;
   --radius-md: 0;
   --radius-lg: 0;
   --radius-xl: 0;
