@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { INTRO, INTRO_VERSION, SECTION_VERSION, sectionTour, type TourStep, type TourTab } from '../domain/tour';
 import type { CurrentUser } from '../domain/types';
@@ -90,6 +90,8 @@ interface Active {
 /** preview — админ в «Посмотреть как»: подсказки роли только по кнопке из Справки, «видел» не запоминаем. */
 export function Tour({ user, tab, onTab, preview = false }: { user: CurrentUser; tab: Tab; onTab: (t: Tab) => void; preview?: boolean }) {
   const replayed = useReplay();
+  // уже обработанные повторы: после смены роли («Посмотреть как») Tour создаётся заново и не должен заново показывать старое
+  const handled = useRef(replayed.n);
   const [active, setActive] = useState<Active | null>(() =>
     preview || seen(user.id, 'intro') ? null : { key: 'intro', steps: INTRO[user.role], ready: false },
   );
@@ -104,7 +106,8 @@ export function Tour({ user, tab, onTab, preview = false }: { user: CurrentUser;
 
   // повтор из меню или Справки
   useEffect(() => {
-    if (!replayed.n) return;
+    if (!replayed.n || replayed.n === handled.current) return;
+    handled.current = replayed.n;
     if (replayed.key === 'intro') return begin('intro', INTRO[user.role]);
     const t = sectionTour(replayed.key, user.role);
     if (!t) return;
