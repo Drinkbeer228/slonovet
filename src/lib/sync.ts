@@ -237,12 +237,21 @@ async function readCursor(t: TableName): Promise<Cursor | null> {
 const quote = (v: string) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 const after = (a: Cursor, b: Cursor) => a.ts > b.ts || (a.ts === b.ts && a.id > b.id);
 
-/** Только одна вкладка этого браузера синхронизирует в один момент. */
+/**
+ * Только одна вкладка этого браузера синхронизирует в один момент. Замок занят три раза подряд —
+ * значит, он «завис» (так бывает на iPhone), и синхронизируемся без него, а не молчим вечно.
+ */
+let lockBusy = 0;
 async function exclusive(fn: () => Promise<void>) {
   const locks = navigator.locks;
-  if (!locks?.request) return fn();
+  if (!locks?.request || lockBusy >= 3) return fn();
   await locks.request('slonovet-sync', { ifAvailable: true }, async (lock) => {
-    if (lock) await fn();
+    if (!lock) {
+      lockBusy++;
+      return;
+    }
+    lockBusy = 0;
+    await fn();
   });
 }
 

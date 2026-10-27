@@ -71,8 +71,9 @@ export async function resumeSession() {
   await purgeDemo();
   const client = getClient();
   if (client && navigator.onLine) {
-    const { data } = await client.auth.getSession();
-    if (!data.session) {
+    // проверка входа не дольше 6 с: не ответила — работаем с тем, что есть на телефоне, синхронизация догонит
+    const checked = await Promise.race([client.auth.getSession(), new Promise<null>((r) => setTimeout(() => r(null), 6000))]);
+    if (checked && !checked.data.session) {
       // сессия истекла — нужно войти заново
       set(null);
       return;
