@@ -74,7 +74,15 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         <PurchasesView user={user} adding={buying} onAddClose={() => setBuying(false)} />
       ) : (
         <>
-        <Section id="requests-active" title="Активные" aside={active.length ? String(active.length) : undefined}>
+        <Section
+          id="requests-active"
+          title={
+            <span className="flex items-center gap-2">
+              Активные
+              {active.length > 0 && <span className="rounded-full bg-surface2 px-2 py-0.5 text-[13px] font-bold text-muted">{active.length}</span>}
+            </span>
+          }
+        >
           {active.length === 0 ? <Empty>Активных заявок нет</Empty> : <RequestList list={active} user={user} onOpen={setOpen} />}
         </Section>
         {closed.length > 0 && (
