@@ -76,3 +76,14 @@ describe('новое в обсуждении', () => {
     expect(unreadRequests(comments, 'vet', {}, new Set(['r2']))).toBe(0);
   });
 });
+
+describe('вход: что сказать человеку', () => {
+  it('неверный пароль — только когда сервер так ответил; обрыв связи — «нет связи»', async () => {
+    const { loginErrorText } = await import('../lib/auth');
+    expect(loginErrorText({ status: 400, code: 'invalid_credentials' })).toBe('Неверный логин или пароль');
+    expect(loginErrorText({ status: 0, name: 'AuthRetryableFetchError' })).toMatch(/^Нет связи/);
+    expect(loginErrorText({ name: 'AuthRetryableFetchError' })).toMatch(/^Нет связи/);
+    expect(loginErrorText({ status: 503 })).toMatch(/^Нет связи/);
+    expect(loginErrorText({ status: 429 })).toMatch(/^Слишком много/);
+  });
+});

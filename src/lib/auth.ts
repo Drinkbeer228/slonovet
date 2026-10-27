@@ -83,12 +83,27 @@ export async function resumeSession() {
   startSync();
 }
 
+/**
+ * Что сказать человеку, когда вход не удался. «Неверный логин или пароль» — только когда сервер так и ответил;
+ * обрыв связи (запрос до сервера не дошёл) раньше выдавался за неверный пароль — и человек искал ошибку не там.
+ */
+export function loginErrorText(error: { status?: number; code?: string; name?: string } | null): string {
+  if (!error) return 'Неверный логин или пароль';
+  if (error.code === 'invalid_credentials' || error.status === 400) return 'Неверный логин или пароль';
+  if (error.status === 429) return 'Слишком много попыток входа. Подождите минуту и попробуйте снова.';
+  return 'Нет связи с сервером. Проверьте интернет — подойдёт любой Wi‑Fi — и попробуйте ещё раз.';
+}
+
 export async function loginCloud(login: string, password: string): Promise<void> {
   const client = getClient();
   if (!client) throw new Error('Сервер не настроен');
   const clean = login.trim().toLowerCase();
   const { data, error } = await client.auth.signInWithPassword({ email: `${clean}@${LOGIN_DOMAIN}`, password });
-  if (error || !data.user) throw new Error('Неверный логин или пароль');
+  if (error || !data.user) {
+    const text = loginErrorText(error);
+    diag('login-fail', `${error?.status ?? ''} ${error?.code ?? ''} ${error?.name ?? ''}`);
+    throw new Error(text);
+  }
   diag('login-token');
   const { data: profile, error: pErr } = await client.from('profiles').select('*').eq('id', data.user.id).single();
   if (pErr || !profile) throw new Error('Профиль не найден. Попросите администратора проверить учётную запись.');
