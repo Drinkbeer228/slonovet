@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { addMark } from '../../domain/actions';
+import { haptics } from '../../lib/haptics';
 import { FREQ_LABEL, overdue, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import type { CurrentUser, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
@@ -30,6 +31,7 @@ export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser
               return;
             }
             await addMark(t.req.id, shift, user, answer);
+            haptics.success();
             toast(answer ? `Отмечено: ${answer}` : 'Отмечено');
           }}
           onDetailed={() => setMarking({ todo: t, answer: '' })}
@@ -152,6 +154,7 @@ function MarkSheet({ todo, answer, shift, user, onClose }: { todo: RequestTodo |
             setBusy(true);
             try {
               await addMark(todo.req.id, shift, user, [picked, note.trim()].filter(Boolean).join(' — '), photo ?? undefined);
+              haptics.success();
               toast('Отмечено');
               close();
             } finally {

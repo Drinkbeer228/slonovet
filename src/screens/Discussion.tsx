@@ -5,6 +5,7 @@ import type { CurrentUser, VetRequest } from '../domain/types';
 import { markRead, unreadCount, useReadMarks } from '../lib/comments';
 import { localDay, relDate, timeOf } from '../lib/dates';
 import { useRows } from '../lib/store';
+import { haptics } from '../lib/haptics';
 import { Icon } from '../ui/Icon';
 import { Sheet, inputCls } from '../ui/kit';
 
@@ -29,6 +30,7 @@ export function DiscussionThread({ req, user }: { req: VetRequest; user: Current
     setBusy(true);
     try {
       await addComment(req.id, user, text);
+      haptics.success();
       setText('');
     } finally {
       setBusy(false);

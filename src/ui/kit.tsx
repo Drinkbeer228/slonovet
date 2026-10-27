@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 import { addDays, isoDate, longDate, parseIso } from '../lib/dates';
 import { usePhotoUrl } from '../lib/photos';
+import { haptics } from '../lib/haptics';
 
 /* ---------- Кнопки ---------- */
 
@@ -438,6 +439,7 @@ function useSheetDrag(open: boolean, onClose: () => void) {
     const d = Math.max(0, y - s.y);
     const speed = d / Math.max(1, performance.now() - s.t);
     if (d > 80 || (d > 20 && speed > 0.6)) {
+      haptics.tap();
       setLeaving(true);
       window.setTimeout(onClose, 180);
     } else setDy(0);

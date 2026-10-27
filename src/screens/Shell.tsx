@@ -8,6 +8,7 @@ import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { useRows } from '../lib/store';
+import { haptics } from '../lib/haptics';
 import { currentShift, requestTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
 import { balances, stockPerDay, stockView } from '../domain/stock';
@@ -223,7 +224,10 @@ export function BottomNav({ user, tabs, tab, onTab }: { user: CurrentUser; tabs:
             type="button"
             aria-current={on ? 'page' : undefined}
             data-tour={`nav-${t}`}
-            onClick={() => onTab(t)}
+            onClick={() => {
+              if (t !== tab) haptics.tap();
+              onTab(t);
+            }}
             className={`flex flex-col items-center gap-1 py-1.5 text-[12px] ${on ? 'font-extrabold text-teal' : 'font-bold text-muted'}`}
           >
             <span className="relative">
