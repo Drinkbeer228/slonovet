@@ -8,7 +8,7 @@ import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { startTour } from './Tour';
-import { openInstallSheet } from './InstallHint';
+import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
 import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
 
@@ -303,7 +303,7 @@ export function MenuSheet({
           </Card>
         )}
 
-        {!installed && (
+        {INSTALL_HINTS && !installed && (
           <Button
             icon="install"
             full
@@ -366,7 +366,8 @@ export function MenuSheet({
 function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
   const [state, setState] = usePushState();
   const topics = pushTopics(role);
-  if (!state || state === 'unsupported' || !topics.length) return null;
+  // на iPhone без установки — молчим, пока установка на экран не работает (INSTALL_HINTS)
+  if (!state || state === 'unsupported' || !topics.length || (state === 'need-install' && !INSTALL_HINTS)) return null;
   return (
     <Card className="flex flex-col gap-2 p-4">
       <span className="flex items-center gap-2 text-[15px] font-bold">

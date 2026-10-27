@@ -3,6 +3,12 @@ import { platform, promptInstall, useInstall, type Platform } from '../lib/insta
 import { Button, Card, Segmented, Sheet, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
+/**
+ * Подсказки об установке пока выключены у всех: с иконки на iPhone приложение открывается чёрным экраном.
+ * Разберёмся — вернуть true.
+ */
+export const INSTALL_HINTS = false;
+
 /* ---------- шторка с инструкцией: открывается из баннера и из меню ---------- */
 
 let open = false;
@@ -126,7 +132,7 @@ function dismissedRecently() {
 export function InstallBanner() {
   const { canPrompt, installed } = useInstall();
   const [hidden, setHidden] = useState(dismissedRecently);
-  if (installed || hidden) return null;
+  if (!INSTALL_HINTS || installed || hidden) return null;
   const os = platform();
   const dismiss = () => {
     try {
