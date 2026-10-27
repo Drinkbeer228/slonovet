@@ -5,7 +5,7 @@ import { ANSWER_PRESETS, FREQ_LABEL, overdue, requestProgress, whenLabel, whoLab
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
-import { addDays, isoDate, localDay, relDate, shortDate, timeOf } from '../../lib/dates';
+import { addDays, isoDate, localDay, relDate, shortDate, stampOf, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest } from '../../domain/access';
 import { PurchasesView } from '../PurchasesView';
@@ -191,7 +191,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
         <span className="text-[13px] font-semibold text-muted">
           {whenLabel(req) || FREQ_LABEL[req.frequency]}
           {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
-          {req.needs_photo ? ' · с фото' : ''} · {req.author_name}, {relDate(localDay(req.created_at))}
+          {req.needs_photo ? ' · с фото' : ''} · {stampOf(req.created_at)} · {req.author_name}
         </span>
         <Section title="Выполнение" aside={String(mine.length)}>
           {mine.length === 0 ? (

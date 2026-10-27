@@ -36,6 +36,11 @@ export function shortDate(iso: string): string {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** «26.10 в 19:30» — точный момент (когда назначили лекарство, важен час) */
+export function stampOf(ts: string): string {
+  return `${shortDate(localDay(ts))} в ${timeOf(ts)}`;
+}
+
 export function timeOf(ts: string | null | undefined): string {
   if (!ts) return '';
   const d = new Date(ts);

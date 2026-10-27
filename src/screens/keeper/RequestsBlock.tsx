@@ -5,7 +5,7 @@ import { FREQ_LABEL, overdue, requestTodos, whenLabel, whoLabel, type RequestTod
 import type { CurrentUser, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
 import { remove, useRows } from '../../lib/store';
-import { shortDate, timeOf } from '../../lib/dates';
+import { shortDate, timeOf, stampOf } from '../../lib/dates';
 import { Button, Card, Chip, FilePreview, IconButton, PhotoPick, PhotoThumb, Section, Sheet, inputCls, toast } from '../../ui/kit';
 
 export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
@@ -76,7 +76,9 @@ function RequestCard({
       </div>
       <p className="m-0 text-[15px] font-medium leading-snug">{req.text}</p>
       {req.photo_path && <PhotoThumb path={req.photo_path} size={96} />}
-      <span className="-mt-1.5 text-[12px] font-semibold text-muted">от {req.author_name}</span>
+      <span className="-mt-1.5 text-[12px] font-semibold text-muted">
+        {stampOf(req.created_at)} · {req.author_name}
+      </span>
       {marks.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {marks.map((m) => (
