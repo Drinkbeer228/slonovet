@@ -87,9 +87,12 @@ interface Active {
   ready: boolean;
 }
 
-export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab: (t: Tab) => void }) {
+/** preview — админ в «Посмотреть как»: подсказки роли только по кнопке из Справки, «видел» не запоминаем. */
+export function Tour({ user, tab, onTab, preview = false }: { user: CurrentUser; tab: Tab; onTab: (t: Tab) => void; preview?: boolean }) {
   const replayed = useReplay();
-  const [active, setActive] = useState<Active | null>(() => (seen(user.id, 'intro') ? null : { key: 'intro', steps: INTRO[user.role], ready: false }));
+  const [active, setActive] = useState<Active | null>(() =>
+    preview || seen(user.id, 'intro') ? null : { key: 'intro', steps: INTRO[user.role], ready: false },
+  );
   const [pos, setPos] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
@@ -132,7 +135,7 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
 
   // показали — значит увидел: закрыл приложение посреди подсказок — заново не покажем
   useEffect(() => {
-    if (active?.ready) markSeen(user.id, active.key);
+    if (active?.ready && !preview) markSeen(user.id, active.key);
   }, [active?.ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = active?.ready ? active.steps : null;
@@ -140,8 +143,10 @@ export function Tour({ user, tab, onTab }: { user: CurrentUser; tab: Tab; onTab:
 
   function finish(skipped: boolean) {
     if (!active) return;
-    logEvent('tour.done', { role: user.role, tour: active.key, step: pos + 1, of: active.steps.length, skipped });
-    markSeen(user.id, active.key);
+    if (!preview) {
+      logEvent('tour.done', { role: user.role, tour: active.key, step: pos + 1, of: active.steps.length, skipped });
+      markSeen(user.id, active.key);
+    }
     setActive(null);
     setRect(null);
   }

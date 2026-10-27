@@ -147,7 +147,7 @@ function Main() {
       <BottomNav tabs={tabs} tab={current} onTab={setTab} />
       <InstallSheet />
       <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} role={user.role} onTab={setTab} />
-      {!previewRole && <Tour user={user} tab={current} onTab={setTab} />}
+      <Tour key={user.role} user={user} tab={current} onTab={setTab} preview={!!previewRole} />
     </div>
   );
 }
