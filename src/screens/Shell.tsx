@@ -8,6 +8,8 @@ import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { startTour } from './Tour';
+import { openInstallSheet } from './InstallHint';
+import { useInstall } from '../lib/install';
 
 export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
 
@@ -204,6 +206,7 @@ export function MenuSheet({
   const s = useSyncStatus();
   const [busy, setBusy] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const { installed } = useInstall();
   const extra = MENU_TABS[role];
   const preview = usePreviewRole();
   return (
@@ -295,6 +298,19 @@ export function MenuSheet({
               </button>
             ))}
           </Card>
+        )}
+
+        {!installed && (
+          <Button
+            icon="install"
+            full
+            onClick={() => {
+              onClose();
+              openInstallSheet();
+            }}
+          >
+            Установить на телефон
+          </Button>
         )}
 
         <Button

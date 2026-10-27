@@ -3,6 +3,7 @@ import { refreshCurrentUser, resumeSession, useSession } from './lib/auth';
 import { initStore, setWriteBlock, useRows } from './lib/store';
 import { Toaster, toast } from './ui/kit';
 import { Login } from './screens/Login';
+import { InstallBanner, InstallSheet } from './screens/InstallHint';
 import { BottomNav, MENU_TABS, MenuSheet, OfflineBanner, PreviewBanner, TABS_BY_ROLE, TopBar, type Tab } from './screens/Shell';
 import { getPreviewRole, usePreviewRole } from './lib/preview';
 import { ShiftScreen } from './screens/keeper/ShiftScreen';
@@ -94,6 +95,7 @@ function Main() {
       <TopBar user={user} tabs={tabs} tab={current} onTab={setTab} onMenu={() => setMenu(true)} />
       <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:pb-16">
         <OfflineBanner />
+        {session.mode === 'cloud' && !previewRole && <InstallBanner />}
         {previewRole && <PreviewBanner role={previewRole} />}
         <div className={current === 'shift' ? '' : 'mx-auto max-w-2xl'}>
           {current === 'shift' && <ShiftScreen user={user} />}
@@ -108,6 +110,7 @@ function Main() {
         </div>
       </main>
       <BottomNav tabs={tabs} tab={current} onTab={setTab} />
+      <InstallSheet />
       <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} role={user.role} onTab={setTab} />
       {!previewRole && <Tour user={user} tab={current} onTab={setTab} />}
     </div>
