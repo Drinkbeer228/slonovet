@@ -19,8 +19,20 @@ function open(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('blobs')) db.createObjectStore('blobs', { keyPath: 'path' });
       if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      clearTimeout(timer);
+      resolve(req.result);
+    };
+    req.onerror = () => {
+      clearTimeout(timer);
+      dbPromise = null;
+      reject(req.error);
+    };
+    // бывает, что браузер не отвечает вовсе (iPhone после переустановки) — не висим, следующий вызов попробует снова
+    const timer = setTimeout(() => {
+      dbPromise = null;
+      reject(new Error('IndexedDB не открылась за 5 с'));
+    }, 5000);
   });
   return dbPromise;
 }

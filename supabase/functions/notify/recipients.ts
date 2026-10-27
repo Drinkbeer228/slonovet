@@ -7,7 +7,7 @@ export type Payload =
   | { type: 'purchase'; id: string; title: string; amount?: string; urgent?: boolean; author_id?: string | null }
   | { type: 'low'; item_id: string; item_name: string; days?: number | null; author_id?: string | null };
 
-/** Кто получает: срочное — киперы; «плохо» — врач и директор; закупки и «заканчивается» — те, кто заказывает. Системный админ — всё. */
+/** Кто получает: срочное — дежурный кипер; «плохо» — врач и директор; закупки и «заканчивается» — те, кто заказывает. Системный админ — всё. */
 export const ROLES_FOR: Record<Payload['type'], string[]> = {
   urgent: ['keeper', 'admin'],
   bad: ['vet', 'director', 'admin'],
@@ -19,9 +19,15 @@ const METRIC: Record<string, string> = { behavior: 'общее', sleep: 'сон'
 const who = (e: string) => (e === 'all' ? 'Всем слонам' : e === 'work' ? 'Работа' : e);
 const short = (s: string, n = 120) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
-/** Активные люди с нужной ролью, кроме того, кто это сделал. */
-export function recipients(p: Payload, profiles: { id: string; role: string; active: boolean }[]): string[] {
-  return profiles.filter((x) => x.active && ROLES_FOR[p.type].includes(x.role) && x.id !== p.author_id).map((x) => x.id);
+/**
+ * Активные люди с нужной ролью, кроме того, кто это сделал. Срочное назначение — только дежурному киперу
+ * (onDuty — кипер открытой смены); если смены нет — всем киперам, чтобы не потерялось.
+ */
+export function recipients(p: Payload, profiles: { id: string; role: string; active: boolean }[], onDuty: string | null = null): string[] {
+  return profiles
+    .filter((x) => x.active && ROLES_FOR[p.type].includes(x.role) && x.id !== p.author_id)
+    .filter((x) => !(p.type === 'urgent' && x.role === 'keeper' && onDuty && x.id !== onDuty))
+    .map((x) => x.id);
 }
 
 /** Текст уведомления, раздел для открытия и ключ от повтора (одно и то же событие — одно уведомление). */

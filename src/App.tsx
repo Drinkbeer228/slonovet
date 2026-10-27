@@ -17,26 +17,55 @@ import { RatingScreen } from './screens/RatingScreen';
 import { logEvent } from './lib/log';
 import { MoveScreen } from './screens/MoveScreen';
 import { Tour } from './screens/Tour';
+import { diag } from './lib/diag';
 
 const TAB_KEY = 'slonovet_tab';
 
 export default function App() {
   const [ready, setReady] = useState(false);
+  const [stuck, setStuck] = useState(false);
   const session = useSession();
 
   useEffect(() => {
+    let stage = 'store';
+    // данные с телефона не открылись за 8 с — сказать об этом и дать продолжить, а не висеть на «Загрузке»
+    const timer = setTimeout(() => {
+      diag('stuck', stage);
+      setStuck(true);
+    }, 8000);
     (async () => {
       try {
         await initStore();
+        stage = 'session';
         await resumeSession();
+        diag('ready');
+      } catch (e) {
+        diag('init-error', `${stage}: ${e instanceof Error ? e.message : String(e)}`);
       } finally {
+        clearTimeout(timer);
         setReady(true);
       }
     })();
+    return () => clearTimeout(timer);
   }, []);
 
   if (!ready) {
-    return <div className="flex min-h-screen items-center justify-center text-[15px] font-semibold text-muted">Загрузка…</div>;
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <span className="text-[15px] font-semibold text-muted">Загрузка…</span>
+        {stuck && (
+          <>
+            <span className="text-[14px] text-muted">Данные на телефоне долго открываются.</span>
+            <button type="button" onClick={() => location.reload()} className="h-12 rounded-2xl bg-teal px-6 text-[16px] font-extrabold text-bg">
+              Перезапустить
+            </button>
+            <button type="button" onClick={() => setReady(true)} className="text-[14px] font-bold text-teal">
+              Продолжить без них
+            </button>
+          </>
+        )}
+      </div>
+    );
   }
 
   return (

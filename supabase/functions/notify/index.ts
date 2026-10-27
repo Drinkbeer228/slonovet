@@ -54,7 +54,13 @@ Deno.serve(async (req) => {
   if (!first) return reply({ sent: 0, duplicate: true });
 
   const { data: people } = await admin.from('profiles').select('id, role, active');
-  const ids = recipients(p, people ?? []);
+  // срочное — дежурному: кипер последней открытой смены
+  let onDuty: string | null = null;
+  if (p.type === 'urgent') {
+    const { data: open } = await admin.from('shifts').select('keeper_id').eq('status', 'open').eq('deleted', false).order('date', { ascending: false }).order('accepted_at', { ascending: false }).limit(1);
+    onDuty = open?.[0]?.keeper_id ?? null;
+  }
+  const ids = recipients(p, people ?? [], onDuty);
   if (!ids.length) return reply({ sent: 0 });
   const { data: subs } = await admin.from('push_subscriptions').select('endpoint, p256dh, auth').in('user_id', ids);
 

@@ -14,8 +14,11 @@ const people = [
 ];
 
 describe('push-уведомления: кому и что', () => {
-  it('срочное назначение — активным киперам и системному админу, не автору', () => {
-    expect(recipients({ type: 'urgent', id: 'r1', elephant: 'Марго', text: 'Смотреть ногу', author_id: 'v1' }, people)).toEqual(['k1', 'a1']);
+  it('срочное назначение — дежурному киперу и системному админу, не автору', () => {
+    const many = [...people, { id: 'k3', role: 'keeper', active: true }];
+    const urgent = { type: 'urgent' as const, id: 'r1', elephant: 'Марго', text: 'Смотреть ногу', author_id: 'v1' };
+    expect(recipients(urgent, many, 'k3')).toEqual(['a1', 'k3']);
+    expect(recipients(urgent, many, null)).toEqual(['k1', 'a1', 'k3']); // смены нет — всем киперам, чтобы не потерялось
   });
 
   it('«плохо» у слонихи — врачу, директору и админу, не тому, кто отметил', () => {

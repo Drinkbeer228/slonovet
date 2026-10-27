@@ -90,8 +90,10 @@ export function newlyLow(lowIds: string[], reported: { day: string; ids: string[
 export async function reportLowStock() {
   const s = getSession();
   if (s?.mode !== 'cloud' || !navigator.onLine) return;
-  const items = getRows('stock_items');
   const moves = getRows('stock_moves');
+  // только позиции, внесённые на склад (был приход или пересчёт): пустой склад — не повод слать «заканчивается»
+  const stocked = new Set(moves.filter((m) => m.reason === 'in' || m.counted != null).map((m) => m.item_id));
+  const items = getRows('stock_items').filter((it) => stocked.has(it.id));
   const bal = balances(moves);
   const perDay = stockPerDay(items, getRows('diets'), moves);
   const low = items.map((it) => stockView(it, bal.get(it.id) ?? 0, perDay.get(it.id) ?? null)).filter((v) => v.low);
