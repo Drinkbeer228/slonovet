@@ -2,6 +2,7 @@ import { getRow, getRows, newId, put } from '../lib/store';
 import { ELEPHANTS, METRICS } from './elephants';
 import { savePhoto } from '../lib/photos';
 import { logEvent } from '../lib/log';
+import { reportLowStock } from '../lib/push';
 import { isoDate } from '../lib/dates';
 import { newHandoverCode, newShift } from './shift';
 import { balances, feedUsage, toStockUnits, weighedItem } from './stock';
@@ -137,6 +138,7 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
       deleted: false,
     } satisfies Omit<StockMove, 'updated_at'>);
   }
+  void reportLowStock(); // что-то стало «заканчивается» — закупщикам уйдёт уведомление
 }
 
 /** Кипер поправил, сколько выдал по позиции (например, картофеля 2 сетки вместо 3). Списание пересчитывается. */
@@ -165,6 +167,7 @@ export async function addStockMoveNote(item_id: string, delta: number, reason: '
   logEvent('stock.move', { item: item_id, delta, reason, note });
   if (!delta) return;
   await put('stock_moves', { id: newId(), item_id, delta, reason, shift_id, author_name: user.full_name, note, created_at: new Date().toISOString() });
+  void reportLowStock();
 }
 
 /** Кипер вписывает, сколько кг выдал по строке рациона «по весу». Списывается со склада. */

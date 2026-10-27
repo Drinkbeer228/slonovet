@@ -20,6 +20,8 @@ export default defineConfig({
         // запросы к Supabase не кэшируем — данные и так хранятся в IndexedDB
         navigateFallbackDenylist: [/^\/auth/, /^\/rest/, /^\/storage/, /^\/functions/],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // push-уведомления: показ и открытие нужного раздела (public/push-sw.js)
+        importScripts: ['push-sw.js'],
       },
       manifest: {
         id: 'slonovet',

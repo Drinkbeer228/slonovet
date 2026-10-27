@@ -3,13 +3,14 @@ import type { CurrentUser, Role } from '../domain/types';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, Segmented, Sheet } from '../ui/kit';
+import { Button, Card, Chip, Confirm, Segmented, Sheet, toast } from '../ui/kit';
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { startTour } from './Tour';
 import { openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
+import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
 
 export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
 
@@ -278,6 +279,8 @@ export function MenuSheet({
           </Card>
         )}
 
+        {session.mode === 'cloud' && !preview && <PushCard role={session.user.role} onClose={onClose} />}
+
         <ThemeCard />
 
         {extra.length > 0 && (
@@ -356,6 +359,65 @@ export function MenuSheet({
         <span className="text-center text-[12px] font-semibold text-muted">Версия от {__BUILD__}</span>
       </div>
     </Sheet>
+  );
+}
+
+/** Уведомления на этот телефон: что приходит этой роли и кнопка включить или выключить. */
+function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
+  const [state, setState] = usePushState();
+  const topics = pushTopics(role);
+  if (!state || state === 'unsupported' || !topics.length) return null;
+  return (
+    <Card className="flex flex-col gap-2 p-4">
+      <span className="flex items-center gap-2 text-[15px] font-bold">
+        <Icon name="bell" size={18} />
+        Уведомления {state === 'on' && <span className="text-[13px] font-bold text-teal">включены</span>}
+      </span>
+      <span className="text-[13px] font-semibold text-muted">Придут, даже когда приложение закрыто: {topics.join(', ')}.</span>
+      {state === 'need-install' && (
+        <>
+          <span className="text-[13px] font-semibold text-amber">На iPhone — только у приложения на экране «Домой». Сначала установите его.</span>
+          <Button
+            icon="install"
+            onClick={() => {
+              onClose();
+              openInstallSheet();
+            }}
+          >
+            Как установить
+          </Button>
+        </>
+      )}
+      {state === 'denied' && (
+        <span className="text-[13px] font-semibold text-amber">Уведомления запрещены в настройках телефона для этого сайта — разрешите их там.</span>
+      )}
+      {state === 'off' && (
+        <Button
+          icon="bell"
+          onClick={async () => {
+            try {
+              const next = await enablePush();
+              setState(next);
+              if (next === 'on') toast('Уведомления включены');
+            } catch {
+              toast('Не удалось включить — проверьте интернет', 'error');
+            }
+          }}
+        >
+          Включить уведомления
+        </Button>
+      )}
+      {state === 'on' && (
+        <Button
+          onClick={async () => {
+            await disablePush().catch(() => undefined);
+            setState('off');
+          }}
+        >
+          Выключить на этом телефоне
+        </Button>
+      )}
+    </Card>
   );
 }
 

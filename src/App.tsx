@@ -63,6 +63,12 @@ function Main() {
   const tabs = TABS_BY_ROLE[user.role];
   const allowed = [...tabs, ...MENU_TABS[user.role]];
   const [tab, setTabState] = useState<Tab>(() => {
+    // открыли из уведомления: /?tab=stock — нужный раздел
+    const fromLink = new URLSearchParams(location.search).get('tab') as Tab | null;
+    if (fromLink && allowed.includes(fromLink)) {
+      history.replaceState(null, '', location.pathname);
+      return fromLink;
+    }
     try {
       const saved = localStorage.getItem(TAB_KEY) as Tab | null;
       if (saved && allowed.includes(saved)) return saved;

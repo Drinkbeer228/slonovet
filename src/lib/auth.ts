@@ -114,6 +114,8 @@ export async function logout() {
   const s = session;
   if (s?.mode === 'cloud') {
     await syncNow().catch(() => undefined);
+    // уведомления этого телефона — тому, кто вошёл; вышел — отписываем, чтобы не шли следующему
+    await import('./push').then((m) => m.disablePush()).catch(() => undefined);
     await getClient()?.auth.signOut().catch(() => undefined);
   }
   stopSync(false);
