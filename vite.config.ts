@@ -17,9 +17,26 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       workbox: {
-        // запросы к Supabase не кэшируем — данные и так хранятся в IndexedDB
-        navigateFallbackDenylist: [/^\/auth/, /^\/rest/, /^\/storage/, /^\/functions/],
+        // запросы к Supabase не кэшируем — данные и так хранятся в IndexedDB.
+        // Сама страница — сначала из сети: онлайн всегда свежая версия, сразу при открытии.
+        // Из памяти телефона — только если сети нет или она молчит дольше 4 с (манеж, «белые списки»).
+        navigateFallback: null,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 4,
+              // /?tab=… из уведомления — та же страница
+              matchOptions: { ignoreSearch: true },
+            },
+          },
+        ],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // страница не лежит в предзагрузке: иначе «/» отдаётся из неё раньше, чем дойдёт до «сначала из сети».
+        // Для работы без связи её сохраняет кэш pages при каждом открытии онлайн
+        globIgnores: ['**/index.html'],
         // push-уведомления: показ и открытие нужного раздела (public/push-sw.js)
         importScripts: ['push-sw.js'],
         // новая версия сразу берёт открытые страницы и приложение перезагружается само; без этого телефон
