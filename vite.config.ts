@@ -22,6 +22,10 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // push-уведомления: показ и открытие нужного раздела (public/push-sw.js)
         importScripts: ['push-sw.js'],
+        // новая версия сразу берёт открытые страницы и приложение перезагружается само; без этого телефон
+        // днями показывал старое (на iPhone с экрана «Домой» — пока не закроешь полностью)
+        clientsClaim: true,
+        skipWaiting: true,
       },
       manifest: {
         id: 'slonovet',
