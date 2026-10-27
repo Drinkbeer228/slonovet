@@ -73,7 +73,6 @@ export function Login() {
               spellCheck={false}
               autoComplete="username"
               enterKeyHint="next"
-              placeholder="латиницей, как выдали"
               required
             />
           </Field>
