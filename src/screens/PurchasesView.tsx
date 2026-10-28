@@ -80,39 +80,21 @@ export function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase
     </Sheet>
   );
 }
-const byNewest = (a: Purchase, b: Purchase) => (a.created_at < b.created_at ? 1 : -1);
 
-/** Для «Фуража»: только активные закупки и кнопка «Нужно купить». */
+/**
+ * Для «Фуража»: кнопка «Нужно купить» — сразу форма в шторке. Сам список закупок с «Заказано» и «Привезли»
+ * живёт на доске «Задачи» → «Закупки», здесь не дублируем — только сколько в работе.
+ */
 export function PurchasesBlock({ user }: { user: CurrentUser }) {
-  const all = useRows('purchases');
+  const active = useRows('purchases').filter(isActive).length;
   const [creating, setCreating] = useState(false);
-  const [open, setOpen] = useState<Purchase | null>(null);
-  const active = all.filter(isActive).sort((a, b) => Number(b.urgent) - Number(a.urgent) || byNewest(a, b));
   return (
-    <Section title="Закупки" aside={active.length ? String(active.length) : undefined}>
-      {active.length > 0 && <PurchaseList list={active} user={user} onOpen={setOpen} />}
+    <Section title="Закупки" aside={active ? `в работе: ${active} · в «Задачах»` : undefined}>
       <Button icon="plus" full onClick={() => setCreating(true)}>
         Нужно купить
       </Button>
       <NewPurchaseSheet open={creating} user={user} onClose={() => setCreating(false)} />
-      <PurchaseDetail purchase={open} user={user} onClose={() => setOpen(null)} />
     </Section>
-  );
-}
-
-function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentUser; onOpen: (p: Purchase) => void }) {
-  const buyer = canEdit('purchases', user.role);
-  const [ordering, setOrdering] = useState<Purchase | null>(null);
-  const [arriving, setArriving] = useState<Purchase | null>(null);
-  const arrived = (p: Purchase) => (p.item_id ? setArriving(p) : setStatus(p, 'done', user));
-  return (
-    <Card className="divide-y divide-surface2 overflow-hidden">
-      {list.map((p) => (
-        <PurchaseRow key={p.id} p={p} buyer={buyer} onOpen={onOpen} onOrder={setOrdering} onArrive={arrived} className="px-4 py-3" />
-      ))}
-      <OrderSheet purchase={ordering} user={user} onClose={() => setOrdering(null)} />
-      <ArriveSheet purchase={arriving} user={user} onClose={() => setArriving(null)} />
-    </Card>
   );
 }
 

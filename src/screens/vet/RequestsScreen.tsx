@@ -11,7 +11,8 @@ import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest, canEdit } from '../../domain/access';
-import { Icon, type IconName } from '../../ui/Icon';
+import { Icon } from '../../ui/Icon';
+import { TASK_TYPE } from '../taskType';
 import { ArriveSheet, NewPurchaseSheet, OrderSheet, PurchaseDetail, PurchaseRow } from '../PurchasesView';
 import { DiscussionThread } from '../Discussion';
 import { unreadCount, useReadMarks } from '../../lib/comments';
@@ -24,13 +25,6 @@ const FILTERS: { value: BoardFilter; label: string }[] = [
   { value: 'work', label: 'Работа' },
   { value: 'purchases', label: 'Закупки' },
 ];
-
-/** Тип задачи на доске — цвет полоски, иконка, подпись. Янтарный и коралловый — только состояние (срочно, просрочено, заказано). */
-const TYPE: Record<BoardType, { stripe: string; text: string; icon: IconName; label: string }> = {
-  elephants: { stripe: 'border-l-teal', text: 'text-teal', icon: 'syringe', label: 'Слоны' },
-  work: { stripe: 'border-l-sky', text: 'text-sky', icon: 'wrench', label: 'Работа' },
-  purchases: { stripe: 'border-l-violet', text: 'text-violet', icon: 'box', label: 'Закупка' },
-};
 
 /** «Задачи» — доска коллектива: назначения по слонам, хоздела и закупки по группам во времени. */
 export function RequestsScreen({ user }: { user: CurrentUser }) {
@@ -108,7 +102,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
                   i.kind === 'request' ? (
                     <BoardRequest key={i.req.id} item={i} user={user} onOpen={setOpen} />
                   ) : (
-                    <BoardCard key={i.p.id} type="purchases" label={TYPE.purchases.label}>
+                    <BoardCard key={i.p.id} type="purchases" label={TASK_TYPE.purchases.label}>
                       <PurchaseRow p={i.p} buyer={buyer} onOpen={setOpenBuy} onOrder={setOrdering} onArrive={arrive} />
                     </BoardCard>
                   ),
@@ -138,7 +132,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
 
 /** Рамка карточки на доске: цветная полоска слева и подпись типа с иконкой — тип видно не только по цвету. */
 function BoardCard({ type, label, right, children }: { type: BoardType; label: string; right?: ReactNode; children: ReactNode }) {
-  const t = TYPE[type];
+  const t = TASK_TYPE[type];
   return (
     <Card className={`flex flex-col gap-1.5 border-l-4 px-4 py-3 ${t.stripe}`}>
       <div className="flex items-center justify-between gap-2">
@@ -170,7 +164,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
     <button type="button" onClick={() => onOpen(r)} className={`text-left ${closed ? 'opacity-60' : ''}`}>
       <BoardCard
         type={item.type}
-        label={item.type === 'work' ? TYPE.work.label : whoLabel(r.elephant)}
+        label={item.type === 'work' ? TASK_TYPE.work.label : whoLabel(r.elephant)}
         right={
           <span className="flex items-center gap-1.5">
             {late && pill('bg-coral/15 text-coral', 'ПРОСРОЧЕНО')}
@@ -187,7 +181,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
         </span>
         {r.frequency !== 'once' && !closed && (
           <div className="h-1.5 overflow-hidden rounded-full bg-surface2">
-            <div className={`h-full ${item.type === 'work' ? 'bg-sky' : 'bg-teal'}`} style={{ width: `${Math.round((p.done / p.total) * 100)}%` }} />
+            <div className={`h-full ${TASK_TYPE[item.type].bar}`} style={{ width: `${Math.round((p.done / p.total) * 100)}%` }} />
           </div>
         )}
         <span className="text-[12px] font-semibold text-muted">
