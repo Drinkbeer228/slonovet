@@ -224,7 +224,6 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   const [frac, setFrac] = useState(0);
   const [value, setValue] = useState('');
   const [sackKg, setSackKg] = useState('');
-  const [perGarets, setPerGarets] = useState('');
   const [openedFor, setOpenedFor] = useState<string | null>(null);
   // остаток трогали — значит, пересчитали; иначе (переименовали) пересчёт не записываем
   const [counted, setCounted] = useState(false);
@@ -237,7 +236,6 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
     setValue(String(Math.round(view.balance * 10) / 10));
     setSackKg(String(it.sack_kg ?? ''));
     setName(it.name);
-    setPerGarets(String(it.kg_per_garets ?? ''));
   }
   const close = () => {
     setOpenedFor(null);
@@ -270,7 +268,6 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             // название и настройки — одной записью, чтобы одно не затёрло другое
             const next: StockItem = { ...it, name: name.trim() || it.name };
             if (it.kind === 'sack' && num(sackKg)) next.sack_kg = num(sackKg);
-            if (perGarets) next.kg_per_garets = num(perGarets) || null;
             if (next.name !== it.name || next.sack_kg !== it.sack_kg || next.kg_per_garets !== it.kg_per_garets) await put('stock_items', next);
             toast('Сохранено');
             close();
@@ -352,11 +349,6 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             <Field label={`Вес: 1 ${packWords(it)[0]}, кг`}>
               <input className={inputCls} type="text" inputMode="decimal" value={sackKg} onChange={(e) => setSackKg(e.target.value)} />
             </Field>
-            {!veg && (
-              <Field label="В совке, кг" hint="полный мерный совок">
-                <input className={inputCls} type="text" inputMode="decimal" value={perGarets} onChange={(e) => setPerGarets(e.target.value)} placeholder="—" />
-              </Field>
-            )}
           </div>
         )}
         <div className="flex flex-col gap-3 border-t border-line pt-4">

@@ -101,7 +101,7 @@ export interface RequestTodo {
   done: boolean;
 }
 
-export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift: Shift): RequestTodo[] {
+export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift: Shift, now = new Date()): RequestTodo[] {
   return requests
     .filter((r) => r.status === 'active' && (!r.due_date || r.due_date >= shift.date) && (!r.on_date || r.on_date <= shift.date))
     .map((req) => {
@@ -112,7 +112,14 @@ export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift
       return { req, marks: here, allMarks, needed, done };
     })
     .filter((t) => !(t.req.frequency === 'once' && t.done && t.marks.length === 0))
-    .sort((a, b) => Number(a.done) - Number(b.done) || Number(b.req.urgent) - Number(a.req.urgent) || byWhen(a.req, b.req));
+    // невыполненное: просроченное, потом срочное, потом по дню и часу
+    .sort(
+      (a, b) =>
+        Number(a.done) - Number(b.done) ||
+        Number(overdue(b.req, b.done, now)) - Number(overdue(a.req, a.done, now)) ||
+        Number(b.req.urgent) - Number(a.req.urgent) ||
+        byWhen(a.req, b.req),
+    );
 }
 
 /** Порядок по времени: сначала задачи на день и час (раньше — выше), потом остальные. */
@@ -142,6 +149,14 @@ export function whenLabel(req: VetRequest, today = isoDate()): string {
   const day = req.on_date === today ? 'сегодня' : req.on_date.slice(8, 10) + '.' + req.on_date.slice(5, 7);
   return req.at_time ? `${day} к ${req.at_time.slice(0, 5)}` : day;
 }
+
+/** Готовые наборы ответов: про слонов — ветеринарные; про «Работу» (хоздела) — человеческие статусы. */
+export const WORK_PRESETS: { label: string; options: string[] }[] = [
+  // без «в работе»: любая отметка — выполнение, и разовая задача после неё закрылась бы
+  { label: 'Сделано / не получилось', options: ['сделано', 'не получилось'] },
+];
+
+export const answerPresets = (who: string) => (who === 'work' ? WORK_PRESETS : ANSWER_PRESETS);
 
 /** Готовые наборы ответов для заявки врача */
 export const ANSWER_PRESETS: { label: string; options: string[] }[] = [

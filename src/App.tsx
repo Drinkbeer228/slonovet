@@ -4,7 +4,7 @@ import { initStore, setWriteBlock, useRows } from './lib/store';
 import { Toaster, toast } from './ui/kit';
 import { Login } from './screens/Login';
 import { InstallBanner, InstallSheet } from './screens/InstallHint';
-import { BottomNav, MENU_TABS, MenuSheet, OfflineBanner, PreviewBanner, TABS_BY_ROLE, TopBar, type Tab } from './screens/Shell';
+import { BottomNav, MenuSheet, OfflineBanner, PreviewBanner, TABS, TopBar, menuTabs, type Tab } from './screens/Shell';
 import { getPreviewRole, usePreviewRole } from './lib/preview';
 import { ShiftScreen } from './screens/keeper/ShiftScreen';
 import { DietScreen } from './screens/DietScreen';
@@ -17,6 +17,7 @@ import { RatingScreen } from './screens/RatingScreen';
 import { logEvent } from './lib/log';
 import { MoveScreen } from './screens/MoveScreen';
 import { Tour } from './screens/Tour';
+import { DevRoleSwitcher } from './screens/DevRoleSwitcher';
 import { diag } from './lib/diag';
 
 const TAB_KEY = 'slonovet_tab';
@@ -89,8 +90,8 @@ function Main() {
   // админ может посмотреть приложение глазами другой роли; всё остальное считается от неё
   const user = previewRole && session.user.role === 'admin' ? { ...session.user, role: previewRole } : session.user;
   const profiles = useRows('profiles');
-  const tabs = TABS_BY_ROLE[user.role];
-  const allowed = [...tabs, ...MENU_TABS[user.role]];
+  const tabs = TABS;
+  const allowed = [...tabs, ...menuTabs(user.role)];
   const [tab, setTabState] = useState<Tab>(() => {
     // открыли из уведомления: /?tab=stock — нужный раздел
     const fromLink = new URLSearchParams(location.search).get('tab') as Tab | null;
@@ -148,6 +149,7 @@ function Main() {
       <InstallSheet />
       <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} role={user.role} onTab={setTab} />
       <Tour key={user.role} user={user} tab={current} onTab={setTab} preview={!!previewRole} />
+      {import.meta.env.DEV && <DevRoleSwitcher />}
     </div>
   );
 }

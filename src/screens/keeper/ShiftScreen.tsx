@@ -122,7 +122,6 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         </div>
       )}
 
-      <JumpBar shift={shift} readOnly={readOnly} />
 
       {someoneElses && !readOnly && <NotHandedHint shift={shift} user={user} />}
       <HandoverBanner shift={shift} from={from} myId={user.id} />
@@ -170,43 +169,6 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       <NoteSheet draft={noteDraft} shiftId={shift.id} user={user} onClose={() => setNoteDraft(null)} />
       <HandoverSheet open={handoverOpen} shift={shift} onClose={() => setHandoverOpen(false)} />
     </div>
-  );
-}
-
-/** Строка-сводка вверху: сколько осталось и тап — прокрутка к нужному блоку. */
-function JumpBar({ shift, readOnly }: { shift: Shift; readOnly: boolean }) {
-  const requests = useRows('requests');
-  const marks = useRows('request_marks');
-  const left = requestTodos(requests, marks, shift).filter((t) => !t.done).length;
-  const feeds = FEED_TIMES.filter((t) => shift.feeds[t]?.done).length;
-  const flags = shiftFlags(shift).length;
-  const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const items = [
-    { id: 'sec-requests', label: 'Назначения', val: left ? String(left) : '✓', warn: left > 0 },
-    { id: 'sec-state', label: 'Состояние', val: flags ? String(flags) : '✓', warn: flags > 0 },
-    { id: 'sec-feeding', label: 'Кормление', val: `${feeds}/${FEED_TIMES.length}`, warn: feeds < FEED_TIMES.length },
-    { id: 'sec-quests', label: 'За дежурство', val: '', warn: false },
-    { id: 'sec-note', label: readOnly ? 'Заметка' : 'Сдать', val: '', warn: false },
-  ];
-  return (
-    // прилипает под шапкой: посреди длинного дежурства переходы под рукой
-    <nav
-      aria-label="Блоки дежурства"
-      data-tour="jumpbar"
-      className="sticky top-14 z-20 -mx-4 flex gap-2 overflow-x-auto bg-bg/95 px-4 py-2 backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {items.map((i) => (
-        <button
-          key={i.id}
-          type="button"
-          onClick={() => go(i.id)}
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 text-[14px] font-bold text-ink2"
-        >
-          {i.label}
-          {i.val && <span className={i.warn ? 'text-amber' : 'text-teal'}>{i.val}</span>}
-        </button>
-      ))}
-    </nav>
   );
 }
 

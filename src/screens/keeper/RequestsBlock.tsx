@@ -4,6 +4,8 @@ import { haptics } from '../../lib/haptics';
 import { FREQ_LABEL, overdue, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import type { CurrentUser, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
+import { TASK_TYPE, taskType } from '../taskType';
+import { Icon } from '../../ui/Icon';
 import { remove, useRows } from '../../lib/store';
 import { shortDate, timeOf, stampOf } from '../../lib/dates';
 import { Button, Card, Chip, FilePreview, IconButton, PhotoPick, PhotoThumb, Section, Sheet, inputCls, toast } from '../../ui/kit';
@@ -58,13 +60,15 @@ function RequestCard({
 }) {
   const { req, marks, needed, done } = todo;
   const late = overdue(req, done);
+  const t = TASK_TYPE[taskType(req.elephant)];
   const when = whenLabel(req);
   const multi = needed > 1;
   const who = whoLabel(req.elephant);
   return (
-    <Card className={`flex flex-col gap-2.5 p-3.5 ${done ? 'opacity-60' : req.urgent || late ? 'ring-1 ring-coral/60' : 'ring-1 ring-amber/35'}`}>
+    <Card className={`flex flex-col gap-2.5 border-l-4 p-3.5 ${t.stripe} ${done ? 'opacity-60' : req.urgent || late ? 'ring-1 ring-coral/60' : ''}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-[13px] font-extrabold text-amber">
+        <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
+          <Icon name={t.icon} size={15} />
           {who}
           {req.urgent && !done && <span className="rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">СРОЧНО</span>}
           {late && <span className="rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">ПРОСРОЧЕНО</span>}
