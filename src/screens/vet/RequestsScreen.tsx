@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { logEvent } from '../../lib/log';
 import { ELEPHANTS } from '../../domain/elephants';
-import { ANSWER_PRESETS, FREQ_LABEL, overdue, requestProgress, whenLabel, whoLabel } from '../../domain/shift';
+import { ANSWER_PRESETS, FREQ_LABEL, currentShift, overdue, requestProgress, requestTodos, whenLabel, whoLabel } from '../../domain/shift';
+import { addMark } from '../../domain/actions';
+import { haptics } from '../../lib/haptics';
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
@@ -163,8 +165,11 @@ export function RequestList({ list, user, onOpen }: { list: VetRequest[]; user: 
 
 function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: CurrentUser; onClose: () => void }) {
   const marks = useRows('request_marks');
+  const shift = currentShift(useRows('shifts'));
   const [confirm, setConfirm] = useState(false);
   if (!req) return null;
+  // отметить может любой (директор сам обработал Претти) — но только в открытое дежурство и если в нём ещё не отмечено
+  const todo = shift && req.status === 'active' ? requestTodos([req], marks, shift)[0] : undefined;
   const mine = marks.filter((m) => m.request_id === req.id).sort((a, b) => (a.done_at < b.done_at ? 1 : -1));
   return (
     <Sheet
@@ -201,6 +206,43 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
           {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
           {req.needs_photo ? ' · с фото' : ''} · {stampOf(req.created_at)} · {req.author_name}
         </span>
+        {todo && !todo.done && (
+          <div className="flex flex-col gap-2">
+            {req.needs_photo ? (
+              <span className="text-[13px] font-semibold text-muted">Врач просит фото — отметьте на вкладке «Дежурство», там можно снять.</span>
+            ) : req.options?.length ? (
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
+                {req.options.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={async () => {
+                      await addMark(req.id, shift!, user, o);
+                      haptics.success();
+                      toast(`Отмечено: ${o}`);
+                    }}
+                    className="h-11 rounded-xl bg-ink px-2 text-[15px] font-extrabold text-bg"
+                  >
+                    {o}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <Button
+                kind="primary"
+                icon="check"
+                full
+                onClick={async () => {
+                  await addMark(req.id, shift!, user);
+                  haptics.success();
+                  toast('Отмечено');
+                }}
+              >
+                Отметить выполнение
+              </Button>
+            )}
+          </div>
+        )}
         <Section title="Выполнение" aside={String(mine.length)}>
           {mine.length === 0 ? (
             <Empty>Пока не отмечено</Empty>

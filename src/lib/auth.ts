@@ -129,6 +129,14 @@ export async function loginDemo(role: Role, name: string) {
   stopSync(true);
 }
 
+const DEMO_NAMES: Record<Role, string> = { keeper: 'Соколов', vet: 'Иванова', director: 'Директор', manager: 'Администратор', admin: 'Администратор' };
+
+/** Только для разработки (переключатель ролей): сменить роль в примере, не пересевая данные. */
+export function switchDemoRole(role: Role) {
+  if (session?.mode !== 'demo') return;
+  set({ mode: 'demo', user: { id: `demo-${role}`, login: role, full_name: DEMO_NAMES[role], role } });
+}
+
 export async function logout() {
   const s = session;
   if (s?.mode === 'cloud') {

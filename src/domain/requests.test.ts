@@ -87,3 +87,15 @@ describe('вход: что сказать человеку', () => {
     expect(loginErrorText({ status: 429 })).toMatch(/^Слишком много/);
   });
 });
+
+describe('сводка «Сейчас главное»', () => {
+  it('просроченное раньше срочного, срочное раньше обычного, выполненное не берём', async () => {
+    const { mainTodo } = await import('./shift');
+    const s = shift('2026-10-26');
+    const list = [req('plain'), req('hot', { urgent: true }), req('late', { on_date: '2026-10-26', at_time: '09:00' }), req('done1')];
+    const todos = requestTodos(list, [mark('done1', s.id)], s);
+    expect(mainTodo(todos, new Date(2026, 9, 26, 10, 0))?.req.id).toBe('late');
+    expect(mainTodo(todos, new Date(2026, 9, 26, 8, 0))?.req.id).toBe('hot');
+    expect(mainTodo(requestTodos([req('x')], [mark('x', s.id)], s))).toBeUndefined();
+  });
+});

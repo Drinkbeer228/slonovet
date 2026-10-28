@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
+import { MANAGES } from '../domain/access';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
@@ -31,24 +32,18 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   move: { label: 'Переезд', icon: 'truck' },
 };
 
-export const TABS_BY_ROLE: Record<Role, Tab[]> = {
-  keeper: ['shift', 'diet', 'stock', 'journal'],
-  // дежурство видят все: не кипер — только смотрит
-  vet: ['journal', 'shift', 'requests', 'diet'],
-  director: ['journal', 'shift', 'requests', 'stock'],
-  manager: ['stock', 'shift', 'journal'],
-  admin: ['shift', 'journal', 'requests', 'stock'],
-};
+/**
+ * Одни и те же разделы у всех ролей: видят все, а что можно делать — решают кнопки внутри
+ * (domain/access.ts). Дежурство не кипер только смотрит, назначения и лечение отмечают все.
+ */
+export const TABS: Tab[] = ['shift', 'journal', 'requests', 'stock'];
 
-/** Порядок разделов в меню */
-const ALL_TABS: Tab[] = ['shift', 'journal', 'requests', 'diet', 'stock', 'users', 'move', 'rating', 'guide'];
+/** Меню профиля — одно у всех; «Персонал» — тем, кто заводит людей (MANAGES). */
+export function menuTabs(role: Role): Tab[] {
+  return (['diet', 'users', 'move', 'rating', 'guide'] as Tab[]).filter((t) => t !== 'users' || Boolean(MANAGES[role]?.length));
+}
 
-/** Все видят всё: чего нет на нижней панели — открывается из меню (на чужом разделе — только просмотр). */
-export const MENU_TABS = Object.fromEntries(
-  (Object.keys(TABS_BY_ROLE) as Role[]).map((r) => [r, ALL_TABS.filter((t) => !TABS_BY_ROLE[r].includes(t))]),
-) as Record<Role, Tab[]>;
-
-const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
+export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
 
 export function Logo({ size = 32 }: { size?: number }) {
   return <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={size} height={size} className="rounded-[22%]" />;
@@ -132,12 +127,17 @@ export function TopBar({
   onTab: (t: Tab) => void;
   onMenu: () => void;
 }) {
-  const badges = useBadges(user, tabs);
+  const badges = useBadges(user);
   return (
     <header className="sticky top-0 z-30 border-b border-surface2 bg-bg/95 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
         <Logo size={28} />
-        <span className="text-[16px] font-extrabold tracking-tight">СлоноВет</span>
+        <span className="hidden text-[16px] font-extrabold tracking-tight md:inline">СлоноВет</span>
+        {/* кто вошёл и с какой ролью — одинаково у всех; на телефоне фамилия */}
+        <span className="flex min-w-0 flex-col leading-tight md:hidden">
+          <span className="truncate text-[15px] font-extrabold">{user.full_name.split(' ')[0]}</span>
+          <span className="self-start rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
+        </span>
         <nav className="ml-4 hidden flex-1 items-center gap-1 md:flex" aria-label="Разделы">
           {tabs.map((t) => (
             <button
@@ -154,6 +154,10 @@ export function TopBar({
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <span className="hidden flex-col items-end leading-tight md:flex">
+            <span className="text-[14px] font-bold">{user.full_name}</span>
+            <span className="rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
+          </span>
           <SyncChip onClick={onMenu} />
           <button
             type="button"
@@ -173,9 +177,9 @@ export function TopBar({
 /**
  * Цифры на разделах — чтобы не открывать вкладку проверять: на «Дежурстве» — сколько назначений ждёт
  * ответа в открытом дежурстве, на «Фураже» — сколько позиций заканчивается (как в плашке «Заканчивается»),
- * на «Заявках» — в скольких заявках новое в обсуждении (у кого «Заявок» нет — прибавляем к «Дежурству»).
+ * на «Заявках» — в скольких заявках новое в обсуждении.
  */
-export function useBadges(user: CurrentUser, tabs: Tab[]): Partial<Record<Tab, number>> {
+export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
   const shifts = useRows('shifts');
@@ -193,7 +197,7 @@ export function useBadges(user: CurrentUser, tabs: Tab[]): Partial<Record<Tab, n
   }, [items, moves, diets]);
   const active = new Set(requests.filter((r) => r.status === 'active' && !r.deleted).map((r) => r.id));
   const talk = unreadRequests(comments, user.id, read, active);
-  return tabs.includes('requests') ? { shift: left, stock: low, requests: talk } : { shift: left + talk, stock: low };
+  return { shift: left, stock: low, requests: talk };
 }
 
 function Badge({ n, urgent }: { n?: number; urgent?: boolean }) {
@@ -209,7 +213,7 @@ function Badge({ n, urgent }: { n?: number; urgent?: boolean }) {
 }
 
 export function BottomNav({ user, tabs, tab, onTab }: { user: CurrentUser; tabs: Tab[]; tab: Tab; onTab: (t: Tab) => void }) {
-  const badges = useBadges(user, tabs);
+  const badges = useBadges(user);
   return (
     <nav
       aria-label="Разделы"
@@ -260,7 +264,7 @@ export function MenuSheet({
   const [busy, setBusy] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const { installed } = useInstall();
-  const extra = MENU_TABS[role];
+  const extra = menuTabs(role);
   const preview = usePreviewRole();
   return (
     <Sheet open={open} onClose={onClose} title={session.user.full_name}>
@@ -319,7 +323,7 @@ export function MenuSheet({
                   on={preview === r}
                   onClick={() => {
                     setPreviewRole(preview === r ? null : r);
-                    onTab(TABS_BY_ROLE[r][0]);
+                    onTab(TABS[0]);
                     onClose();
                   }}
                 >

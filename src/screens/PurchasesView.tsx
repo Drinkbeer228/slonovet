@@ -198,7 +198,7 @@ function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null;
   );
 }
 
-function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: CurrentUser; onClose: () => void }) {
+export function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: CurrentUser; onClose: () => void }) {
   const items = useRows('stock_items');
   const [itemId, setItemId] = useState<string | null>(null);
   const [other, setOther] = useState('');

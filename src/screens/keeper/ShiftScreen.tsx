@@ -16,11 +16,21 @@ import { HandedShift, HandoverBanner, NotHandedHint } from './HandedShift';
 import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
+import { ShiftSummary } from './ShiftSummary';
 
 /** Ведут дежурство только киперы (domain/access.ts). Остальные смотрят его как есть; назначения и лечение отмечают все. */
 const canWork = (u: CurrentUser) => canWorkShift(u.role);
 
 export function ShiftScreen({ user }: { user: CurrentUser }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <ShiftSummary user={user} />
+      <ShiftBody user={user} />
+    </div>
+  );
+}
+
+function ShiftBody({ user }: { user: CurrentUser }) {
   const shifts = useRows('shifts');
   const shift = currentShift(shifts);
   const [acceptOwn, setAcceptOwn] = useState(false);

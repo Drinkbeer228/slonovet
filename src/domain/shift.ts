@@ -115,6 +115,12 @@ export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift
     .sort((a, b) => Number(a.done) - Number(b.done) || Number(b.req.urgent) - Number(a.req.urgent) || byWhen(a.req, b.req));
 }
 
+/** Для сводки «Сейчас главное»: первая невыполненная — просроченное, потом срочное, потом по времени. */
+export function mainTodo(todos: RequestTodo[], now = new Date()): RequestTodo | undefined {
+  const rank = (t: RequestTodo) => (overdue(t.req, t.done, now) ? 0 : t.req.urgent ? 1 : 2);
+  return todos.filter((t) => !t.done).sort((a, b) => rank(a) - rank(b) || byWhen(a.req, b.req))[0];
+}
+
 /** Порядок по времени: сначала задачи на день и час (раньше — выше), потом остальные. */
 const whenKey = (r: VetRequest) => (r.on_date ? `${r.on_date} ${r.at_time?.slice(0, 5) ?? '99:99'}` : '9999');
 const byWhen = (a: VetRequest, b: VetRequest) => {
