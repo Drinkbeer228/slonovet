@@ -1,9 +1,10 @@
 import { canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, updateShift } from '../../domain/actions';
-import { FEED_TIMES, acceptedBy, currentShift, lastHanded, requestTodos, shiftFlags } from '../../domain/shift';
+import { FEED_TIMES, acceptedBy, currentShift, lastHanded, newShift, requestTodos, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
+import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
@@ -24,7 +25,23 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
   const shift = currentShift(shifts);
   const [acceptOwn, setAcceptOwn] = useState(false);
   const [accepting, setAccepting] = useState(false);
+  // «Посмотреть как»: принять нельзя (ничего не сохраняется) — показываем пример открытого дежурства в памяти
+  const preview = usePreviewRole();
+  const sample = usePreviewSample();
   if (shift) return <OpenShift shift={shift} user={user} readOnly={!canWork(user)} />;
+  if (sample && preview) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Card className="flex items-center gap-3 p-3.5 ring-1 ring-teal/40">
+          <span className="flex-1 text-[13px] font-semibold text-muted">
+            Пример: так выглядит открытое дежурство у кипера. Нажимать можно — ничего не сохраняется.
+          </span>
+          <Button onClick={() => setPreviewSample(null)}>Скрыть</Button>
+        </Card>
+        <OpenShift shift={sample} user={user} readOnly={false} />
+      </div>
+    );
+  }
 
   const last = lastHanded(shifts);
   // только что сдал сам — показываем код, пока сменщик не принял
@@ -39,6 +56,11 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
           Принять дежурство
         </Button>
       </div>
+      {preview && (
+        <Button full icon="eye" onClick={() => setPreviewSample({ ...newShift(user, {}), id: 'preview-sample', updated_at: '' })}>
+          Показать открытое дежурство (пример)
+        </Button>
+      )}
       <Sheet open={accepting} onClose={() => setAccepting(false)} title="Принять дежурство">
         <AcceptShift user={user} />
       </Sheet>
