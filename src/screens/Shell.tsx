@@ -22,7 +22,7 @@ export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' 
 
 export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   shift: { label: 'Дежурство', icon: 'shift' },
-  requests: { label: 'Заявки', icon: 'message' },
+  requests: { label: 'Задачи', icon: 'message' },
   diet: { label: 'Рацион', icon: 'bowl' },
   stock: { label: 'Фураж', icon: 'box' },
   journal: { label: 'Журнал', icon: 'book' },
@@ -177,7 +177,7 @@ export function TopBar({
 /**
  * Цифры на разделах — чтобы не открывать вкладку проверять: на «Дежурстве» — сколько назначений ждёт
  * ответа в открытом дежурстве, на «Фураже» — сколько позиций заканчивается (как в плашке «Заканчивается»),
- * на «Заявках» — в скольких заявках новое в обсуждении.
+ * на «Задачах» — в скольких задачах новое в обсуждении.
  */
 export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   const requests = useRows('requests');

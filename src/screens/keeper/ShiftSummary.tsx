@@ -39,8 +39,8 @@ export function ShiftSummary({ user }: { user: CurrentUser }) {
         done={done}
         main={main && { who: whoLabel(main.req.elephant), text: main.req.text, when: whenLabel(main.req), late: overdue(main.req, false), urgent: main.req.urgent }}
       />
-      <div className="grid grid-cols-2 gap-3">
-        <Tile icon="bowl" label="Кормление" off={!open ? 'нет дежурства' : !keeper ? 'только кипер' : ''} onClick={() => go('sec-feeding')} />
+      {/* только то, что открывает быстрый ввод; переходы по смене — в полосе «Назначения · Состояние · Кормление» ниже */}
+      <div className="grid grid-cols-3 gap-2">
         <Tile
           icon="syringe"
           label="Запись о лечении"
@@ -48,11 +48,19 @@ export function ShiftSummary({ user }: { user: CurrentUser }) {
           onClick={() => setNote({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}
         />
         <Tile icon="box" label="Нужно купить" onClick={() => setBuying(true)} />
-        <Tile icon="message" label="Новая заявка" onClick={() => setAsking(true)} />
+        <Tile icon="message" label="Новая задача" onClick={() => setAsking(true)} />
       </div>
       {noteShift && <NoteSheet draft={note} shiftId={noteShift.id} user={user} onClose={() => setNote(null)} />}
       <NewPurchaseSheet open={buying} user={user} onClose={() => setBuying(false)} />
-      <NewRequestSheet initial={asking ? 'Претти' : null} user={user} onClose={() => setAsking(false)} />
+      <NewRequestSheet
+        initial={asking ? 'Претти' : null}
+        user={user}
+        onClose={() => setAsking(false)}
+        onBuy={() => {
+          setAsking(false);
+          setBuying(true);
+        }}
+      />
     </section>
   );
 }
@@ -117,11 +125,11 @@ function Tile({ icon, label, off = '', onClick }: { icon: IconName; label: strin
       type="button"
       disabled={Boolean(off)}
       onClick={onClick}
-      className="flex aspect-[5/3] flex-col items-start justify-between rounded-2xl border border-line bg-surface p-3.5 text-left active:bg-surface2 disabled:opacity-45"
+      className="flex min-h-[88px] flex-col items-start justify-between gap-2 rounded-2xl border border-line bg-surface p-3 text-left active:bg-surface2 disabled:opacity-45"
     >
-      <Icon name={icon} size={24} className={off ? 'text-muted' : 'text-teal'} />
+      <Icon name={icon} size={22} className={off ? 'text-muted' : 'text-teal'} />
       <span className="flex flex-col">
-        <span className="text-[15px] font-extrabold leading-tight">{label}</span>
+        <span className="text-[14px] font-extrabold leading-tight">{label}</span>
         {off && <span className="text-[12px] font-semibold text-muted">{off}</span>}
       </span>
     </button>

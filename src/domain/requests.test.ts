@@ -99,3 +99,13 @@ describe('сводка «Сейчас главное»', () => {
     expect(mainTodo(requestTodos([req('x')], [mark('x', s.id)], s))).toBeUndefined();
   });
 });
+
+describe('варианты ответа по адресату', () => {
+  it('для «Работы» — без «в работе» (отметка закрыла бы разовую задачу), для слонов — ветеринарные', async () => {
+    const { answerPresets } = await import('./shift');
+    const work = answerPresets('work').flatMap((p) => p.options);
+    expect(work).toContain('сделано');
+    expect(work).not.toContain('в работе');
+    expect(answerPresets('Одри').map((p) => p.label)).toContain('Съела');
+  });
+});

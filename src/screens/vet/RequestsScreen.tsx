@@ -15,23 +15,25 @@ import { DiscussionThread } from '../Discussion';
 import { unreadCount, useReadMarks } from '../../lib/comments';
 
 const VIEW_KEY = 'slonovet_requests_view';
+type View = 'elephants' | 'work' | 'purchases';
 
 export function RequestsScreen({ user }: { user: CurrentUser }) {
   const requests = useRows('requests');
   const [creating, setCreating] = useState<ElephantName | 'all' | 'work' | null>(null);
   const [open, setOpen] = useState<VetRequest | null>(null);
   const [buying, setBuying] = useState(false);
-  // две вкладки: назначения киперам и закупки; кто не ставит назначений — сразу в закупках
-  const [view, setViewState] = useState<'requests' | 'purchases'>(() => {
+  // три части: задачи по слонам (назначения), хоздела («Работа») и закупки — одна таблица задач, разделённая по «кому»
+  const [view, setViewState] = useState<View>(() => {
     try {
       const v = localStorage.getItem(VIEW_KEY);
-      if (v === 'requests' || v === 'purchases') return v;
+      if (v === 'elephants' || v === 'work' || v === 'purchases') return v;
+      if (v === 'requests') return 'elephants'; // сохранено до разделения
     } catch {
       /* без хранилища — по роли */
     }
-    return user.role === 'manager' ? 'purchases' : 'requests';
+    return user.role === 'manager' ? 'purchases' : 'elephants';
   });
-  const setView = (v: 'requests' | 'purchases') => {
+  const setView = (v: View) => {
     setViewState(v);
     try {
       localStorage.setItem(VIEW_KEY, v);
@@ -39,8 +41,9 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       /* не запомнится — не беда */
     }
   };
-  const active = requests.filter((r) => r.status === 'active').sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-  const closed = requests
+  const mine = requests.filter((r) => (view === 'work') === (r.elephant === 'work'));
+  const active = mine.filter((r) => r.status === 'active').sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  const closed = mine
     .filter((r) => r.status === 'closed')
     .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
     .slice(0, 20);
@@ -49,9 +52,9 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
-          <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Заявки</h1>
-          {view === 'requests' ? (
-            <Button kind="primary" icon="plus" onClick={() => setCreating('Претти')}>
+          <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Задачи</h1>
+          {view !== 'purchases' ? (
+            <Button kind="primary" icon="plus" onClick={() => setCreating(view === 'work' ? 'work' : 'Претти')}>
               Новая
             </Button>
           ) : (
@@ -63,11 +66,12 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       </header>
       <div data-tour="requests-tabs">
       <Segmented
-        label="Вид заявок"
+        label="Вид задач"
         value={view}
         onChange={setView}
         options={[
-          { value: 'requests', label: 'Назначения' },
+          { value: 'elephants', label: 'Слоны' },
+          { value: 'work', label: 'Работа' },
           { value: 'purchases', label: 'Закупки' },
         ]}
       />
@@ -85,7 +89,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
             </span>
           }
         >
-          {active.length === 0 ? <Empty>Активных заявок нет</Empty> : <RequestList list={active} user={user} onOpen={setOpen} />}
+          {active.length === 0 ? <Empty>{view === 'work' ? 'Хоздел нет' : 'Активных назначений нет'}</Empty> : <RequestList list={active} user={user} onOpen={setOpen} />}
         </Section>
         {closed.length > 0 && (
           <Section title="Закрытые">
@@ -94,7 +98,16 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         )}
         </>
       )}
-      <NewRequestSheet initial={creating} user={user} onClose={() => setCreating(null)} />
+      <NewRequestSheet
+        initial={creating}
+        user={user}
+        onClose={() => setCreating(null)}
+        onBuy={() => {
+          setCreating(null);
+          setView('purchases');
+          setBuying(true);
+        }}
+      />
       <RequestDetail req={open} user={user} onClose={() => setOpen(null)} />
     </div>
   );
@@ -181,7 +194,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
           <div className="flex gap-2">
             {req.status === 'active' ? (
               <Button full onClick={() => setConfirm(true)}>
-                Закрыть заявку
+                Закрыть задачу
               </Button>
             ) : (
               <Button
@@ -268,12 +281,12 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
       </div>
       <Confirm
         open={confirm}
-        title="Закрыть заявку?"
+        title="Закрыть задачу?"
         text="Киперы перестанут её видеть."
         okLabel="Закрыть"
         onOk={async () => {
           await put('requests', { ...req, status: 'closed' });
-          toast('Заявка закрыта');
+          toast('Задача закрыта');
           onClose();
         }}
         onClose={() => setConfirm(false)}
@@ -284,7 +297,18 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
 
 const FREQS: RequestFrequency[] = ['once', 'shift', 'feeding'];
 
-export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantName | 'all' | 'work' | null; user: CurrentUser; onClose: () => void }) {
+export function NewRequestSheet({
+  initial,
+  user,
+  onClose,
+  onBuy,
+}: {
+  initial: ElephantName | 'all' | 'work' | null;
+  user: CurrentUser;
+  onClose: () => void;
+  /** «Купить? → Закупки»: хоздело «купить» на самом деле закупка — открыть её форму */
+  onBuy?: () => void;
+}) {
   const [who, setWho] = useState<ElephantName | 'all' | 'work'>('Претти');
   const [text, setText] = useState('');
   const [freq, setFreq] = useState<RequestFrequency>('shift');
@@ -376,6 +400,11 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
             ))}
           </div>
         </div>
+        {who === 'work' && onBuy && (
+          <button type="button" onClick={onBuy} className="-mt-2 self-start px-1 py-1 text-[14px] font-bold text-teal">
+            Купить? → Закупки
+          </button>
+        )}
         <Field label="Что сделать">
           <textarea
             rows={4}
