@@ -36,7 +36,8 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
  * Одни и те же разделы у всех ролей: видят все, а что можно делать — решают кнопки внутри
  * (domain/access.ts). Дежурство не кипер только смотрит, назначения и лечение отмечают все.
  */
-export const TABS: Tab[] = ['shift', 'journal', 'requests', 'stock'];
+// от сегодняшнего к архиву
+export const TABS: Tab[] = ['shift', 'requests', 'stock', 'journal'];
 
 /** Меню профиля — одно у всех; «Персонал» — тем, кто заводит людей (MANAGES). */
 export function menuTabs(role: Role): Tab[] {

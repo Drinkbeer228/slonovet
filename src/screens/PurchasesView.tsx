@@ -7,11 +7,12 @@ import { isoDate, localDay, relDate, shortDate, timeOf } from '../lib/dates';
 import { arrivePurchase, setPurchaseStatus } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { categoryOf, countWords, fmtNum, packWords, toStockUnits } from '../domain/stock';
-import { Button, Card, Check, Chip, DateInput, Empty, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
+import { Button, Card, Check, Chip, DateInput, Field, Section, Sheet, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
-  new: { label: 'ждёт', cls: 'text-amber' },
-  ordered: { label: 'заказано', cls: 'text-teal' },
+  new: { label: 'ждёт', cls: 'text-ink2' },
+  // янтарный — состояние «заказано, едет» (цвет типа «Закупки» — фиолетовый, на доске)
+  ordered: { label: 'заказано', cls: 'text-amber' },
   done: { label: 'привезли', cls: 'text-muted' },
   cancelled: { label: 'отменено', cls: 'text-muted' },
 };
@@ -36,7 +37,7 @@ function firstNumber(text: string): string {
 }
 
 /** «Привезли» по позиции фуража: сразу зачислить приход, чтобы не вводить второй раз в «Фураже». */
-function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
+export function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
   const items = useRows('stock_items');
   const shifts = useRows('shifts');
   const [qty, setQty] = useState('');
@@ -81,29 +82,6 @@ function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase | null
 }
 const byNewest = (a: Purchase, b: Purchase) => (a.created_at < b.created_at ? 1 : -1);
 
-/** Закупки целиком: что просили купить, что заказано, что уже привезли. Кнопка «Купить» — в шапке «Заявок». */
-export function PurchasesView({ user, adding, onAddClose }: { user: CurrentUser; adding: boolean; onAddClose: () => void }) {
-  const all = useRows('purchases');
-  const [open, setOpen] = useState<Purchase | null>(null);
-  const active = all.filter(isActive).sort((a, b) => Number(b.urgent) - Number(a.urgent) || byNewest(a, b));
-  const closed = all.filter((p) => !isActive(p)).sort(byNewest).slice(0, 20);
-
-  return (
-    <div className="flex flex-col gap-6">
-      <Section title="Активные" aside={active.length ? String(active.length) : undefined}>
-        {active.length ? <PurchaseList list={active} user={user} onOpen={setOpen} /> : <Empty>Ничего не просили купить</Empty>}
-      </Section>
-      {closed.length > 0 && (
-        <Section title="Закрытые">
-          <PurchaseList list={closed} user={user} onOpen={setOpen} />
-        </Section>
-      )}
-      <NewPurchaseSheet open={adding} user={user} onClose={onAddClose} />
-      <PurchaseDetail purchase={open} user={user} onClose={() => setOpen(null)} />
-    </div>
-  );
-}
-
 /** Для «Фуража»: только активные закупки и кнопка «Нужно купить». */
 export function PurchasesBlock({ user }: { user: CurrentUser }) {
   const all = useRows('purchases');
@@ -130,34 +108,7 @@ function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentU
   return (
     <Card className="divide-y divide-surface2 overflow-hidden">
       {list.map((p) => (
-        <div key={p.id} className={`flex flex-col gap-2 px-4 py-3 ${isActive(p) ? '' : 'opacity-60'}`}>
-          <button type="button" onClick={() => onOpen(p)} className="flex w-full flex-col gap-0.5 text-left">
-            <span className="flex items-baseline justify-between gap-2">
-              <span className="text-[15px] font-bold">
-                {p.title}
-                {p.amount && <span className="font-semibold text-ink2"> · {p.amount}</span>}
-              </span>
-              {p.urgent && isActive(p) && <span className="shrink-0 rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] font-bold text-coral">СРОЧНО</span>}
-            </span>
-            {p.note && <span className="text-[13px] font-medium text-ink2">{p.note}</span>}
-            <span className="text-[12px] font-semibold text-muted">
-              {p.author_name}, {relDate(localDay(p.created_at))}
-            </span>
-          </button>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full bg-surface2 px-2.5 py-1 text-[12px] font-bold ${STATUS[p.status].cls}`}>{statusText(p)}</span>
-            {buyer && p.status === 'new' && (
-              <button type="button" onClick={() => setOrdering(p)} className="h-9 rounded-full border border-teal px-3.5 text-[13px] font-bold text-teal">
-                Заказано
-              </button>
-            )}
-            {buyer && isActive(p) && (
-              <button type="button" onClick={() => arrived(p)} className="h-9 rounded-full border border-line px-3.5 text-[13px] font-bold text-ink2">
-                Привезли
-              </button>
-            )}
-          </div>
-        </div>
+        <PurchaseRow key={p.id} p={p} buyer={buyer} onOpen={onOpen} onOrder={setOrdering} onArrive={arrived} className="px-4 py-3" />
       ))}
       <OrderSheet purchase={ordering} user={user} onClose={() => setOrdering(null)} />
       <ArriveSheet purchase={arriving} user={user} onClose={() => setArriving(null)} />
@@ -165,8 +116,56 @@ function PurchaseList({ list, user, onOpen }: { list: Purchase[]; user: CurrentU
   );
 }
 
+/** Одна закупка: что, сколько, кто просил, состояние и кнопки закупщика. Общая для «Фуража» и доски «Задачи». */
+export function PurchaseRow({
+  p,
+  buyer,
+  onOpen,
+  onOrder,
+  onArrive,
+  className = '',
+}: {
+  p: Purchase;
+  buyer: boolean;
+  onOpen: (p: Purchase) => void;
+  onOrder: (p: Purchase) => void;
+  onArrive: (p: Purchase) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-col gap-2 ${isActive(p) ? '' : 'opacity-60'} ${className}`}>
+      <button type="button" onClick={() => onOpen(p)} className="flex w-full flex-col gap-0.5 text-left">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="text-[15px] font-bold">
+            {p.title}
+            {p.amount && <span className="font-semibold text-ink2"> · {p.amount}</span>}
+          </span>
+          {p.urgent && isActive(p) && <span className="shrink-0 rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] font-bold text-coral">СРОЧНО</span>}
+        </span>
+        {p.note && <span className="text-[13px] font-medium text-ink2">{p.note}</span>}
+        <span className="text-[12px] font-semibold text-muted">
+          {p.author_name}, {relDate(localDay(p.created_at))}
+        </span>
+      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`rounded-full bg-surface2 px-2.5 py-1 text-[12px] font-bold ${STATUS[p.status].cls}`}>{statusText(p)}</span>
+        {buyer && p.status === 'new' && (
+          <button type="button" onClick={() => onOrder(p)} className="h-9 rounded-full border border-teal px-3.5 text-[13px] font-bold text-teal">
+            Заказано
+          </button>
+        )}
+        {buyer && isActive(p) && (
+          <button type="button" onClick={() => onArrive(p)} className="h-9 rounded-full border border-line px-3.5 text-[13px] font-bold text-ink2">
+            Привезли
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** «Заказано»: можно сразу указать, когда обещали привезти. */
-function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
+export function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
   const [date, setDate] = useState('');
   useEffect(() => {
     if (p) setDate(p.delivery_date ?? '');
@@ -248,7 +247,7 @@ export function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user:
               status_at: null,
               created_at: new Date().toISOString(),
             });
-            toast('Заявка на закупку отправлена');
+            toast('Попросили купить');
             onClose();
           }}
         >
@@ -299,7 +298,7 @@ export function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user:
   );
 }
 
-function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
+export function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
   const [ordering, setOrdering] = useState(false);
   const [arriving, setArriving] = useState(false);
   if (!p) return null;

@@ -36,9 +36,11 @@ describe('разовая задача на конкретный день', () =>
     expect(overdue(req('b', { frequency: 'shift', on_date: '2026-10-20' }), false, new Date(2026, 9, 26))).toBe(false);
   });
 
-  it('порядок: срочное, потом по часу, потом без времени', () => {
+  it('порядок: просроченное, срочное, потом по часу, потом без времени', () => {
     const list = [req('plain'), req('late', { on_date: '2026-10-26', at_time: '18:00' }), req('early', { on_date: '2026-10-26', at_time: '09:00' }), req('hot', { urgent: true })];
-    expect(ids(list, [], shift('2026-10-26'))).toEqual(['hot', 'early', 'late', 'plain']);
+    expect(requestTodos(list, [], shift('2026-10-26'), new Date(2026, 9, 26, 8, 0)).map((t) => t.req.id)).toEqual(['hot', 'early', 'late', 'plain']);
+    // в 10:00 «early» (к 09:00) просрочена — она первой, раньше срочной
+    expect(requestTodos(list, [], shift('2026-10-26'), new Date(2026, 9, 26, 10, 0)).map((t) => t.req.id)).toEqual(['early', 'hot', 'late', 'plain']);
   });
 
   it('подпись: «сегодня к 16:00», «27.10»', () => {
@@ -85,18 +87,6 @@ describe('вход: что сказать человеку', () => {
     expect(loginErrorText({ name: 'AuthRetryableFetchError' })).toMatch(/^Нет связи/);
     expect(loginErrorText({ status: 503 })).toMatch(/^Нет связи/);
     expect(loginErrorText({ status: 429 })).toMatch(/^Слишком много/);
-  });
-});
-
-describe('сводка «Сейчас главное»', () => {
-  it('просроченное раньше срочного, срочное раньше обычного, выполненное не берём', async () => {
-    const { mainTodo } = await import('./shift');
-    const s = shift('2026-10-26');
-    const list = [req('plain'), req('hot', { urgent: true }), req('late', { on_date: '2026-10-26', at_time: '09:00' }), req('done1')];
-    const todos = requestTodos(list, [mark('done1', s.id)], s);
-    expect(mainTodo(todos, new Date(2026, 9, 26, 10, 0))?.req.id).toBe('late');
-    expect(mainTodo(todos, new Date(2026, 9, 26, 8, 0))?.req.id).toBe('hot');
-    expect(mainTodo(requestTodos([req('x')], [mark('x', s.id)], s))).toBeUndefined();
   });
 });
 

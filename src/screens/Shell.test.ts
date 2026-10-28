@@ -7,8 +7,8 @@ import { TABS, menuTabs } from './Shell';
 const ROLES: Role[] = ['keeper', 'vet', 'director', 'manager', 'admin'];
 
 describe('единый каркас', () => {
-  it('нижние разделы одинаковые у всех: Дежурство, Журнал, Заявки, Фураж', () => {
-    expect(TABS).toEqual(['shift', 'journal', 'requests', 'stock']);
+  it('нижние разделы одинаковые у всех: Дежурство, Задачи, Фураж, Журнал', () => {
+    expect(TABS).toEqual(['shift', 'requests', 'stock', 'journal']);
   });
 
   it('меню одно у всех, «Персонал» — только у тех, кто заводит людей', () => {

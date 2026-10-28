@@ -13,6 +13,9 @@
   --color-teal-ink: #04201c;
   --color-amber: #f5b547;
   --color-coral: #ff8a7a;
+  /* типы задач на доске: слоны — teal, работа — sky, закупки — violet (amber/coral — только тревога и состояние) */
+  --color-sky: #60b4f5;
+  --color-violet: #b39dff;
   --color-nav: #0e161c;
   --color-tick: #5b717d;
   --color-track: #3a4b57;
@@ -40,6 +43,8 @@
   --color-teal-ink: #ffffff;
   --color-amber: #8f5a00;
   --color-coral: #c22e1d;
+  --color-sky: #1665b0;
+  --color-violet: #6a3fc4;
   --color-nav: #ffffff;
   --color-tick: #7b8f9b;
   --color-track: #9fb0ba;
@@ -65,6 +70,8 @@
   --color-teal-ink: #ffffff;
   --color-amber: #8a5200;
   --color-coral: #d01c14;
+  --color-sky: #0f56a3;
+  --color-violet: #5d2fb0;
   --color-nav: #c84c0c;
   --color-tick: #1a1a1a;
   --color-track: #1a1a1a;
