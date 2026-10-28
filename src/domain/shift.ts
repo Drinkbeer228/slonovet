@@ -149,6 +149,14 @@ export function whenLabel(req: VetRequest, today = isoDate()): string {
   return req.at_time ? `${day} к ${req.at_time.slice(0, 5)}` : day;
 }
 
+/** Готовые наборы ответов: про слонов — ветеринарные; про «Работу» (хоздела) — человеческие статусы. */
+export const WORK_PRESETS: { label: string; options: string[] }[] = [
+  { label: 'Сделано / в работе / проблема', options: ['сделано', 'в работе', 'проблема'] },
+  { label: 'Сделано / не получилось', options: ['сделано', 'не получилось'] },
+];
+
+export const answerPresets = (who: string) => (who === 'work' ? WORK_PRESETS : ANSWER_PRESETS);
+
 /** Готовые наборы ответов для заявки врача */
 export const ANSWER_PRESETS: { label: string; options: string[] }[] = [
   { label: 'Съела', options: ['всё', 'половину', 'отказ'] },

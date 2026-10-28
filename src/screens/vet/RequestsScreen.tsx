@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { logEvent } from '../../lib/log';
 import { ELEPHANTS } from '../../domain/elephants';
-import { ANSWER_PRESETS, FREQ_LABEL, currentShift, overdue, requestProgress, requestTodos, whenLabel, whoLabel } from '../../domain/shift';
+import { FREQ_LABEL, answerPresets, currentShift, overdue, requestProgress, requestTodos, whenLabel, whoLabel } from '../../domain/shift';
 import { addMark } from '../../domain/actions';
 import { haptics } from '../../lib/haptics';
 import type { CurrentUser, ElephantName, RequestFrequency, VetRequest } from '../../domain/types';
@@ -346,11 +346,11 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
               status: 'active',
               created_at: new Date().toISOString(),
             });
-            toast('Заявка отправлена киперам');
+            toast('Задача поставлена');
             onClose();
           }}
         >
-          Отправить киперам
+          Поставить задачу
         </Button>
       }
     >
@@ -359,7 +359,18 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
           <span className="px-1 text-[14px] font-bold text-muted">Кому</span>
           <div className="flex flex-wrap gap-2">
             {[...ELEPHANTS, 'all' as const, 'work' as const].map((e) => (
-              <Chip key={e} on={who === e} onClick={() => setWho(e)}>
+              <Chip
+                key={e}
+                on={who === e}
+                onClick={() => {
+                  // слоны ↔ работа: ветеринарные ответы к хоздела не подходят (и наоборот) — сбрасываем на «выполнено»
+                  if ((e === 'work') !== (who === 'work')) {
+                    setOptions([]);
+                    setOwn('');
+                  }
+                  setWho(e);
+                }}
+              >
                 {whoLabel(e)}
               </Chip>
             ))}
@@ -385,12 +396,12 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <span className="px-1 text-[14px] font-bold text-muted">Ответ кипера кнопками</span>
+          <span className="px-1 text-[14px] font-bold text-muted">Варианты ответа</span>
           <div className="flex flex-wrap gap-2">
             <Chip on={options.length === 0} onClick={() => setOptions([])}>
               Просто «выполнено»
             </Chip>
-            {ANSWER_PRESETS.map((p) => (
+            {answerPresets(who).map((p) => (
               <Chip key={p.label} on={options.join('|') === p.options.join('|')} onClick={() => setOptions(p.options)}>
                 {p.label}
               </Chip>
@@ -408,9 +419,9 @@ export function NewRequestSheet({ initial, user, onClose }: { initial: ElephantN
                   .filter(Boolean),
               );
             }}
-            placeholder="Свои варианты через запятую: мутная, прозрачная, с песком"
+            placeholder={who === 'work' ? 'Свои варианты через запятую: забрал, нет на месте' : 'Свои варианты через запятую: мутная, прозрачная, с песком'}
           />
-          {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кипер увидит кнопки: {options.join(' · ')}</span>}
+          {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кнопки ответа: {options.join(' · ')}</span>}
         </div>
         {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
         {freq === 'once' ? (
