@@ -248,18 +248,28 @@ export function Empty({ children }: { children: ReactNode }) {
 
 /* ---------- Переключатели ---------- */
 
+/** Выбранный сегмент светится своим цветом: бирюза — обычный выбор, янтарь и коралл — состояние. */
+const SEG_ON: Record<'teal' | 'amber' | 'coral', string> = {
+  teal: 'text-teal-fg [text-shadow:0_0_12px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]',
+  amber: 'text-amber-fg [text-shadow:0_0_12px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]',
+  coral: 'text-coral-fg [text-shadow:0_0_12px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]',
+};
+
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
   label,
   dots,
+  tones,
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
   label: string;
   dots?: Partial<Record<T, boolean>>;
+  /** цвет выбранного варианта, если он — состояние: «внимание» янтарём, «плохо» кораллом (иначе бирюза) */
+  tones?: Partial<Record<T, 'amber' | 'coral'>>;
 }) {
   return (
     <div role="group" aria-label={label} className={`grid gap-1 rounded-2xl p-1 ${TONE.sunken}`} style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
@@ -275,7 +285,7 @@ export function Segmented<T extends string>({
               onChange(o.value);
             }}
             className={`h-11 rounded-xl text-[15px] font-extrabold transition-transform active:scale-[0.97] ${
-              on ? `${KEY} text-teal-fg [text-shadow:0_0_12px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]` : 'border border-transparent text-muted'
+              on ? `${KEY} ${SEG_ON[tones?.[o.value] ?? 'teal']}` : 'border border-transparent text-muted'
             }`}
           >
             {o.label}
@@ -287,12 +297,14 @@ export function Segmented<T extends string>({
   );
 }
 
-export function Chip({ on, children, onClick, tone = 'ink' }: { on: boolean; children: ReactNode; onClick: () => void; tone?: 'ink' | 'amber' }) {
+export function Chip({ on, children, onClick, tone = 'ink' }: { on: boolean; children: ReactNode; onClick: () => void; tone?: 'ink' | 'amber' | 'coral' }) {
   // выбранный — подсвеченное цветное стекло с чёткой гранью, текст ink (держит контраст в обеих темах); невыбранный — матовый в лунке
   const active =
     tone === 'amber'
       ? 'border-amber/60 bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-ink shadow-[inset_0_1px_0_var(--color-hl),0_0_16px_-4px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]'
-      : 'border-teal/60 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-ink shadow-(--shadow-key-on)';
+      : tone === 'coral'
+        ? 'border-coral/60 bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-ink shadow-[inset_0_1px_0_var(--color-hl),0_0_16px_-4px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]'
+        : 'border-teal/60 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-ink shadow-(--shadow-key-on)';
   return (
     <button
       type="button"

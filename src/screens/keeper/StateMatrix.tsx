@@ -206,6 +206,7 @@ function CellSheet({
             if (v === '0') onClose();
           }}
           options={LEVELS}
+          tones={{ '1': 'amber', '2': 'coral' }}
         />
         )}
         {level > 0 && (
@@ -214,7 +215,7 @@ function CellSheet({
               {meta.symptoms.map((sym) => {
                 const on = symptoms.includes(sym);
                 return (
-                  <Chip key={sym} on={on} onClick={() => toggleSymptom(shift, el, m, sym)}>
+                  <Chip key={sym} on={on} tone={level === 2 ? 'coral' : 'amber'} onClick={() => toggleSymptom(shift, el, m, sym)}>
                     {sym}
                   </Chip>
                 );
