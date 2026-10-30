@@ -335,7 +335,7 @@ export async function seedDemo() {
   ]);
   await seedRows('notes', notes);
 
-  // «Контейнеры»: опись и погрузка — около десятка ящиков разных типов; один не едет, один без габаритов
+  // «Контейнеры»: опись и погрузка — около десятка ящиков разной тары; один на базе, один без габаритов
   const box = (id: string, number: string, kind: Container['kind'], l: number | null, w: number | null, h: number | null, contents: string, extra: Partial<Container> = {}): Container => ({
     id: `demo-box-${id}`,
     number,
@@ -351,16 +351,16 @@ export async function seedDemo() {
     ...extra,
   });
   await seedRows('containers', [
-    box('1', '1', 'wheels', 200, 120, 180, 'Тумбы для слонов ×2\nСтупеньки'),
-    box('2', '2', 'wheels', 200, 120, 180, 'Тумба большая\nПодставка под ноги'),
-    box('3', '3', 'wheels', 120, 80, 150, 'Попоны праздничные ×3\nСбруя парадная'),
-    box('4', '4', 'wheels', 120, 80, 150, 'Попоны рабочие\nЦепи, карабины'),
-    box('5', '5', 'case', 120, 80, 100, 'Аптечка ветеринарная\nШприцы, бинты'),
-    box('6', '6', 'props', 120, 80, 110, 'Синяя шляпа в звёздочку\nКрасный плащ\nМячи большие ×4', { note: 'хрупкое' }),
-    box('7', 'Кофр звук 1', 'light_sound', 100, 60, 90, 'Пульт\nУдлинитель 20 м ×2'),
-    box('8', 'Кофр свет 2', 'light_sound', 100, 60, 90, 'Прожекторы ×4', { in_tour: false, note: 'остался на базе' }),
-    box('9', '9', 'luggage', 80, 60, 70, 'Личные вещи Соколова'),
-    box('10', '10', 'other', null, null, null, 'Вёдра, щётки, шланг 30 м'),
+    box('1', '1', 'wheels', 200, 120, 180, 'Тумбы для слонов ×2\nСтупеньки', { purpose: 'elephants' }),
+    box('2', '2', 'wheels', 200, 120, 180, 'Тумба большая\nПодставка под ноги', { purpose: 'elephants' }),
+    box('3', '3', 'wheels', 120, 80, 150, 'Попоны праздничные ×3\nСбруя парадная', { purpose: 'elephants' }),
+    box('4', '4', 'wheels', 120, 80, 150, 'Попоны рабочие\nЦепи, карабины', { purpose: 'elephants' }),
+    box('5', '5', 'case', 120, 80, 100, 'Аптечка ветеринарная\nШприцы, бинты', { purpose: 'elephants' }),
+    box('6', '6', 'box', 120, 80, 110, 'Синяя шляпа в звёздочку\nКрасный плащ\nМячи большие ×4', { purpose: 'props', note: 'хрупкое' }),
+    box('7', 'Кофр звук 1', 'case', 100, 60, 90, 'Пульт\nУдлинитель 20 м ×2', { purpose: 'light_sound' }),
+    box('8', 'Кофр свет 2', 'case', 100, 60, 90, 'Прожекторы ×4', { purpose: 'light_sound', in_tour: false }),
+    box('9', '9', 'bag', 80, 60, 70, 'Личные вещи Соколова', { purpose: 'personal' }),
+    box('10', '10', 'other', null, null, null, 'Вёдра, щётки, шланг 30 м', { purpose: 'household' }),
   ]);
   await seedRows('trucks', [{ id: 'demo-truck', name: 'Фура 1', length_cm: 1360, width_cm: 245, height_cm: 270, created_by: 'Соколов', updated_at: now }]);
 }

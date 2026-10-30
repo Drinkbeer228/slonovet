@@ -319,7 +319,7 @@ function TruckSheet({ edit, user, onClose, onSaved }: { edit: Truck | null; user
         <span className="px-1 text-[13px] font-semibold text-muted">Кузов изнутри, см. По умолчанию — еврофура 1360 × 245 × 270.</span>
         <div className="grid grid-cols-3 gap-2">
           {(['l', 'w', 'h'] as const).map((k) => (
-            <Field key={k} label={{ l: 'Длина', w: 'Ширина', h: 'Высота' }[k]}>
+            <Field key={k} label={{ l: 'Длина, см', w: 'Ширина, см', h: 'Высота, см' }[k]}>
               <input className={inputCls} inputMode="numeric" value={t[k]} onChange={(e) => setT({ ...t, [k]: e.target.value.replace(/\D/g, '') })} />
             </Field>
           ))}
@@ -381,7 +381,7 @@ function ExtraSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => vo
         </Field>
         <div className="grid grid-cols-4 gap-2">
           {(['n', 'l', 'w', 'h'] as const).map((k) => (
-            <Field key={k} label={{ n: 'Штук', l: 'Длина', w: 'Ширина', h: 'Высота' }[k]}>
+            <Field key={k} label={{ n: 'Штук', l: 'Длина, см', w: 'Ширина, см', h: 'Высота, см' }[k]}>
               <input className={inputCls} inputMode="numeric" value={e[k]} onChange={(ev) => setE({ ...e, [k]: ev.target.value.replace(/\D/g, '') })} placeholder={k === 'n' ? '' : 'см'} />
             </Field>
           ))}

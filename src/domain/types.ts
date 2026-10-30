@@ -230,7 +230,10 @@ export interface Supplier extends Base {
   created_by: string;
 }
 
-export type ContainerKind = 'wheels' | 'case' | 'light_sound' | 'props' | 'luggage' | 'other';
+/** Тара. 'light_sound' | 'props' | 'luggage' — старые записи до разделения на тару и «что внутри» (миграция 029 их переносит). */
+export type ContainerKind = 'wheels' | 'case' | 'box' | 'pallet' | 'bag' | 'other' | 'light_sound' | 'props' | 'luggage';
+/** Что внутри — для кого или для чего ящик. */
+export type ContainerPurpose = 'elephants' | 'props' | 'light_sound' | 'costumes' | 'household' | 'personal';
 
 /**
  * Контейнер: номер как на ящике («6», «6А», «Кофр звук 2»), тип, габариты в см, едет ли в этом туре,
@@ -240,10 +243,12 @@ export interface Container extends Base {
   number: string;
   /** '' — у старых записей, до типов */
   kind?: ContainerKind | '';
+  /** что внутри; '' — не указано */
+  purpose?: ContainerPurpose | '';
   length_cm?: number | null;
   width_cm?: number | null;
   height_cm?: number | null;
-  /** false — уехал в другой город / не едет: в погрузку не идёт, в описи остаётся */
+  /** true — в туре (идёт в погрузку), false — на базе: в погрузку не идёт, в описи остаётся */
   in_tour?: boolean;
   contents: string;
   note: string;
