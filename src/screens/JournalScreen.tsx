@@ -226,7 +226,7 @@ function ShiftCard({ shift: s }: { shift: Shift }) {
 
 /**
  * Подробности дежурства под таблицей — по важности: «Что важно» (не норма, невыполненное, замечания, передача),
- * записи, выполненные назначения; рутина (кормление, туалет, сено, мешки) — одной строкой, подробно по тапу.
+ * записи, выполненные назначения; «Кормление и уборка» (кормление, туалет, сено, мешки) — одной строкой, подробно по тапу.
  */
 function ShiftDetails({ shift }: { shift: Shift }) {
   const [openRoutine, setOpenRoutine] = useState(false);
@@ -261,7 +261,7 @@ function ShiftDetails({ shift }: { shift: Shift }) {
   const branchesText = branches ? `${branches}${b?.kinds?.length ? ` · ${b.kinds.join(', ')}` : ''}` : '—';
 
   const missed = missedTasks(requests, marks, shift);
-  // рутина одной строкой: что не так с кормлением — по имени, остальное числом
+  // кормление и уборка одной строкой: что не так с кормлением — по имени, остальное числом
   const feedIssues = FEED_TIMES.flatMap((t) => {
     const f = shift.feeds[t];
     if (!f?.done) return feedStatus(shift, t) === 'late' ? [`${t} не отмечено`] : [];
@@ -336,7 +336,7 @@ function ShiftDetails({ shift }: { shift: Shift }) {
         <div className="flex flex-col gap-3">
           <button type="button" onClick={() => setOpenRoutine(!openRoutine)} aria-expanded={openRoutine} className={`flex min-h-11 items-center gap-3 rounded-2xl px-4 py-3 text-left ${KEY}`}>
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[12px] font-extrabold tracking-wide text-muted">РУТИНА</span>
+              <span className="text-[12px] font-extrabold tracking-wide text-muted">КОРМЛЕНИЕ И УБОРКА</span>
               <span className="text-[14px] font-semibold">{routine}</span>
             </span>
             <Icon name="down" size={18} className={`shrink-0 text-muted transition ${openRoutine ? 'rotate-180' : ''}`} />
