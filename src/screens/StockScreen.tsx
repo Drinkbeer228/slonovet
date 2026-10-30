@@ -106,7 +106,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       {low.length > 0 && (
         <Plate glow="amber" halo className="flex flex-col p-4">
           <span className="pb-1 text-[12px] font-extrabold tracking-wide text-amber-fg">ЗАКАНЧИВАЕТСЯ</span>
-          {/* у каждой — заказано ли и сколько взять на 2 недели; не заказано — «Купить» одним нажатием */}
+          {/* у каждой — заказано ли и сколько взять на неделю; не заказано — «В закупку» одним нажатием */}
           {low.map((v) => {
             const p = purchases.find((x) => x.item_id === v.item.id);
             const hint = orderHint(v);
@@ -127,8 +127,8 @@ export function StockScreen({ user }: { user: CurrentUser }) {
                   </span>
                 </span>
                 {!p && (
-                  <button type="button" onClick={() => setBuy({ itemId: v.item.id, amount: hint?.text ?? '' })} className={`h-11 shrink-0 rounded-xl px-3.5 text-[14px] font-bold text-ink ${KEY}`}>
-                    Купить
+                  <button type="button" onClick={() => setBuy({ itemId: v.item.id, amount: hint?.text ?? '' })} aria-label={`${v.item.name} — в закупку`} className={`h-11 shrink-0 rounded-xl px-3.5 text-[14px] font-bold text-ink ${KEY}`}>
+                    В закупку
                   </button>
                 )}
               </div>
