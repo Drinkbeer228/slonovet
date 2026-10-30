@@ -215,7 +215,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
         <span className="text-[13px] font-semibold text-muted">
           Поставил: {r.author_name}, {relDate(localDay(r.created_at))}
           {r.frequency !== 'once' ? ` · ${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}` : !p.last ? ' · ждёт отметки' : ''}
-          {todo && !todo.done ? ' · в этой смене не отмечено' : ''}
+          {todo && !todo.done && r.frequency !== 'once' ? ' · в этой смене не отмечено' : ''}
         </span>
         {assignee && (
           <span className={`text-[13px] font-bold ${resting ? 'text-amber-fg' : 'text-ink2'}`}>
