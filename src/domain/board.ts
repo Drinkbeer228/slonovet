@@ -1,5 +1,5 @@
 import { isoDate, localDay } from '../lib/dates';
-import { byPriority, deadlineKey } from './shift';
+import { byPriority, closingMarks, deadlineKey, overdue } from './shift';
 import type { Purchase, RequestMark, VetRequest } from './types';
 
 /*
@@ -23,7 +23,8 @@ const requestType = (r: VetRequest): 'elephants' | 'work' => (r.elephant === 'wo
 function requestGroup(r: VetRequest, marks: RequestMark[], today: string): BoardGroup {
   if (r.status === 'closed') return 'closed';
   if (r.frequency !== 'once') return r.due_date && r.due_date < today ? 'closed' : r.urgent ? 'today' : 'courses';
-  if (marks.some((m) => m.request_id === r.id && !m.deleted)) return 'closed';
+  // «не получилось» задачу не закрывает — закрывает отметка выполнения
+  if (closingMarks(marks, r).length) return 'closed';
   // срочное — всегда в «Сегодня», даже если поставлено на будущий день
   return r.on_date && r.on_date > today && !r.urgent ? 'planned' : 'today';
 }
@@ -68,6 +69,19 @@ export function boardGroups(
   out.courses.sort(byItemPriority);
   out.planned.sort(byItemPriority);
   out.closed = out.closed.sort((a, b) => cmp(touched(b), touched(a))).slice(0, CLOSED_LIMIT);
+  return out;
+}
+
+/** Что требует внимания на доске: просроченное и срочное без отметки; у закупок — новые срочные. По типам — для точек фильтра. */
+export function boardAttention(requests: VetRequest[], purchases: Purchase[], marks: RequestMark[], now = new Date()): Record<BoardType, number> {
+  const out: Record<BoardType, number> = { elephants: 0, work: 0, purchases: 0 };
+  const today = isoDate(now);
+  for (const r of requests) {
+    if (r.deleted || requestGroup(r, marks, today) === 'closed') continue;
+    const done = closingMarks(marks, r).length > 0;
+    if (overdue(r, done, now) || (r.urgent && r.frequency === 'once' && !done)) out[requestType(r)]++;
+  }
+  for (const p of purchases) if (!p.deleted && p.status === 'new' && p.urgent) out.purchases++;
   return out;
 }
 

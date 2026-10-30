@@ -1,6 +1,7 @@
 // Задачи на день и час, просрочка и «новое в обсуждении».
 import { describe, expect, it } from 'vitest';
-import { dutyTodos, overdue, requestTodos, whenLabel } from './shift';
+import { dutyTodos, onRestDay, overdue, requestTodos, whenLabel } from './shift';
+import { boardAttention, boardGroups } from './board';
 import { unreadCount, unreadRequests } from '../lib/comments';
 import type { RequestComment, RequestMark, Shift, VetRequest } from './types';
 
@@ -28,7 +29,8 @@ describe('разовая задача на конкретный день', () =>
 
   it('просрочена: после своего часа без отметки или на следующий день; с отметкой — нет', () => {
     expect(overdue(pills, false, new Date(2026, 9, 26, 15, 59))).toBe(false);
-    expect(overdue(pills, false, new Date(2026, 9, 26, 16, 0))).toBe(true);
+    expect(overdue(pills, false, new Date(2026, 9, 26, 16, 0))).toBe(false); // «к 16:00» — ровно в 16:00 ещё вовремя
+    expect(overdue(pills, false, new Date(2026, 9, 26, 16, 1))).toBe(true);
     expect(overdue(pills, false, new Date(2026, 9, 27, 8, 0))).toBe(true);
     expect(overdue(pills, true, new Date(2026, 9, 27, 8, 0))).toBe(false);
     // без часа — просрочена только со следующего дня; регулярная — никогда
@@ -110,5 +112,44 @@ describe('назначения на «Дежурстве»', () => {
     const list = [req('hoz'), req('pretty', { elephant: 'Претти' }), req('all', { elephant: 'all' })];
     expect(dutyTodos(list, [], shift('2026-10-26')).map((t) => t.req.id).sort()).toEqual(['all', 'pretty']);
     expect(requestTodos([list[0]], [], shift('2026-10-26'))).toHaveLength(1);
+  });
+});
+
+describe('этап A: «не получилось», срочное на завтра, задача после полуночи, отсыпной', () => {
+  const noted = (request_id: string, shift_id: string, note: string): RequestMark => ({ ...mark(request_id, shift_id), id: `m-${request_id}-${note}`, note });
+  const fix = req('fix', { options: ['сделано', 'не получилось'], on_date: '2026-10-26' });
+
+  it('«не получилось» не закрывает разовую задачу: она остаётся в смене и на доске, «сделано» — закрывает', () => {
+    const failed = [noted('fix', 's-2026-10-26', 'не получилось — нет ключа')];
+    expect(requestTodos([fix], failed, shift('2026-10-26'))[0].done).toBe(false);
+    expect(ids([fix], failed, shift('2026-10-27'))).toEqual(['fix']);
+    expect(boardGroups([fix], [], failed, 'all', new Date(2026, 9, 27)).today.map((i) => i.kind === 'request' && i.req.id)).toEqual(['fix']);
+    const ok = [...failed, noted('fix', 's-2026-10-27', 'сделано')];
+    expect(boardGroups([fix], [], ok, 'all', new Date(2026, 9, 27)).closed).toHaveLength(1);
+  });
+
+  it('срочное на будущий день видно в смене сразу — как на доске', () => {
+    expect(ids([req('u', { urgent: true, on_date: '2026-10-28' })], [], shift('2026-10-26'))).toEqual(['u']);
+  });
+
+  it('задача «на сегодня», поставленная после полуночи, видна в смене, принятой вчера', () => {
+    const tonight = req('t', { on_date: '2026-10-27' });
+    expect(ids([tonight], [], shift('2026-10-26'))).toEqual([]);
+    expect(requestTodos([tonight], [], shift('2026-10-26'), '2026-10-27').map((t) => t.req.id)).toEqual(['t']);
+  });
+
+  it('доска считает, что требует внимания: просроченное и срочное без отметки, по типам', () => {
+    const late = req('late', { on_date: '2026-10-25' });
+    const urgentEl = req('ue', { elephant: 'Марго', urgent: true });
+    expect(boardAttention([late, urgentEl, fix], [], [], new Date(2026, 9, 26, 12))).toEqual({ elephants: 1, work: 1, purchases: 0 });
+  });
+
+  it('отсыпной: после суточной смены 24 часа; после короткой — нет', () => {
+    const day = { ...shift('2026-10-26'), keeper_id: 'dima', status: 'handed', accepted_at: '2026-10-26T05:00:00Z', handed_at: '2026-10-27T05:00:00Z' } as Shift;
+    const at = (iso: string) => Date.parse(iso);
+    expect(onRestDay('dima', [day], at('2026-10-27T12:00:00Z'))).toBe(true);
+    expect(onRestDay('dima', [day], at('2026-10-28T06:00:00Z'))).toBe(false);
+    expect(onRestDay('dima', [{ ...day, accepted_at: '2026-10-27T01:00:00Z' }], at('2026-10-27T12:00:00Z'))).toBe(false);
+    expect(onRestDay('other', [day], at('2026-10-27T12:00:00Z'))).toBe(false);
   });
 });

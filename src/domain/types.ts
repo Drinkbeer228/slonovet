@@ -103,6 +103,8 @@ export interface VetRequest extends Base {
   on_date?: string | null;
   /** к которому часу, «16:00» — необязательно */
   at_time?: string | null;
+  /** кому поручено (кипер или директор) — необязательно; задача по-прежнему про слона или «Работу» */
+  assignee_id?: string | null;
   created_at: string;
 }
 

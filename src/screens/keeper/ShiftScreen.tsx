@@ -5,7 +5,7 @@ import { FEED_TIMES, acceptedBy, currentShift, dutyTodos, lastHanded, needsRollo
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
-import { localDay, longDate, relDate, timeOf } from '../../lib/dates';
+import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Plate, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
@@ -241,7 +241,7 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   const marks = useRows('request_marks');
 
   const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done);
-  const reqLeft = dutyTodos(requests, marks, shift).filter((t) => !t.done);
+  const reqLeft = dutyTodos(requests, marks, shift, isoDate()).filter((t) => !t.done);
   const flags = shiftFlags(shift);
   const warnings = [
     feedsLeft.length ? `Не отмечено кормление: ${feedsLeft.join(', ')}` : null,

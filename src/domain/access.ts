@@ -23,6 +23,10 @@ export const canEdit = (section: OwnedSection, role: Role) => (EDITORS[section].
 /** Закрыть или вернуть в работу задачу: автор или те, кто ведёт задачи. */
 export const canCloseRequest = (req: { author_id: string | null }, user: { id: string; role: Role }) => req.author_id === user.id || canEdit('requests', user.role);
 
+/** Отменить отметку задачи: кто отметил, дежурный этой смены или те, кто ведёт задачи (врач, директор…). */
+export const canUndoMark = (m: { done_by: string }, user: { id: string; full_name: string; role: Role }, shiftKeeper: string | null) =>
+  m.done_by === user.full_name || shiftKeeper === user.id || canEdit('requests', user.role);
+
 /** Ведёт дежурство (отметки, кормление, сдача) — только кипер. База пускает и системного админа, но экран строже. */
 export const canWorkShift = (role: Role) => role === 'keeper';
 
