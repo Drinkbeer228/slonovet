@@ -4,10 +4,11 @@ import { useMemo, useState } from 'react';
 import { addStockMove, countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
-import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
+import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
+import { LEDGER_FILTERS, currentStop, ledger, type LedgerFilter } from '../domain/stops';
 import { newId, put, useRows } from '../lib/store';
-import { localDay, plural, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
+import { localDay, plural, relDate, shortDate, timeOf } from '../lib/dates';
+import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Segmented, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 const MOVE_LABEL: Partial<Record<string, string>> = { in: 'приход', fix: 'поправка', waste: 'брак', extra: 'вне рациона' };
@@ -98,11 +99,6 @@ export function StockScreen({ user }: { user: CurrentUser }) {
   }, [items, moves, diets]);
   const noQty = useMemo(() => itemsWithoutQty(diets), [diets]);
   const low = [...views.values()].filter((v) => v.low).sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
-  const history = [...moves]
-    .filter((m) => m.reason === 'in' || m.reason === 'fix' || m.reason === 'waste' || m.reason === 'extra')
-    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-    .slice(0, 15);
-  const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
   const canWrite = canEdit('stock', user.role);
   const [adding, setAdding] = useState(false);
 
@@ -182,31 +178,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         {canWrite && ' Нажми на позицию, чтобы поправить остаток, переименовать или удалить.'}
       </p>
 
-      {history.length > 0 && (
-        <Section id="stock-history" title="Приход, выдачи и брак">
-          <Card className="divide-y divide-edge overflow-hidden">
-            {history.map((m) => {
-              const it = items.find((i) => i.id === m.item_id);
-              const unit = it?.kind === 'count' ? countWords(it.id, it.unit)[2] : 'кг';
-              return (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-[14px] font-bold">{nameOf(m.item_id)}</span>
-                    <span className="text-[12px] font-semibold text-muted">
-                      {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unit}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
-                      {m.note ? `: ${m.note}` : ''} · {relDate(localDay(m.created_at))} {timeOf(m.created_at)} · {m.author_name}
-                    </span>
-                  </span>
-                  <span className={`text-[15px] font-extrabold ${Number(m.delta) > 0 ? 'text-teal' : 'text-ink2'}`}>
-                    {Number(m.delta) > 0 ? '+' : '−'}
-                    {fmtNum(Math.abs(Number(m.delta)))} {unit}
-                  </span>
-                </div>
-              );
-            })}
-          </Card>
-        </Section>
-      )}
+      <Ledger moves={moves} items={items} />
 
       <AdjustSheet view={edit} user={user} shiftId={shiftId} onClose={() => setEdit(null)} />
       <AddItemSheet open={adding} items={items} user={user} shiftId={shiftId} onClose={() => setAdding(false)} />
@@ -600,5 +572,83 @@ function AddItemSheet({
         </Field>
       </div>
     </Sheet>
+  );
+}
+
+/** Одна строка ленты: что, сколько, когда, кто. */
+function LedgerRow({ m, items }: { m: StockMove; items: StockItem[] }) {
+  const it = items.find((i) => i.id === m.item_id);
+  const unit = it?.kind === 'count' ? countWords(it.id, it.unit)[2] : 'кг';
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[14px] font-bold">{it?.name ?? m.item_id}</span>
+        <span className="text-[12px] font-semibold text-muted">
+          {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unit}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
+          {m.note ? `: ${m.note}` : ''} · {relDate(localDay(m.created_at))} {timeOf(m.created_at)} · {m.author_name}
+        </span>
+      </span>
+      <span className={`text-[15px] font-extrabold ${Number(m.delta) > 0 ? 'text-teal' : 'text-ink2'}`}>
+        {Number(m.delta) > 0 ? '+' : '−'}
+        {fmtNum(Math.abs(Number(m.delta)))} {unit}
+      </span>
+    </div>
+  );
+}
+
+/** Сколько строк показывать сразу — остальное по «Показать ещё». */
+const LEDGER_PAGE = 20;
+
+/**
+ * «Приход, выдачи и брак»: по умолчанию — только текущий город (с дня приезда); прошлые города — свёрнутым архивом.
+ * Сверху фильтр «Все / Приходы / Выдачи / Брак». История не теряется — она просто не мешает.
+ */
+function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
+  const stops = useRows('tour_stops');
+  const [filter, setFilter] = useState<LedgerFilter>('all');
+  const [more, setMore] = useState(false);
+  const [archive, setArchive] = useState(false);
+  const { start, current, archive: past } = ledger(moves, stops, filter);
+  const here = currentStop(stops);
+  if (!current.length && !past.length && filter === 'all') return null;
+  const shown = more ? current : current.slice(0, LEDGER_PAGE);
+  return (
+    <Section id="stock-history" title="Приход, выдачи и брак" aside={here ? `${here.city} · с ${shortDate(here.arrive_on)}` : `с ${shortDate(start)}`}>
+      <Segmented label="Какие движения" value={filter} onChange={setFilter} options={LEDGER_FILTERS} />
+      {current.length ? (
+        <Card className="divide-y divide-edge overflow-hidden">
+          {shown.map((m) => (
+            <LedgerRow key={m.id} m={m} items={items} />
+          ))}
+        </Card>
+      ) : (
+        <Empty>{here ? `В ${here.city} пока ничего` : 'За последние 30 дней ничего'}</Empty>
+      )}
+      {current.length > LEDGER_PAGE && (
+        <Button full onClick={() => setMore(!more)}>
+          {more ? 'Свернуть' : `Показать ещё ${current.length - LEDGER_PAGE}`}
+        </Button>
+      )}
+      {past.length > 0 && (
+        <>
+          <Button full onClick={() => setArchive(!archive)}>
+            {archive ? 'Скрыть архив' : `Архив прошлых гастролей · ${past.reduce((n, g) => n + g.moves.length, 0)}`}
+          </Button>
+          {archive &&
+            past.map((g) => (
+              <div key={g.stop?.id ?? '_before'} className="flex flex-col gap-1.5">
+                <span className="px-1 text-[13px] font-extrabold text-muted">
+                  {g.stop ? `${g.stop.city} · ${shortDate(g.stop.arrive_on)}${g.stop.depart_on ? `–${shortDate(g.stop.depart_on)}` : ''}` : 'Раньше'}
+                </span>
+                <Card className="divide-y divide-edge overflow-hidden">
+                  {g.moves.map((m) => (
+                    <LedgerRow key={m.id} m={m} items={items} />
+                  ))}
+                </Card>
+              </div>
+            ))}
+        </>
+      )}
+    </Section>
   );
 }

@@ -205,6 +205,15 @@ export interface MoveItem extends Base {
   created_by: string;
 }
 
+/** Город гастролей: с какого дня труппа там (и до какого). Текущий — последний по дате приезда. */
+export interface TourStop extends Base {
+  city: string;
+  arrive_on: string;
+  depart_on: string | null;
+  note: string;
+  created_by: string;
+}
+
 export type PurchaseStatus = 'new' | 'ordered' | 'done' | 'cancelled';
 
 /** Закупка: кто-то просит купить; администратор/директор отмечает «заказано» и «привезли». */
@@ -236,6 +245,7 @@ export interface TableMap {
   diets: Diet;
   move_items: MoveItem;
   purchases: Purchase;
+  tour_stops: TourStop;
 }
 
 export type TableName = keyof TableMap;
@@ -252,6 +262,7 @@ export const TABLES: TableName[] = [
   'diets',
   'move_items',
   'purchases',
+  'tour_stops',
 ];
 
 export interface CurrentUser {
