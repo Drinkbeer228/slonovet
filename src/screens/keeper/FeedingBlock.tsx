@@ -1,4 +1,5 @@
 import { ELEPHANTS } from '../../domain/elephants';
+import { feedStatus } from '../../domain/monitoring';
 import { cycleEaten, setFeedDone, setFeedGiven, setFeedKg, setHay } from '../../domain/actions';
 import { categoryOf, feedUsage, weighedItem } from '../../domain/stock';
 import { FEED_TIMES } from '../../domain/shift';
@@ -53,6 +54,10 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
           const done = Boolean(f?.done);
           const { title, prep } = mealTitle(diets, t);
           const cancelled = mealCancelled(base, diets, t);
+          // время прошло, а не отмечено — красным; было до приёма смены — бледно, не этого дежурного
+          const st = feedStatus(shift, t);
+          const late = st === 'late' && !cancelled;
+          const outside = st === 'outside' && !cancelled;
           return (
             <div key={t} className="border-b border-edge">
               <button
@@ -62,10 +67,12 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
                 onClick={() => setFeedDone(shift, t, !done, user)}
                 className="flex w-full items-center gap-3 px-4 py-3 text-left"
               >
-                <span className={`w-12 text-[15px] font-extrabold ${done ? 'text-faint' : ''}`}>{t}</span>
+                <span className={`w-12 text-[15px] font-extrabold ${done || outside ? 'text-faint' : late ? 'text-coral-fg' : ''}`}>{t}</span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className={`text-[15px] font-bold ${done || cancelled ? 'text-faint' : ''}`}>{title}</span>
-                  <span className={`text-[12px] font-semibold ${cancelled && !done ? 'text-amber-fg' : 'text-muted'}`}>{done ? 'выдано' : cancelled ? 'в дороге — отменено' : prep}</span>
+                  <span className={`text-[15px] font-bold ${done || cancelled || outside ? 'text-faint' : ''}`}>{title}</span>
+                  <span className={`text-[12px] font-semibold ${cancelled && !done ? 'text-amber-fg' : late ? 'text-coral-fg' : 'text-muted'}`}>
+                    {done ? 'выдано' : cancelled ? 'в дороге — отменено' : late ? `не отмечено — время прошло${prep ? ` · ${prep}` : ''}` : outside ? 'было до приёма смены' : prep}
+                  </span>
                 </span>
                 <Tick on={done} />
               </button>

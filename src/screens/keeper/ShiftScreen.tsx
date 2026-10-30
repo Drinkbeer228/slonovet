@@ -11,7 +11,7 @@ import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { RoadBanner } from '../common/RoadBanner';
 import { mealCancelled } from '../../domain/road';
-import { carryFlags } from '../../domain/monitoring';
+import { carryFlags, durationText, feedStatus, noDutySince } from '../../domain/monitoring';
 import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
@@ -156,7 +156,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
       {accept && (
         <div className="flex flex-col gap-2">
-          <p className="m-0 px-1 text-[14px] font-semibold text-ink2">Сейчас никто не дежурит.</p>
+          <NoDutyLine />
           {accept}
         </div>
       )}
@@ -243,7 +243,8 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   const marks = useRows('request_marks');
 
   const { diets: roadDiets, base: baseDiets } = useEffectiveDiets();
-  const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done && !mealCancelled(baseDiets, roadDiets, t));
+  // только пропущенные в эту смену: до приёма и ещё не наступившие — не этого дежурного
+  const feedsLeft = FEED_TIMES.filter((t) => feedStatus(shift, t) === 'late' && !mealCancelled(baseDiets, roadDiets, t));
   const reqLeft = dutyTodos(requests, marks, shift, isoDate()).filter((t) => !t.done);
   const flags = shiftFlags(shift);
   const carry = carryFlags(useRows('shifts'), shift);
@@ -324,5 +325,18 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
         <p className="m-0 text-[13px] font-semibold text-muted">Сменщик увидит у себя «Тебе сдали смену» и нажмёт «Принять». Не увидит (нет связи), заступит сам.</p>
       </div>
     </Sheet>
+  );
+}
+
+/** «Сейчас никто не дежурит — с 08:00, 11 ч 28 мин»: дольше получаса — янтарём, слоны без присмотра. */
+function NoDutyLine() {
+  const gap = noDutySince(useRows('shifts'));
+  if (!gap) return <p className="m-0 px-1 text-[14px] font-semibold text-ink2">Сейчас никто не дежурит.</p>;
+  const long = gap.minutes >= 30;
+  return (
+    <p className={`m-0 px-1 text-[14px] font-semibold ${long ? 'text-amber-fg' : 'text-ink2'}`}>
+      Сейчас никто не дежурит — с {relDate(localDay(gap.from))} {timeOf(gap.from)}
+      {long ? `, уже ${durationText(gap.minutes)}` : ''}.
+    </p>
   );
 }
