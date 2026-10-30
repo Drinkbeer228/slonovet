@@ -7,7 +7,7 @@ import { isoDate, localDay, relDate, shortDate, timeOf } from '../lib/dates';
 import { arrivePurchase, setPurchaseStatus } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { categoryOf, countWords, fmtNum, packWords, toStockUnits } from '../domain/stock';
-import { Button, Card, Check, Chip, DateInput, Field, Section, Sheet, UrgentBadge, inputCls, toast } from '../ui/kit';
+import { Button, Card, Check, Chip, DateInput, Field, KEY, Section, Sheet, UrgentBadge, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
   new: { label: 'ждёт', cls: 'text-ink2' },
@@ -130,14 +130,14 @@ export function PurchaseRow({
         </span>
       </button>
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full bg-surface2 px-2.5 py-1 text-[13px] font-bold ${STATUS[p.status].cls}`}>{statusText(p)}</span>
+        <span className={`rounded-full border border-edge-hi bg-surface2 px-2.5 py-1 text-[13px] font-bold shadow-[inset_0_1px_0_var(--color-hl)] ${STATUS[p.status].cls}`}>{statusText(p)}</span>
         {buyer && p.status === 'new' && (
-          <button type="button" onClick={() => onOrder(p)} className="h-11 rounded-full border border-teal px-4 text-[14px] font-bold text-teal">
+          <button type="button" onClick={() => onOrder(p)} className="h-11 rounded-full border border-teal/50 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] px-4 text-[14px] font-bold text-teal-fg shadow-(--shadow-key-on) transition-transform active:scale-[0.97]">
             Заказано
           </button>
         )}
         {buyer && isActive(p) && (
-          <button type="button" onClick={() => onArrive(p)} className="h-11 rounded-full border border-line px-4 text-[14px] font-bold text-ink2">
+          <button type="button" onClick={() => onArrive(p)} className={`h-11 rounded-full px-4 text-[14px] font-bold text-ink ${KEY}`}>
             Привезли
           </button>
         )}

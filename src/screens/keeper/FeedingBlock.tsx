@@ -5,15 +5,15 @@ import { FEED_TIMES } from '../../domain/shift';
 import type { CurrentUser, Diet, Eaten, Shift } from '../../domain/types';
 import { useState } from 'react';
 import { useRows } from '../../lib/store';
-import { Card, DecimalInput, Section, Segmented, Sheet, Stepper, Tick } from '../../ui/kit';
+import { Card, DecimalInput, LEVEL_CELL, Section, Segmented, Sheet, Stepper, Tick } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { qtyText } from '../DietScreen';
 
 const EATEN_LABEL: Record<Eaten, string> = { all: 'всё', half: '½', none: 'отказ' };
 const EATEN_CLS: Record<Eaten, string> = {
-  all: 'border-transparent bg-surface2 text-ink2',
-  half: 'border-transparent bg-amber/15 text-amber',
-  none: 'border-transparent bg-coral/15 text-coral',
+  all: LEVEL_CELL[0],
+  half: LEVEL_CELL[1],
+  none: LEVEL_CELL[2],
 };
 
 /** «запарить за 20 мин» → «запарить в 12:40» */
@@ -51,7 +51,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
           const done = Boolean(f?.done);
           const { title, prep } = mealTitle(diets, t);
           return (
-            <div key={t} className="border-b border-surface2">
+            <div key={t} className="border-b border-edge">
               <button
                 type="button"
                 role="checkbox"
@@ -76,7 +76,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
                         type="button"
                         onClick={() => cycleEaten(shift, t, el)}
                         aria-label={`${el} съела: ${EATEN_LABEL[e]}. Нажми, чтобы изменить`}
-                        className={`h-11 flex-1 rounded-[10px] border px-1 text-[13px] font-bold ${EATEN_CLS[e]}`}
+                        className={`h-11 flex-1 rounded-[10px] border px-1 text-[13px] font-bold transition-transform active:scale-[0.97] ${EATEN_CLS[e]}`}
                       >
                         {el} · {EATEN_LABEL[e]}
                       </button>
@@ -114,7 +114,7 @@ function RecipeSheet({ time, onTime, diets }: { time: string | null; onTime: (t:
           <div className="flex flex-col gap-1.5">
             <span className="text-[17px] font-extrabold">{title}</span>
             {prep && (
-              <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber/15 px-2.5 py-1 text-[13px] font-bold text-amber">
+              <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-amber/40 bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] px-2.5 py-1 text-[13px] font-bold text-amber-fg shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]">
                 <Icon name="clock" size={14} />
                 {prep}
               </span>
@@ -127,7 +127,7 @@ function RecipeSheet({ time, onTime, diets }: { time: string | null; onTime: (t:
                 <span className="pb-1 text-[15px] font-extrabold text-teal">{el}</span>
                 {meal?.items.length ? (
                   meal.items.map((it, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3 border-t border-surface2 py-2">
+                    <div key={i} className="flex items-center justify-between gap-3 border-t border-edge py-2">
                       <span className="text-[15px] text-ink2">{it.name}</span>
                       <span className={`whitespace-nowrap text-[15px] font-extrabold ${it.qty == null ? 'text-muted' : ''}`}>{qtyText(it.qty, it.unit)}</span>
                     </div>

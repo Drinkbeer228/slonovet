@@ -829,4 +829,8 @@ export const LEVEL_CELL = [
   'border-transparent bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg font-extrabold shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-coral)_55%,transparent),inset_0_0_14px_-4px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]',
 ];
 
-export const LEVEL_DOT = ['bg-dot0', 'bg-dot1', 'bg-dot2'];
+export const LEVEL_DOT = [
+  'bg-dot0',
+  'bg-dot1 shadow-[0_0_8px_color-mix(in_srgb,var(--color-dot1)_var(--glow),transparent)]',
+  'bg-dot2 shadow-[0_0_8px_color-mix(in_srgb,var(--color-dot2)_var(--glow),transparent)]',
+];

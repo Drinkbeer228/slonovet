@@ -9,7 +9,7 @@ import type { CurrentUser, ElephantName, Purchase, RequestFrequency, VetRequest 
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, LateBadge, PhotoPick, PhotoThumb, Section, Segmented, Sheet, UrgentBadge, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast, type Glow } from '../../ui/kit';
 import { canCloseRequest, canEdit } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
@@ -67,7 +67,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       <header className="flex items-center justify-between gap-3 px-1">
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Задачи</h1>
         {/* на «Закупках» — сразу форма закупки; иначе задача (на «Работе» — уже с адресатом «Работа») */}
-        <Button kind="primary" icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : setCreating(view === 'work' ? 'work' : 'Претти'))}>
+        <Button kind="accent" icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : setCreating(view === 'work' ? 'work' : 'Претти'))}>
           {view === 'purchases' ? 'Купить' : 'Новая'}
         </Button>
       </header>
@@ -86,7 +86,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
             title={
               <span className="flex items-center gap-2">
                 {GROUP_TITLE[g]}
-                <span className="rounded-full bg-surface2 px-2 py-0.5 text-[13px] font-bold text-muted">{list.length}</span>
+                <span className="rounded-full border border-edge-hi bg-surface2 px-2 py-0.5 text-[13px] font-bold text-ink2 shadow-[inset_0_1px_0_var(--color-hl)]">{list.length}</span>
               </span>
             }
             aside={
@@ -103,7 +103,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
                   i.kind === 'request' ? (
                     <BoardRequest key={i.req.id} item={i} user={user} onOpen={setOpen} />
                   ) : (
-                    <BoardCard key={i.p.id} type="purchases" label={TASK_TYPE.purchases.label}>
+                    <BoardCard key={i.p.id} type="purchases" label={TASK_TYPE.purchases.label} urgent={i.p.urgent && (i.p.status === 'new' || i.p.status === 'ordered')}>
                       <PurchaseRow p={i.p} buyer={buyer} onOpen={setOpenBuy} onOrder={setOrdering} onArrive={arrive} />
                     </BoardCard>
                   ),
@@ -131,11 +131,29 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
   );
 }
 
-/** Рамка карточки на доске: цветная полоска слева и подпись типа с иконкой — тип видно не только по цвету. */
-function BoardCard({ type, label, right, ring, children }: { type: BoardType; label: string; right?: ReactNode; ring?: string; children: ReactNode }) {
+/**
+ * Плита карточки на доске: свечение по левому краю цветом типа (слоны — teal, работа — sky, закупка — violet),
+ * у срочного и просроченного — coral. Тип читается и по иконке с подписью, не только по свету.
+ */
+function BoardCard({
+  type,
+  label,
+  right,
+  urgent,
+  late,
+  children,
+}: {
+  type: BoardType;
+  label: string;
+  right?: ReactNode;
+  urgent?: boolean;
+  late?: boolean;
+  children: ReactNode;
+}) {
   const t = TASK_TYPE[type];
+  const glow: Glow = urgent || late ? 'coral' : t.glow;
   return (
-    <Card className={`flex flex-col gap-2 border-l-4 px-4 py-3 ${t.stripe} ${ring ?? ''}`}>
+    <Plate glow={glow} halo={urgent} className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
           <Icon name={t.icon} size={15} />
@@ -144,7 +162,7 @@ function BoardCard({ type, label, right, ring, children }: { type: BoardType; la
         {right}
       </div>
       {children}
-    </Card>
+    </Plate>
   );
 }
 
@@ -163,7 +181,8 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
     <button type="button" onClick={() => onOpen(r)} className="text-left">
       <BoardCard
         type={item.type}
-        ring={!closed && r.urgent ? 'ring-2 ring-coral' : !closed && late ? 'ring-1 ring-coral/60' : undefined}
+        urgent={!closed && r.urgent}
+        late={late}
         label={item.type === 'work' ? TASK_TYPE.work.label : whoLabel(r.elephant)}
         right={
           <span className="flex items-center gap-1.5">
@@ -181,9 +200,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
           {r.status === 'closed' ? 'закрыта' : `${whenLabel(r) || FREQ_LABEL[r.frequency]}${r.due_date ? ` · до ${shortDate(r.due_date)}` : ''}`}
         </span>
         {r.frequency !== 'once' && !closed && (
-          <div className="h-1.5 overflow-hidden rounded-full bg-surface2">
-            <div className={`h-full ${TASK_TYPE[item.type].bar}`} style={{ width: `${Math.round((p.done / p.total) * 100)}%` }} />
-          </div>
+          <Meter value={p.total ? p.done / p.total : 0} tone={TASK_TYPE[item.type].glow} label="Выполнено дежурств" />
         )}
         <span className={`text-[13px] font-semibold ${closed ? 'text-ink2' : 'text-muted'}`}>
           {p.last && (r.frequency === 'once' || closed)

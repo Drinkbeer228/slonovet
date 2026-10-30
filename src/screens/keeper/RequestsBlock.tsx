@@ -72,10 +72,10 @@ function RequestCard({
           <Icon name={t.icon} size={18} />
           <span className="truncate">{who}</span>
         </h3>
-        <span className="flex shrink-0 items-center gap-1.5">
+        <span className="flex shrink-0 items-center gap-2">
           {req.urgent && !done && <UrgentBadge />}
           {late && <LateBadge />}
-          <span className="-my-1.5">
+          <span className="-my-1.5 -mr-1 ml-0.5">
             <DiscussionButton req={req} user={user} onOpen={onTalk} compact />
           </span>
         </span>
