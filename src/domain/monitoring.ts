@@ -103,3 +103,67 @@ export function elephantHistory(shifts: Shift[], el: ElephantName, days = 14, to
     };
   });
 }
+
+/* ---------- кормления по времени и дыры между сменами ---------- */
+
+/** Когда кормление этой смены: время до 08:00 — уже следующее утро (смена 08:00 → 08:00). */
+export function feedMoment(shift: Pick<Shift, 'date'>, time: string): Date {
+  const d = new Date(`${shift.date}T${time}:00`);
+  if (time < '08:00') d.setDate(d.getDate() + 1);
+  return d;
+}
+
+/**
+ * Кормление в смене: done — отмечено; outside — было до приёма или после сдачи (не этого дежурного);
+ * late — время прошло (больше часа), а не отмечено; soon — ещё впереди.
+ */
+export type FeedStatus = 'done' | 'outside' | 'late' | 'soon';
+const LATE_MS = 60 * 60_000;
+export function feedStatus(shift: Shift, time: string, now = new Date()): FeedStatus {
+  if (shift.feeds?.[time]?.done) return 'done';
+  const at = feedMoment(shift, time).getTime();
+  if (shift.accepted_at && at < Date.parse(shift.accepted_at)) return 'outside';
+  if (shift.handed_at && at > Date.parse(shift.handed_at)) return 'outside';
+  if (shift.status === 'handed' || now.getTime() > at + LATE_MS) return 'late';
+  return 'soon';
+}
+
+export interface Gap {
+  from: string;
+  to: string;
+  minutes: number;
+}
+
+/** Меньше получаса между сдачей и приёмом — обычная пересменка, не дыра. */
+const GAP_MIN = 30;
+
+/** Сколько никто не дежурил перед этой сменой: от сдачи предыдущей (по времени) до приёма этой. */
+export function gapBefore(shifts: Shift[], shift: Shift): Gap | null {
+  if (!shift.accepted_at) return null;
+  const prev = live(shifts)
+    .filter((s) => s.id !== shift.id && s.accepted_at && s.accepted_at < shift.accepted_at!)
+    .sort((a, b) => (a.accepted_at! < b.accepted_at! ? 1 : -1))[0];
+  if (!prev?.handed_at) return null;
+  const minutes = Math.round((Date.parse(shift.accepted_at) - Date.parse(prev.handed_at)) / 60_000);
+  return minutes >= GAP_MIN ? { from: prev.handed_at, to: shift.accepted_at, minutes } : null;
+}
+
+/** Сейчас никто не дежурит: с какого времени (сдача последней смены). null — кто-то на смене или смен ещё не было. */
+export function noDutySince(shifts: Shift[], now = new Date()): Gap | null {
+  const list = live(shifts);
+  if (list.some((s) => s.status === 'open')) return null;
+  const last = list.filter((s) => s.handed_at).sort((a, b) => (a.handed_at! < b.handed_at! ? 1 : -1))[0];
+  if (!last?.handed_at) return null;
+  const minutes = Math.round((now.getTime() - Date.parse(last.handed_at)) / 60_000);
+  return { from: last.handed_at, to: now.toISOString(), minutes };
+}
+
+/** «11 ч 28 мин», «45 мин», «2 сут 3 ч». */
+export function durationText(minutes: number): string {
+  const d = Math.floor(minutes / 1440);
+  const h = Math.floor((minutes % 1440) / 60);
+  const m = minutes % 60;
+  if (d) return `${d} сут${h ? ` ${h} ч` : ''}`;
+  if (h) return `${h} ч${m ? ` ${m} мин` : ''}`;
+  return `${m} мин`;
+}

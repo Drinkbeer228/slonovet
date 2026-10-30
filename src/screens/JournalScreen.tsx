@@ -9,7 +9,7 @@ import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
 import { ElephantHistorySheet } from './common/ElephantHistory';
-import { missedTasks } from '../domain/monitoring';
+import { durationText, feedStatus, gapBefore, missedTasks } from '../domain/monitoring';
 import type { ElephantName } from '../domain/types';
 import { mealTitle } from './keeper/FeedingBlock';
 import { washText } from './keeper/QuestsBlock';
@@ -152,6 +152,7 @@ function DaysView() {
 
       {(byDay.get(selected) ?? []).map((s) => (
         <Fragment key={s.id}>
+          <GapLine gap={gapBefore(all, s)} />
           <div>
             <ShiftCard shift={s} />
           </div>
@@ -263,7 +264,7 @@ function ShiftDetails({ shift }: { shift: Shift }) {
   // рутина одной строкой: что не так с кормлением — по имени, остальное числом
   const feedIssues = FEED_TIMES.flatMap((t) => {
     const f = shift.feeds[t];
-    if (!f?.done) return shift.status === 'handed' ? [`${t} не отмечено`] : [];
+    if (!f?.done) return feedStatus(shift, t) === 'late' ? [`${t} не отмечено`] : [];
     return ELEPHANTS.filter((e) => (f.eaten?.[e] ?? 'all') !== 'all').map((e) => `${e} ${EATEN[f.eaten![e]!]} в ${t}`);
   });
   const total = (pick: (e: ElephantName) => number) => ELEPHANTS.reduce((n, e) => n + pick(e), 0);
@@ -346,12 +347,13 @@ function ShiftDetails({ shift }: { shift: Shift }) {
                 {FEED_TIMES.map((t) => {
                   const f = shift.feeds[t];
                   const eaten = f?.done ? ELEPHANTS.filter((e) => (f.eaten?.[e] ?? 'all') !== 'all') : [];
+                  const st = feedStatus(shift, t);
                   return (
                     <div key={t} className="flex items-center gap-3 px-4 py-2.5 text-[14px]">
                       <span className="w-12 font-extrabold">{t}</span>
                       <span className="flex-1 font-semibold text-ink2">{mealTitle(diets, t).title}</span>
-                      <span className={`font-bold ${f?.done ? (eaten.length ? 'text-amber-fg' : 'text-teal-fg') : shift.status === 'handed' ? 'text-coral-fg' : 'text-muted'}`}>
-                        {f?.done ? (eaten.length ? eaten.map((e) => `${e} ${EATEN[f.eaten![e]!]}`).join(', ') : 'всё') : shift.status === 'handed' ? 'не отмечено' : 'ещё нет'}
+                      <span className={`font-bold ${f?.done ? (eaten.length ? 'text-amber-fg' : 'text-teal-fg') : st === 'late' ? 'text-coral-fg' : 'text-muted'}`}>
+                        {f?.done ? (eaten.length ? eaten.map((e) => `${e} ${EATEN[f.eaten![e]!]}`).join(', ') : 'всё') : st === 'late' ? 'не отмечено' : st === 'outside' ? 'не в смене' : 'ещё впереди'}
                       </span>
                     </div>
                   );
@@ -378,6 +380,18 @@ function ShiftDetails({ shift }: { shift: Shift }) {
           {next ? ` · принял ${next.keeper_name} в ${timeOf(next.accepted_at)}${next.accept_remarks ? '' : ', без замечаний'}` : ''}
         </p>
     </div>
+  );
+}
+
+/** «08:00–19:28 никто не дежурил · 11 ч 28 мин» — над сменой, если перед ней была дыра. */
+function GapLine({ gap }: { gap: ReturnType<typeof gapBefore> }) {
+  if (!gap) return null;
+  const sameDay = localDay(gap.from) === localDay(gap.to);
+  return (
+    <p className="m-0 flex items-center gap-2 rounded-xl border border-amber/40 px-3 py-2.5 text-[14px] font-bold text-amber-fg">
+      <Icon name="alert" size={16} className="shrink-0" />
+      {sameDay ? `${timeOf(gap.from)}–${timeOf(gap.to)}` : `${shortDate(localDay(gap.from))} ${timeOf(gap.from)} – ${shortDate(localDay(gap.to))} ${timeOf(gap.to)}`} никто не дежурил · {durationText(gap.minutes)}
+    </p>
   );
 }
 

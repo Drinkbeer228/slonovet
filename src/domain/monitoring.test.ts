@@ -1,6 +1,6 @@
 // Наблюдение из смены в смену: перенос проблем, пропущенные назначения, история слона.
 import { describe, expect, it } from 'vitest';
-import { carryFlags, elephantHistory, missedTasks, previousShift } from './monitoring';
+import { carryFlags, durationText, elephantHistory, feedStatus, gapBefore, missedTasks, noDutySince, previousShift } from './monitoring';
 import type { RequestMark, Shift, VetRequest } from './types';
 
 const shift = (id: string, date: string, extra: Partial<Shift> = {}): Shift =>
@@ -75,5 +75,43 @@ describe('история слона', () => {
     expect(h[1].levels.food).toBeNull(); // не отмечали и не подтверждали
     expect(h[1].feces).toBe(5);
     expect(h[2]).toMatchObject({ eaten: null, feces: null, urine: null });
+  });
+});
+
+describe('кормления по времени', () => {
+  const local = (d: string, t: string) => new Date(`${d}T${t}:00`).toISOString();
+  const s = shift('s', '2026-10-30', { status: 'open', accepted_at: local('2026-10-30', '19:28'), feeds: { '19:00': { done: true } } });
+
+  it('до приёма смены — не этого дежурного; отмечено — done; 07:00 — следующее утро', () => {
+    expect(feedStatus(s, '13:00', new Date(local('2026-10-30', '20:00')))).toBe('outside');
+    expect(feedStatus(s, '19:00', new Date(local('2026-10-30', '20:00')))).toBe('done');
+    expect(feedStatus(s, '07:00', new Date(local('2026-10-30', '23:00')))).toBe('soon');
+    expect(feedStatus(s, '07:00', new Date(local('2026-10-31', '08:30')))).toBe('late');
+  });
+
+  it('смена с утра: прошло больше часа — late, в пределах часа — ещё soon; сдана — late', () => {
+    const day = shift('d', '2026-10-30', { status: 'open', accepted_at: local('2026-10-30', '08:00') });
+    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '13:30')))).toBe('soon');
+    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '14:10')))).toBe('late');
+    expect(feedStatus({ ...day, status: 'handed', handed_at: local('2026-10-31', '08:00') }, '17:00')).toBe('late');
+  });
+});
+
+describe('дыры между сменами', () => {
+  const local = (d: string, t: string) => new Date(`${d}T${t}:00`).toISOString();
+  const a = shift('a', '2026-10-29', { accepted_at: local('2026-10-29', '08:00'), handed_at: local('2026-10-30', '08:00') });
+  const b = shift('b', '2026-10-30', { status: 'open', accepted_at: local('2026-10-30', '19:28') });
+
+  it('08:00–19:28 — 11 ч 28 мин без дежурного; пересменка меньше получаса — не дыра', () => {
+    expect(gapBefore([a, b], b)).toMatchObject({ minutes: 688 });
+    expect(durationText(688)).toBe('11 ч 28 мин');
+    const quick = { ...b, accepted_at: local('2026-10-30', '08:10') };
+    expect(gapBefore([a, quick], quick)).toBeNull();
+  });
+
+  it('сейчас никто не дежурит — с момента последней сдачи; кто-то на смене — null', () => {
+    expect(noDutySince([a], new Date(local('2026-10-30', '10:00')))?.minutes).toBe(120);
+    expect(noDutySince([a, b])).toBeNull();
+    expect(durationText(1440 + 180)).toBe('1 сут 3 ч');
   });
 });
