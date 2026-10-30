@@ -2,7 +2,7 @@
 // по последней миграции, а функция admin-users знает тех же, кто с кем работает в «Персонале».
 import { describe, expect, it } from 'vitest';
 import adminUsers from '../../supabase/functions/admin-users/index.ts?raw';
-import { EDITORS, MANAGES, canWorkShift } from './access';
+import { EDITORS, MANAGES, canTakeShift, canWorkShift } from './access';
 import type { Role } from './types';
 
 const files = import.meta.glob('../../supabase/migrations/*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -57,6 +57,16 @@ describe('права: экран = база = сервер', () => {
   it('дежурство: всем, кого экран пускает вести смену, база разрешает запись', () => {
     const allowed = db.get('shifts.write') ?? [];
     for (const r of ['keeper', 'vet', 'director', 'manager', 'admin'] as Role[]) if (canWorkShift(r)) expect(allowed).toContain(r);
+  });
+
+  it('заступить на дежурство: кому экран разрешает, тому база пишет смену (директору и администратору — только свою)', () => {
+    const allowed = db.get('shifts.write') ?? [];
+    const own = /create policy "write_own" on public\.shifts[\s\S]*?my_role\(\) in \(([^)]*)\) and keeper_id = auth\.uid\(\)/.exec(
+      Object.entries(files).sort().map(([, sql]) => sql).join('\n'),
+    );
+    expect(own).not.toBeNull();
+    const ownRoles = [...own![1].matchAll(/'(\w+)'/g)].map((m) => m[1]);
+    for (const r of ['keeper', 'vet', 'director', 'manager', 'admin'] as Role[]) if (canTakeShift(r)) expect([...allowed, ...ownRoles]).toContain(r);
   });
 
   it('«Персонал»: функция admin-users знает тех же, кто с кем работает', () => {

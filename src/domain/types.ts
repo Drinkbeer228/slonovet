@@ -68,8 +68,13 @@ export interface Shift extends Base {
   note: string;
   accepted_at: string | null;
   handed_at: string | null;
-  /** 4 цифры: телефон сдающего показывает, принимающий вводит */
+  /** прежний код передачи: новые смены его не ставят, поле осталось для старых записей */
   handover_code?: string | null;
+  /** кому сдали (он увидит «Тебе сдали смену»); пусто — сдали «кому-нибудь» */
+  handover_to?: string | null;
+  /** кто закрыл смену и как: handover — сдал сменщику, rollover — «новые сутки», takeover — приняли без сдачи, superseded — выровняла база */
+  closed_by?: string | null;
+  close_reason?: 'handover' | 'rollover' | 'takeover' | 'superseded' | null;
   /** какую смену эта приняла — замечания принимающего относятся к ней */
   accepted_from?: string | null;
   accept_remarks?: string;

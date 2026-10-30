@@ -324,7 +324,7 @@ describe('смены без связи — находки аудита, испр
     expect(String(mine[0].id)).toMatch(/^2026-10-26-[0-9a-z]{8}$/);
   });
 
-  it('Д1: у сдающего нет связи — сменщик принимает без кода, потом записи сдающего доходят и сливаются', async () => {
+  it('Д1: у сдающего нет связи — сменщик принимает сразу, потом записи сдающего доходят и сливаются', async () => {
     server.write('shifts', shift('sA', { keeper_id: 'user-a', keeper_name: 'Кипер А' }));
     const a = await phone(); // телефон кипера А
     await syncOnce(a);
@@ -334,22 +334,109 @@ describe('смены без связи — находки аудита, испр
     net.online = false;
     await a.actions.handOver(a.store.getRow('shifts', 'sA')!, 'Одри не доела вечером');
     net.online = true;
-    // Б не дождался кода и принял без него
+    // Б не стал ждать и заступил сам
     const userB = { id: 'user-b', login: 'b', full_name: 'Кипер Б', role: 'keeper' as const };
     signedIn(userB);
     server.user = { id: 'user-b', name: 'Кипер Б', role: 'keeper' };
     await b.actions.takeOverShift(b.store.getRow('shifts', 'sA')!, userB, { elephants: true }, '');
     await syncOnce(b);
     const taken = serverRow<Shift>('shifts', 'sA')!;
-    expect(taken.status).toBe('handed');
+    expect(taken.status).toBe('handed'); // прежнюю смену закрыл сервер (триггер), а не телефон Б
+    expect(taken.close_reason).toBe('takeover');
     const fresh = server.rows('shifts').find((r) => r.keeper_name === 'Кипер Б') as unknown as Shift;
     expect(fresh.status).toBe('open');
     expect(fresh.accepted_from).toBe('sA');
-    expect(fresh.accept_remarks).toMatch(/без кода/);
+    expect(fresh.accept_remarks).toMatch(/без сдачи/);
     // связь у А появилась: его заметка доходит, смена Б не тронута
     server.user = { id: 'user-a', name: 'Кипер А', role: 'keeper' };
     await syncOnce(a);
     expect(serverRow<Shift>('shifts', 'sA')!.note).toBe('Одри не доела вечером');
     expect((server.get('shifts', fresh.id) as unknown as Shift).status).toBe('open');
+  });
+
+  const userB = { id: 'user-b', login: 'b', full_name: 'Кипер Б', role: 'keeper' as const };
+  const asB = () => {
+    signedIn(userB);
+    server.user = { id: 'user-b', name: 'Кипер Б', role: 'keeper' };
+  };
+  const asA = () => {
+    signedIn(keeperA);
+    server.user = { id: 'user-a', name: 'Кипер А', role: 'keeper' };
+  };
+  const openCount = () => server.rows('shifts').filter((r) => r.status === 'open').length;
+
+  async function bothOffline() {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-26T12:00:00Z'));
+    server.write('shifts', shift('sA', { accepted_at: '2026-10-26T06:00:00.000Z' }));
+    const a = await phone();
+    await syncOnce(a);
+    const b = await phone();
+    await syncOnce(b);
+    net.online = false;
+    await a.actions.handOver(a.store.getRow('shifts', 'sA')!, 'всё спокойно', 'user-b'); // А сдал Б, оба без связи
+    vi.setSystemTime(new Date('2026-10-26T12:05:00Z'));
+    await b.actions.acceptShift(userB, { elephants: true }, { id: 'sA', remarks: '' }); // Б принял, не зная, что сдано
+    net.online = true;
+    return { a, b };
+  }
+
+  it('Э1: оба без связи, потом А выходит на связь первым — одна открытая смена, цепочка цела', async () => {
+    const { a, b } = await bothOffline();
+    asA();
+    await syncOnce(a);
+    asB();
+    await syncOnce(b);
+    const sA = serverRow<Shift>('shifts', 'sA')!;
+    expect(sA.status).toBe('handed');
+    expect(sA.handover_to).toBe('user-b');
+    expect(openCount()).toBe(1);
+    expect(server.rows('shifts').find((r) => r.status === 'open')?.accepted_from).toBe('sA');
+  });
+
+  it('Э2: Б выходит на связь первым — А потом ничего не ломает', async () => {
+    const { a, b } = await bothOffline();
+    asB();
+    await syncOnce(b);
+    expect(serverRow<Shift>('shifts', 'sA')!.status).toBe('handed'); // закрыл сервер
+    asA();
+    await syncOnce(a);
+    expect(openCount()).toBe(1);
+    expect(serverRow<Shift>('shifts', 'sA')!.note).toBe('всё спокойно'); // запись сдающего дошла
+  });
+
+  it('Э3: две смены приняты без связи — опоздавшая более старая приходит уже закрытой, никому не отказывают', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-26T10:00:00Z'));
+    const a = await phone();
+    net.online = false;
+    await a.actions.acceptShift(keeperA, {});
+    vi.setSystemTime(new Date('2026-10-26T11:00:00Z'));
+    const b = await phone();
+    await b.actions.acceptShift(userB, {});
+    net.online = true;
+    asB();
+    await syncOnce(b);
+    asA();
+    const res = await syncOnce(a);
+    expect(res.rejected).toHaveLength(0);
+    const rows = server.rows('shifts');
+    expect(rows.filter((r) => r.status === 'open').map((r) => r.keeper_name)).toEqual(['Кипер Б']);
+    expect(rows.find((r) => r.keeper_name === 'Кипер А')?.close_reason).toBe('superseded');
+  });
+
+  it('Э4: «новые сутки» — своя смена закрыта причиной rollover, новая открыта на того же человека', async () => {
+    server.write('shifts', shift('sA', { accepted_at: '2026-10-25T06:00:00.000Z' }));
+    const a = await phone();
+    await syncOnce(a);
+    await a.actions.rolloverShift(a.store.getRow('shifts', 'sA')!, keeperA);
+    await syncOnce(a);
+    const old = serverRow<Shift>('shifts', 'sA')!;
+    expect(old.status).toBe('handed');
+    expect(old.close_reason).toBe('rollover');
+    const open = server.rows('shifts').filter((r) => r.status === 'open');
+    expect(open).toHaveLength(1);
+    expect(open[0].keeper_id).toBe('user-a');
+    expect(open[0].accepted_from).toBe('sA');
   });
 });

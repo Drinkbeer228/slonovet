@@ -5,10 +5,8 @@ import { acceptedBy, dutyTodos, lastHanded, shiftFlags } from '../../domain/shif
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
-import { getSession } from '../../lib/auth';
 import { Button, CHIP, Card, Chip, KEY, Plate, Section, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
-import { WhyLink } from '../common/Why';
 
 /** Быстрые замечания при приёме — чтобы не набирать руками. */
 // частые косяки, которые оставляют сменщику (со слов слоноводов)
@@ -24,7 +22,7 @@ const REMARKS = [
   'Нет воды',
 ];
 
-/** takeover — смена, которую сдающий без связи не смог сдать: принимаем её без кода. */
+/** takeover — смена, которую не сдали (ушёл, нет связи): заступаем сразу, прежнюю закроет сервер. */
 export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: Shift }) {
   const shifts = useRows('shifts');
   const requests = useRows('requests');
@@ -34,13 +32,9 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
   const prev = takeover ?? (last && !acceptedBy(shifts, last) ? last : undefined);
   const [checks, setChecks] = useState<Record<string, boolean | undefined>>({});
   const [remarks, setRemarks] = useState('');
-  const [code, setCode] = useState('');
   // каждый пункт: true — в порядке, false — не в порядке (уйдёт в замечания), нет ответа — пусто
   const allOk = SAFETY_CHECKS.every((c) => checks[c.key] !== undefined);
   const failed = SAFETY_CHECKS.filter((c) => checks[c.key] === false);
-  const needCode = !takeover && Boolean(prev?.handover_code) && prev?.keeper_id !== user.id; // свою смену себе — без кода
-  const ready = allOk && (!needCode || code.length === 4);
-  const demo = getSession()?.mode === 'demo';
   const toggleRemark = (r: string) =>
     setRemarks((t) => {
       const parts = t.split('. ').map((x) => x.trim()).filter(Boolean);
@@ -57,7 +51,7 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
         <Plate glow="amber" halo className="flex gap-2.5 p-3.5">
           <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber-fg" />
           <span className="text-[14px] font-semibold leading-snug text-ink2">
-            Без кода: у {takeover.keeper_name} нет связи. Его дежурство отметим сданным, в журнале останется «принято без кода». Его записи дойдут, когда его телефон выйдет на связь.
+            Смена не сдана: у {takeover.keeper_name} нет связи или он ушёл. Её закроем как «принята без сдачи» и запишем, кто и когда заступил. Его записи дойдут, когда его телефон выйдет на связь.
           </span>
         </Plate>
       )}
@@ -123,38 +117,13 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
         </Section>
       )}
 
-      {needCode && (
-        <Section title="Код от дежурного" aside={<WhyLink id="handover-code" label="зачем?" />}>
-          <Card className="flex flex-col gap-2 p-4">
-            <p className="m-0 text-[14px] text-ink2">
-              Прошлый дежурный — {prev!.keeper_name} — диктует 4 цифры со своего телефона{demo ? ` (в примере — ${prev!.handover_code})` : ''}.
-            </p>
-            <input
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={4}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              aria-label="Код передачи дежурства"
-              placeholder="• • • •"
-              className={`${inputCls} text-center text-[28px] font-extrabold tracking-[0.5em]`}
-            />
-          </Card>
-        </Section>
-      )}
-
       <div className="flex flex-col gap-2">
         <Button
-          kind="primary"
+          kind="accent"
           big
           full
           icon="shield"
-          disabled={!ready}
           onClick={async () => {
-            if (needCode && code !== prev!.handover_code) {
-              toast('Код не совпадает — переспроси', 'error');
-              return;
-            }
             const all = [...failed.map((c) => `Не в порядке: ${c.label.toLowerCase()}`), remarks.trim()].filter(Boolean).join('. ');
             const safety = Object.fromEntries(SAFETY_CHECKS.map((c) => [c.key, checks[c.key] === true]));
             if (takeover) await takeOverShift(takeover, user, safety, all);
@@ -164,8 +133,7 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
         >
           {remarks.trim() || failed.length ? 'Принять с замечаниями' : 'Принять дежурство'}
         </Button>
-        {!allOk && <p className="m-0 text-center text-[13px] font-semibold text-muted">Ответь на все пункты проверки: ✓ или ✗</p>}
-        {allOk && needCode && code.length < 4 && <p className="m-0 text-center text-[13px] font-semibold text-muted">Введи код от дежурного</p>}
+        {!allOk && <p className="m-0 text-center text-[13px] font-semibold text-muted">Проверку можно пропустить: ответь, что успеешь, ✓ или ✗</p>}
       </div>
     </div>
   );

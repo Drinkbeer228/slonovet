@@ -35,18 +35,11 @@ export function acceptedBy(shifts: Shift[], shift: Shift | undefined): Shift | u
   return shift ? shifts.find((s) => s.accepted_from === shift.id) : undefined;
 }
 
-/** Код передачи: 4 случайные цифры, без «0000»-подобных повторов. */
-export function newHandoverCode(): string {
-  const rnd = () => {
-    const a = new Uint32Array(1);
-    if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(a);
-    else a[0] = Math.floor(Math.random() * 2 ** 32);
-    return a[0];
-  };
-  for (;;) {
-    const code = String(rnd() % 10000).padStart(4, '0');
-    if (new Set(code).size > 1) return code;
-  }
+/** Смене пошли вторые сутки: прошло 24 часа от приёма. Смены идут не по календарю, поэтому считаем от приёма. */
+export const ROLLOVER_HOURS = 24;
+export function needsRollover(shift: Shift, now = Date.now()): boolean {
+  if (shift.status !== 'open' || !shift.accepted_at) return false;
+  return now - Date.parse(shift.accepted_at) >= ROLLOVER_HOURS * 3600 * 1000;
 }
 
 export function sortShifts(shifts: Shift[]) {

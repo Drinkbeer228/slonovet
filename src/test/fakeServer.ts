@@ -62,6 +62,20 @@ export class FakeServer {
   write<T extends { id: string }>(table: string, row: T, at = this.now()) {
     this.t(table).set(row.id, { ...(structuredClone(row) as Row), updated_at: at });
   }
+  /** триггер shifts_relay (019): новая открытая смена закрывает более старые открытые и никогда не отказывает */
+  relayInsert(row: Row): Row {
+    if (row.status !== 'open' || row.deleted) return row;
+    const acc = (r: Row) => String(r.accepted_at ?? '');
+    const open = [...this.t('shifts').values()].filter((r) => r.status === 'open' && !r.deleted && r.id !== row.id);
+    if (open.some((r) => acc(r) > acc(row))) {
+      return { ...row, status: 'handed', handed_at: row.handed_at ?? row.accepted_at, close_reason: row.close_reason ?? 'superseded', closed_by: row.closed_by ?? row.keeper_id };
+    }
+    for (const r of open) {
+      const reason = r.id === row.accepted_from ? (r.keeper_id === row.keeper_id ? 'rollover' : 'takeover') : 'superseded';
+      this.write('shifts', { ...r, status: 'handed', handed_at: row.accepted_at, close_reason: reason, closed_by: row.keeper_id });
+    }
+    return row;
+  }
   /** отказ для этой строки, как его вернул бы PostgREST, или null */
   refuse(table: string, row: Row) {
     const f = this.fail(table, row);
@@ -194,7 +208,7 @@ export const fakeClient = {
     const cur = server.get('shifts', args.p_id);
     if (!cur) {
       const defaults = { status: 'open', safety: {}, state: {}, feeds: {}, quests: {}, hay_bales: 0, note: '', accept_remarks: '', deleted: false };
-      server.write('shifts', { ...defaults, ...args.p_row });
+      server.write('shifts', server.relayInsert({ ...defaults, ...args.p_row }));
     } else {
       // как public.apply_shift_patch: патчи вклеиваются в серверную версию
       server.write('shifts', { ...applyPatches(cur, args.p_patches), id: args.p_id });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SEED_DIETS, SEED_STOCK_ITEMS } from './seed';
 import { countPerDay, feedUsage, itemToStockUnits } from './stock';
-import { acceptedBy, currentShift, newHandoverCode, sortShifts } from './shift';
+import { acceptedBy, currentShift, needsRollover, sortShifts } from './shift';
 import type { Shift, StockMove } from './types';
 
 describe('списание корма по рациону', () => {
@@ -72,12 +72,11 @@ describe('передача смены', () => {
     ...extra,
   });
 
-  it('код — 4 цифры, не из одинаковых', () => {
-    for (let i = 0; i < 200; i++) {
-      const c = newHandoverCode();
-      expect(c).toMatch(/^\d{4}$/);
-      expect(new Set(c).size).toBeGreaterThan(1);
-    }
+  it('«новые сутки» предлагаем через 24 часа от приёма, а не в календарную полночь', () => {
+    const open = s('d', '2026-10-25', 'open', { accepted_at: '2026-10-25T08:00:00.000Z' });
+    expect(needsRollover(open, Date.parse('2026-10-26T07:59:00.000Z'))).toBe(false);
+    expect(needsRollover(open, Date.parse('2026-10-26T08:00:00.000Z'))).toBe(true);
+    expect(needsRollover({ ...open, status: 'handed' }, Date.parse('2026-10-27T08:00:00.000Z'))).toBe(false);
   });
 
   it('кто принял сданную смену', () => {
