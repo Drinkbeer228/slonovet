@@ -214,6 +214,18 @@ export interface TourStop extends Base {
   created_by: string;
 }
 
+/** Поставщик в городе гастролей: что возит, как связаться и как он себя показал (1 плохо · 2 так себе · 3 хорошо). */
+export interface Supplier extends Base {
+  city: string;
+  name: string;
+  supplies: string[];
+  phone: string;
+  address: string;
+  quality: 1 | 2 | 3 | null;
+  note: string;
+  created_by: string;
+}
+
 export type PurchaseStatus = 'new' | 'ordered' | 'done' | 'cancelled';
 
 /** Закупка: кто-то просит купить; администратор/директор отмечает «заказано» и «привезли». */
@@ -246,6 +258,7 @@ export interface TableMap {
   move_items: MoveItem;
   purchases: Purchase;
   tour_stops: TourStop;
+  suppliers: Supplier;
 }
 
 export type TableName = keyof TableMap;
@@ -263,6 +276,7 @@ export const TABLES: TableName[] = [
   'move_items',
   'purchases',
   'tour_stops',
+  'suppliers',
 ];
 
 export interface CurrentUser {

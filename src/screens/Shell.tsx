@@ -19,7 +19,7 @@ import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
 import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
 
-export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
+export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move' | 'suppliers';
 
 export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   shift: { label: 'Дежурство', icon: 'shift' },
@@ -31,6 +31,7 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   guide: { label: 'Справка', icon: 'question' },
   rating: { label: 'Мои достижения', icon: 'trophy' },
   move: { label: 'Переезд', icon: 'truck' },
+  suppliers: { label: 'Поставщики', icon: 'phone' },
 };
 
 /**
@@ -42,7 +43,7 @@ export const TABS: Tab[] = ['shift', 'requests', 'stock', 'journal'];
 
 /** Меню профиля — одно у всех; «Персонал» — тем, кто заводит людей (MANAGES). */
 export function menuTabs(role: Role): Tab[] {
-  return (['diet', 'users', 'move', 'rating', 'guide'] as Tab[]).filter((t) => t !== 'users' || Boolean(MANAGES[role]?.length));
+  return (['diet', 'users', 'move', 'suppliers', 'rating', 'guide'] as Tab[]).filter((t) => t !== 'users' || Boolean(MANAGES[role]?.length));
 }
 
 export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };

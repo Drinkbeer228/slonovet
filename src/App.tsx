@@ -16,6 +16,7 @@ import { GuideScreen } from './screens/GuideScreen';
 import { RatingScreen } from './screens/RatingScreen';
 import { logEvent } from './lib/log';
 import { MoveScreen } from './screens/MoveScreen';
+import { SuppliersScreen } from './screens/SuppliersScreen';
 import { Tour } from './screens/Tour';
 import { DevRoleSwitcher } from './screens/DevRoleSwitcher';
 import { diag } from './lib/diag';
@@ -143,6 +144,7 @@ function Main() {
           {current === 'guide' && <GuideScreen role={user.role} />}
           {current === 'rating' && <RatingScreen user={user} />}
           {current === 'move' && <MoveScreen user={user} />}
+          {current === 'suppliers' && <SuppliersScreen user={user} />}
         </div>
       </main>
       <BottomNav user={user} tabs={tabs} tab={current} onTab={setTab} />
