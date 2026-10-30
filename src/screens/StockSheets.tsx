@@ -5,7 +5,8 @@ import { STOCK_CATEGORIES, balances, categoryOf, countWords, fmtNum } from '../d
 import type { CurrentUser, Purchase, StockItem } from '../domain/types';
 import { logEvent } from '../lib/log';
 import { getRows, useRows } from '../lib/store';
-import { Button, Card, Check, Chip, Sheet, inputCls, toast } from '../ui/kit';
+import { plural } from '../lib/dates';
+import { Button, Card, Check, Chip, KEY, Sheet, Stepper, inputCls, toast } from '../ui/kit';
 import { firstNumber } from './PurchasesView';
 
 /**
@@ -26,8 +27,60 @@ const show = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 const sortItems = (items: StockItem[]) =>
   [...items].sort((a, b) => STOCK_CATEGORIES.findIndex((c) => c.id === categoryOf(a)) - STOCK_CATEGORIES.findIndex((c) => c.id === categoryOf(b)) || a.sort - b.sort);
 
-/** Строка «позиция — сколько»: поле числа и единица справа. */
+const isSacks = (it: StockItem) => unitOf(it).label === 'мешков';
+
+/** Открытый мешок — четвертями: так на складе и смотрят («полный и ещё ¾»). */
+const FRAC = [0, 0.25, 0.5, 0.75];
+const FRAC_LABEL = ['—', '¼', '½', '¾'];
+const split = (v: number) => {
+  const q = Math.round(v * 4) / 4;
+  const full = Math.floor(q);
+  return { full, frac: q - full };
+};
+/** «3 + ¾», «¼», «2» */
+const sacksText = (v: number) => {
+  const { full, frac } = split(v);
+  const f = frac ? FRAC_LABEL[FRAC.indexOf(frac)] : '';
+  return full && f ? `${full} + ${f}` : f || String(full);
+};
+
+/** Мешки при пересчёте: полные — кнопками, открытый — одной кнопкой по кругу: — → ¼ → ½ → ¾. */
+function SackRow({ it, value, onChange, hint }: { it: StockItem; value: string; onChange: (v: string) => void; hint?: string }) {
+  const { full, frac } = split(num(value));
+  const set = (f: number, fr: number) => onChange(show(f + fr));
+  const i = FRAC.indexOf(frac);
+  return (
+    <div className="flex min-h-11 items-center gap-2 px-4 py-2">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[15px] font-bold">{it.name}</span>
+        <span className="text-[12px] font-semibold text-muted">{hint ?? `${sacksText(num(value))} ${frac ? 'мешка' : plural(full, 'мешок', 'мешка', 'мешков')}`}</span>
+      </span>
+      <Stepper label={`${it.name}: полных мешков`} value={full} onChange={(f) => set(f, frac)} />
+      <button
+        type="button"
+        onClick={() => set(full, FRAC[(i + 1) % FRAC.length])}
+        aria-label={`${it.name}: открытый мешок — ${frac ? FRAC_LABEL[i] : 'нет'}. Нажми, чтобы изменить`}
+        className={`h-11 w-12 shrink-0 rounded-xl text-[16px] font-extrabold ${frac ? 'text-teal-fg' : 'text-muted'} ${KEY}`}
+      >
+        {frac ? `+${FRAC_LABEL[i]}` : '—'}
+      </button>
+    </div>
+  );
+}
+
+/** Строка «позиция — сколько»: поле числа и единица справа (мешки при поставке — кнопками −/+, целыми). */
 function AmountRow({ it, value, onChange, hint }: { it: StockItem; value: string; onChange: (v: string) => void; hint?: string }) {
+  if (isSacks(it))
+    return (
+      <div className="flex min-h-11 items-center gap-3 px-4 py-2">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-bold">{it.name}</span>
+          {hint && <span className="text-[12px] font-semibold text-muted">{hint}</span>}
+        </span>
+        <Stepper label={`${it.name}: мешков`} value={Math.round(num(value))} onChange={(n) => onChange(String(n))} />
+        <span className="w-14 shrink-0 text-[13px] font-semibold text-muted">мешков</span>
+      </div>
+    );
   return (
     <label className="flex min-h-11 items-center gap-3 px-4 py-2">
       <span className="flex min-w-0 flex-1 flex-col">
@@ -159,7 +212,13 @@ export function RecountSheet({ open, user, shiftId, onClose }: { open: boolean; 
   useEffect(() => {
     if (!open) return;
     const bal = balances(getRows('stock_moves'));
-    const now = Object.fromEntries(getRows('stock_items').map((it) => [it.id, show(Math.max(0, unitOf(it).fromStock(bal.get(it.id) ?? 0)))]));
+    const now = Object.fromEntries(
+      getRows('stock_items').map((it) => {
+        const v = Math.max(0, unitOf(it).fromStock(bal.get(it.id) ?? 0));
+        // мешки — до четверти, как их видно на складе
+        return [it.id, show(isSacks(it) ? Math.round(v * 4) / 4 : v)];
+      }),
+    );
     setVal(now);
     setStart(now);
   }, [open]);
@@ -191,11 +250,16 @@ export function RecountSheet({ open, user, shiftId, onClose }: { open: boolean; 
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="m-0 px-1 text-[13px] font-semibold text-muted">В полях — сколько сейчас по приложению. Поправь, где на складе иначе. Крупы — мешками: «3,75» = 3 полных и ¾.</p>
+        <p className="m-0 px-1 text-[13px] font-semibold text-muted">Стоит то, что сейчас по приложению. Поправь, где на складе иначе. Мешки: полные — «−/+», открытый — кнопка справа (— ¼ ½ ¾).</p>
         <Card className="divide-y divide-edge overflow-hidden">
-          {sorted.map((it) => (
-            <AmountRow key={it.id} it={it} value={val[it.id] ?? ''} onChange={(v) => setVal({ ...val, [it.id]: v })} hint={(val[it.id] ?? '') !== (start[it.id] ?? '') ? `было ${start[it.id]}` : undefined} />
-          ))}
+          {sorted.map((it) => {
+            const was = (val[it.id] ?? '') !== (start[it.id] ?? '');
+            return isSacks(it) ? (
+              <SackRow key={it.id} it={it} value={val[it.id] ?? ''} onChange={(v) => setVal({ ...val, [it.id]: v })} hint={was ? `было ${sacksText(num(start[it.id] ?? '0'))}` : undefined} />
+            ) : (
+              <AmountRow key={it.id} it={it} value={val[it.id] ?? ''} onChange={(v) => setVal({ ...val, [it.id]: v })} hint={was ? `было ${start[it.id]}` : undefined} />
+            );
+          })}
         </Card>
       </div>
     </Sheet>
