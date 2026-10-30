@@ -7,11 +7,12 @@ import { haptics } from '../lib/haptics';
 
 /* ---------- Кнопки ---------- */
 
-type BtnKind = 'primary' | 'light' | 'ghost' | 'danger';
+type BtnKind = 'primary' | 'light' | 'tonal' | 'ghost' | 'danger';
 
 const BTN: Record<BtnKind, string> = {
   primary: 'bg-teal text-teal-ink border-transparent',
   light: 'bg-ink text-bg border-transparent',
+  tonal: 'bg-teal/10 text-teal border-transparent active:bg-teal active:text-teal-ink',
   ghost: 'bg-transparent text-ink border-line',
   danger: 'bg-transparent text-coral border-coral/50',
 };
@@ -701,8 +702,8 @@ export function FilePreview({ file, onRemove }: { file: File; onRemove: () => vo
 
 export const LEVEL_CELL = [
   'border-transparent bg-surface2 text-faint font-semibold',
-  'border-amber bg-amber/15 text-amber font-extrabold',
-  'border-coral bg-coral/15 text-coral font-extrabold',
+  'border-transparent bg-amber/15 text-amber font-extrabold',
+  'border-transparent bg-coral/15 text-coral font-extrabold',
 ];
 
 export const LEVEL_DOT = ['bg-dot0', 'bg-dot1', 'bg-dot2'];

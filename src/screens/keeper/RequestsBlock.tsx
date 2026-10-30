@@ -64,31 +64,36 @@ function RequestCard({
   const when = whenLabel(req);
   const multi = needed > 1;
   const who = whoLabel(req.elephant);
+  const tag = 'inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-[12px] font-bold text-ink2';
   return (
-    <Card className={`flex flex-col gap-2 border-l-4 p-3 ${t.stripe} ${!done && req.urgent ? 'ring-2 ring-coral' : !done && late ? 'ring-1 ring-coral/60' : ''}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
-          <Icon name={t.icon} size={15} />
-          {who}
-        </span>
-        <span className="flex items-center gap-1.5">
+    <div className="flex flex-col gap-2.5 rounded-2xl bg-surface p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <h3 className={`m-0 flex min-w-0 items-center gap-2 text-[20px] font-extrabold leading-tight ${t.text}`}>
+          <Icon name={t.icon} size={18} />
+          <span className="truncate">{who}</span>
+        </h3>
+        <span className="flex shrink-0 items-center gap-1.5">
           {req.urgent && !done && <UrgentBadge />}
           {late && <LateBadge />}
+          <span className="-my-1.5">
+            <DiscussionButton req={req} user={user} onOpen={onTalk} compact />
+          </span>
         </span>
       </div>
       <p className={`m-0 text-[15px] font-medium leading-snug ${done ? 'text-ink2' : ''}`}>{req.text}</p>
-      <div className="flex items-center justify-between gap-2">
-        <span className={`flex items-center gap-1.5 text-[13px] font-bold ${late ? 'text-coral' : 'text-ink2'}`}>
-          {late && <Icon name="alert" size={14} />}
-          {when || FREQ_LABEL[req.frequency]}
-          {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
-        </span>
-        {/* обсуждение — значком в строке срока: отдельная строка кнопки съедала высоту карточки */}
-        <span className="-my-2.5">
-          <DiscussionButton req={req} user={user} onOpen={onTalk} compact />
-        </span>
-      </div>
       {req.photo_path && <PhotoThumb path={req.photo_path} size={72} />}
+      <div className="flex flex-wrap gap-1.5">
+        <span className={late ? `${tag} !bg-coral/10 !text-coral` : tag}>
+          {late && <Icon name="alert" size={12} stroke={3} />}
+          {when || FREQ_LABEL[req.frequency]}
+        </span>
+        {req.due_date && <span className={tag}>до {shortDate(req.due_date)}</span>}
+        {req.needs_photo && !done && (
+          <span className={tag}>
+            <Icon name="camera" size={12} />с фото
+          </span>
+        )}
+      </div>
       {marks.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {marks.map((m) => (
@@ -107,12 +112,13 @@ function RequestCard({
         </div>
       )}
       {!done && req.options?.length ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {multi && <span className="text-[13px] font-semibold text-muted">отмечено {marks.length} из {needed}</span>}
           <div className="flex gap-2">
-            <div className="grid flex-1 gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
+            {/* один цельный переключатель вместо отдельных кнопок */}
+            <div role="group" aria-label="Ответ" className="grid flex-1 gap-0.5 rounded-xl bg-surface2 p-0.5" style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
               {req.options.map((o) => (
-                <button key={o} type="button" onClick={() => onQuick(o)} className="h-11 rounded-xl bg-ink px-2 text-[15px] font-extrabold text-bg">
+                <button key={o} type="button" onClick={() => onQuick(o)} className="h-10 min-w-0 truncate rounded-[10px] px-1.5 text-[14px] font-bold text-ink active:bg-teal active:text-teal-ink">
                   {o}
                 </button>
               ))}
@@ -123,14 +129,14 @@ function RequestCard({
       ) : (
         !done && (
           <div className="flex gap-2">
-            <Button kind="light" icon="check" full onClick={() => onQuick()}>
+            <Button kind="tonal" icon="check" full onClick={() => onQuick()}>
               {multi ? `Отметить (${marks.length} из ${needed})` : req.needs_photo ? 'Выполнено — фото' : 'Выполнено'}
             </Button>
             {!req.needs_photo && <IconButton icon="camera" label="Отметить с фото или заметкой" onClick={onDetailed} />}
           </div>
         )
       )}
-    </Card>
+    </div>
   );
 }
 

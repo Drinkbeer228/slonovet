@@ -11,9 +11,9 @@ import { qtyText } from '../DietScreen';
 
 const EATEN_LABEL: Record<Eaten, string> = { all: 'всё', half: '½', none: 'отказ' };
 const EATEN_CLS: Record<Eaten, string> = {
-  all: 'border-line bg-surface2 text-ink2',
-  half: 'border-amber bg-amber/15 text-amber',
-  none: 'border-coral bg-coral/15 text-coral',
+  all: 'border-transparent bg-surface2 text-ink2',
+  half: 'border-transparent bg-amber/15 text-amber',
+  none: 'border-transparent bg-coral/15 text-coral',
 };
 
 /** «запарить за 20 мин» → «запарить в 12:40» */

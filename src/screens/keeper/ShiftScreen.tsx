@@ -94,23 +94,31 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-0.5 px-1">
-        <span className="text-[13px] font-semibold text-muted">
-          {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
-          {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
-        </span>
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">
-          {handed ? 'Прошлое дежурство' : 'Дежурство'} · {shift.keeper_name}
-        </h1>
-        {readOnly && !accept && (
-          <span className="text-[13px] font-semibold text-muted">
-            {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
+      {/* компактный бар: кто дежурит, с какого часа и статус смены — в одну строку */}
+      <header className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-2.5">
+          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal/15 text-[16px] font-extrabold text-teal">
+            {shift.keeper_name.trim().charAt(0).toUpperCase()}
           </span>
-        )}
-        {stale && (
-          <span className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-bold text-amber">
-            <Icon name="alert" size={16} />
-            Дежурство от {relDate(shift.date)} не сдано
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h1 className="m-0 truncate text-[17px] font-extrabold leading-tight">{shift.keeper_name}</h1>
+            <span className="truncate text-[13px] font-semibold text-muted">
+              {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
+              {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
+            </span>
+          </div>
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold ${
+              stale ? 'bg-amber/15 text-amber' : handed ? 'bg-surface2 text-ink2' : 'bg-teal/15 text-teal'
+            }`}
+          >
+            {stale && <Icon name="alert" size={12} stroke={3} />}
+            {stale ? 'Не сдано' : handed ? 'Сдано' : 'На смене'}
+          </span>
+        </div>
+        {readOnly && !accept && (
+          <span className="px-1 text-[13px] font-semibold text-muted">
+            {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
           </span>
         )}
       </header>
