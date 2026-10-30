@@ -28,13 +28,12 @@ describe('в дороге', () => {
     expect(effectiveDiets([diet], items, false)).toEqual([diet]);
   });
 
-  it('с собой: овощи на дорогу и запас, каши — только на запас, сено на запас — только если на месте его нет', () => {
+  it('с собой: овощи и мешки на дорогу и запас, сено на запас — только если на месте его нет; каш и зерносмеси нет', () => {
     const val = (n: ReturnType<typeof moveNeeds>, label: string) => n.find((x) => x.label === label)?.value;
-    const allItems = [...items, { ...item('formamax', 'porridge'), name: 'ФормаМакс' }];
-    const noHay = moveNeeds(2, [diet], allItems, [], { reserve: 3, hayThere: false });
+    const noHay = moveNeeds(2, [], { reserve: 3, hayThere: false });
+    expect(noHay.map((n) => n.label)).toEqual(['Коробок овощей', 'Сена, тюков', 'Мешков 240 л']);
     expect(val(noHay, 'Коробок овощей')).toBe('15'); // (2 + 3) дня × 3 головы
     expect(val(noHay, 'Сена, тюков')).toBe('≈ 45'); // 9 в день × (2 + 3)
-    expect(val(noHay, 'ФормаМакс')).toMatch(/^6 кг/); // 2 кг × 3 дня запаса, в дороге — нет
-    expect(val(moveNeeds(2, [diet], allItems, [], { reserve: 3, hayThere: true }), 'Сена, тюков')).toBe('≈ 18');
+    expect(val(moveNeeds(2, [], { reserve: 3, hayThere: true }), 'Сена, тюков')).toBe('≈ 18');
   });
 });

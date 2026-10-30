@@ -12,8 +12,6 @@ import { isoDate } from '../lib/dates';
 /** Переезд: сколько всего нужно на дорогу и общий чек-лист сборов — кто что собрал. */
 export function MoveScreen({ user }: { user: CurrentUser }) {
   const rows = useRows('move_items');
-  const diets = useRows('diets');
-  const items = useRows('stock_items');
   const moves = useRows('stock_moves');
   const [text, setText] = useState('');
   const [section, setSection] = useState(MOVE_SECTIONS[0].key);
@@ -23,7 +21,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
   const reserve = rows.find((r) => r.id === RESERVE_ID)?.qty ?? 3;
   const hayThere = rows.find((r) => r.id === HAY_THERE_ID)?.qty === 1;
   const road = roadMode(rows);
-  const needs = moveNeeds(days, diets, items, moves, { reserve, hayThere });
+  const needs = moveNeeds(days, moves, { reserve, hayThere });
   const byId = new Map(rows.map((r) => [r.id, r]));
   const custom = rows.filter((r) => r.id !== DAYS_ID && r.text && !MOVE_SECTIONS.some((s) => s.items.some((i) => i.id === r.id)));
   const allIds = [...MOVE_SECTIONS.flatMap((s) => s.items.map((i) => i.id)), ...custom.map((c) => c.id)];
@@ -88,7 +86,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
           ))}
         </Card>
         <p className="m-0 px-1 text-[12px] font-semibold text-muted">
-          Считаем по рациону и по реальному расходу сена и мешков за неделю. В дороге каши и зерносмесь не дают — их берём только на запас. Коробка — одна голова на один ужин.
+          Сено и мешки — по реальному расходу за неделю. Каши и зерносмесь в дороге не дают — их здесь нет. Коробка овощей — одна голова на один ужин.
         </p>
       </Section>
 
