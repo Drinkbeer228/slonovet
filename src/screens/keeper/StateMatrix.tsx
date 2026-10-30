@@ -9,6 +9,7 @@ import { Button, Card, Chip, LEVEL_CELL, LEVEL_DOT, Section, Segmented, Sheet, T
 import { Icon } from '../../ui/Icon';
 import type { NoteDraft } from '../common/NoteSheet';
 import { ElephantHistorySheet } from '../common/ElephantHistory';
+import { CallVet } from '../common/Alerts';
 
 export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?: (d: NoteDraft) => void; readOnly?: boolean }) {
   const notes = useRows('notes');
@@ -224,6 +225,8 @@ function CellSheet({
                 Фото или словами
               </Button>
             )}
+            {/* «плохо» — тревога: звонить врачу прямо отсюда, не искать в журнале */}
+            {level === 2 && <CallVet />}
           </>
         )}
       </div>

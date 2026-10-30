@@ -16,7 +16,7 @@ export async function seedDemo() {
   const profiles: Profile[] = [
     { id: 'demo-keeper', login: 'sokolov', full_name: 'Соколов', role: 'keeper', active: true, updated_at: now },
     { id: 'demo-keeper2', login: 'orlov', full_name: 'Орлов', role: 'keeper', active: true, updated_at: now },
-    { id: 'demo-vet', login: 'vet', full_name: 'Иванова', role: 'vet', active: true, updated_at: now },
+    { id: 'demo-vet', login: 'vet', full_name: 'Иванова', role: 'vet', active: true, phone: '+7 900 000-00-00', updated_at: now },
     { id: 'demo-admin', login: 'admin', full_name: 'Администратор', role: 'admin', active: true, updated_at: now },
   ];
 
