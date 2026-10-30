@@ -622,7 +622,7 @@ function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
           ))}
         </Card>
       ) : (
-        <Empty>{here ? `В ${here.city} пока ничего` : 'За последние 30 дней ничего'}</Empty>
+        <Empty>{here ? `С ${shortDate(here.arrive_on)} пока ничего` : 'За последние 30 дней ничего'}</Empty>
       )}
       {current.length > LEDGER_PAGE && (
         <Button full onClick={() => setMore(!more)}>

@@ -169,47 +169,50 @@ function StopCard({ user }: { user: CurrentUser }) {
     setOpen(false);
   };
   return (
-    <Plate glow="teal" className="flex flex-col gap-2 p-4">
-      <span className="text-[13px] font-extrabold tracking-wide text-muted">ГДЕ СТОИМ</span>
-      <span className="text-[20px] font-extrabold">{here ? here.city : 'Город не отмечен'}</span>
-      {here && <span className="text-[13px] font-semibold text-muted">с {shortDate(here.arrive_on)} · отметил {here.created_by}</span>}
-      {past.length > 0 && <span className="text-[13px] font-semibold text-muted">До этого: {past.map((s) => s.city).join(' ← ')}</span>}
-      {user.role !== 'vet' && (
-        <Button
-          kind="accent"
-          icon="plus"
-          full
-          onClick={() => {
-            setCity('');
-            setDay(isoDate());
-            setOpen(true);
-          }}
-        >
-          Приехали в новый город
-        </Button>
-      )}
-      <Sheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Приехали в новый город"
-        footer={
-          <Button kind="primary" big full disabled={!city.trim()} onClick={save}>
-            Отметить
+    <>
+      <Plate glow="teal" className="flex flex-col gap-2 p-4">
+        <span className="text-[13px] font-extrabold tracking-wide text-muted">ГДЕ СТОИМ</span>
+        <span className="text-[20px] font-extrabold">{here ? here.city : 'Город не отмечен'}</span>
+        {here && <span className="text-[13px] font-semibold text-muted">с {shortDate(here.arrive_on)} · отметил {here.created_by}</span>}
+        {past.length > 0 && <span className="text-[13px] font-semibold text-muted">До этого: {past.map((s) => s.city).join(' ← ')}</span>}
+        {user.role !== 'vet' && (
+          <Button
+            kind="accent"
+            icon="plus"
+            full
+            onClick={() => {
+              setCity('');
+              setDay(isoDate());
+              setOpen(true);
+            }}
+          >
+            Приехали в новый город
           </Button>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <Field label="Город">
-            <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Например: Казань" autoComplete="off" />
-          </Field>
-          <Field label="Когда приехали">
-            <DateInput value={day} onChange={setDay} label="Когда приехали" />
-          </Field>
-          <span className="text-[13px] font-semibold text-muted">
-            В «Фураже» лента приходов и выдач начнётся с этого дня, прошлое уйдёт в архив по городам.
-          </span>
-        </div>
-      </Sheet>
-    </Plate>
+        )}
+      </Plate>
+      {/* шторка — вне плиты: у плиты свой слой (isolate), и нижняя навигация перекрыла бы кнопку «Отметить» */}
+        <Sheet
+          open={open}
+          onClose={() => setOpen(false)}
+          title="Приехали в новый город"
+          footer={
+            <Button kind="primary" big full disabled={!city.trim()} onClick={save}>
+              Отметить
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            <Field label="Город">
+              <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Например: Казань" autoComplete="off" />
+            </Field>
+            <Field label="Когда приехали">
+              <DateInput value={day} onChange={setDay} label="Когда приехали" />
+            </Field>
+            <span className="text-[13px] font-semibold text-muted">
+              В «Фураже» лента приходов и выдач начнётся с этого дня, прошлое уйдёт в архив по городам.
+            </span>
+          </div>
+        </Sheet>
+    </>
   );
 }
