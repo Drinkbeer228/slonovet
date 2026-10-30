@@ -34,6 +34,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
   const [creating, setCreating] = useState<ElephantName | 'all' | 'work' | null>(null);
   const [open, setOpen] = useState<VetRequest | null>(null);
   const [buying, setBuying] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [openBuy, setOpenBuy] = useState<Purchase | null>(null);
   const [ordering, setOrdering] = useState<Purchase | null>(null);
   const [arriving, setArriving] = useState<Purchase | null>(null);
@@ -70,7 +71,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         {/* на «Закупках» — сразу форма закупки; иначе задача (на «Работе» — уже с адресатом «Работа»).
             На телефоне кнопка висит справа над нижней панелью — под большим пальцем; на широком экране — в шапке */}
         <div className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 md:static">
-          <Button kind="accent" big icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : setCreating(view === 'work' ? 'work' : 'Претти'))}>
+          <Button kind="accent" big icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : view === 'work' ? setCreating('work') : view === 'elephants' ? setCreating('Претти') : setPicking(true))}>
             {view === 'purchases' ? 'Купить' : 'Новая'}
           </Button>
         </div>
@@ -123,9 +124,14 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         initial={creating}
         user={user}
         onClose={() => setCreating(null)}
-        onBuy={() => {
-          setCreating(null);
-          setBuying(true);
+      />
+      <TaskTypeSheet
+        open={picking}
+        onClose={() => setPicking(false)}
+        onPick={(t) => {
+          setPicking(false);
+          if (t === 'purchases') setBuying(true);
+          else setCreating(t === 'work' ? 'work' : 'Претти');
         }}
       />
       <NewPurchaseSheet open={buying} user={user} onClose={() => setBuying(false)} />
@@ -394,17 +400,46 @@ const WHEN: { value: When; label: string }[] = [
   { value: 'course', label: 'Курс' },
 ];
 
+/** «+ Новая» на «Все»: сначала что за задача — слонам, работа или купить. */
+const TASK_KINDS: { type: BoardType; title: string; sub: string }[] = [
+  { type: 'elephants', title: 'Слонам', sub: 'Лечение, процедуры, наблюдение, кормление. Делает дежурный кипер' },
+  { type: 'work', title: 'Работа', sub: 'Хозяйство и поручения: можно назначить человека' },
+  { type: 'purchases', title: 'Купить', sub: 'Закупка: закажет администратор или директор' },
+];
+
+function TaskTypeSheet({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (t: BoardType) => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Новая задача">
+      <div className="flex flex-col gap-2.5">
+        {TASK_KINDS.map((k) => {
+          const t = TASK_TYPE[k.type];
+          return (
+            <button key={k.type} type="button" onClick={() => onPick(k.type)} className="text-left transition-transform active:scale-[0.98]">
+              <Card className={`flex items-center gap-3.5 border-l-4 p-4 ${t.stripe}`}>
+                <Icon name={t.icon} size={26} className={t.text} />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-[18px] font-extrabold">{k.title}</span>
+                  <span className="text-[13px] font-semibold text-muted">{k.sub}</span>
+                </span>
+                <Icon name="next" size={18} className="text-muted" />
+              </Card>
+            </button>
+          );
+        })}
+      </div>
+    </Sheet>
+  );
+}
+
 export function NewRequestSheet({
   initial,
   user,
   onClose,
-  onBuy,
 }: {
+  /** слон или «Всем» — форма «Слонам»; 'work' — форма «Работа» */
   initial: ElephantName | 'all' | 'work' | null;
   user: CurrentUser;
   onClose: () => void;
-  /** «Купить? → Закупки»: хоздело «купить» на самом деле закупка — открыть её форму */
-  onBuy?: () => void;
 }) {
   const [who, setWho] = useState<ElephantName | 'all' | 'work'>('Претти');
   const [text, setText] = useState('');
@@ -419,6 +454,7 @@ export function NewRequestSheet({
   const [own, setOwn] = useState('');
   const [authorPhoto, setAuthorPhoto] = useState<File | null>(null);
   const [assignee, setAssignee] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
   // поручают киперам; директор ставит задачи и следит, исполнителем не числится
   const people = useRows('profiles').filter((p) => p.active && p.role === 'keeper');
   const shifts = useRows('shifts');
@@ -439,6 +475,7 @@ export function NewRequestSheet({
       setOptions([]);
       setOwn('');
       setAssignee(null);
+      setChoosing(false);
     }
   }, [initial]);
 
@@ -476,7 +513,7 @@ export function NewRequestSheet({
               status: 'active',
               created_at: new Date().toISOString(),
               // поле шлём, только если выбрали человека: старый сервер без колонки примет остальные задачи как раньше
-              ...(assignee ? { assignee_id: assignee } : {}),
+              ...(assignee && who === 'work' ? { assignee_id: assignee } : {}),
             });
             toast('Задача поставлена');
             onClose();
@@ -487,51 +524,17 @@ export function NewRequestSheet({
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <span className="px-1 text-[14px] font-bold text-muted">Кому</span>
-          <div className="flex flex-wrap gap-2">
-            {[...ELEPHANTS, 'all' as const, 'work' as const].map((e) => (
-              <Chip
-                key={e}
-                on={who === e}
-                onClick={() => {
-                  // слоны ↔ работа: ветеринарные ответы к хоздела не подходят (и наоборот) — сбрасываем на «выполнено»
-                  if ((e === 'work') !== (who === 'work')) {
-                    setOptions([]);
-                    setOwn('');
-                  }
-                  setWho(e);
-                }}
-              >
-                {whoLabel(e)}
-              </Chip>
-            ))}
-          </div>
-        </div>
-        {people.length > 0 && (
+        {who !== 'work' && (
           <div className="flex flex-col gap-2">
-            <span className="px-1 text-[14px] font-bold text-muted">Поручить (необязательно)</span>
+            <span className="px-1 text-[14px] font-bold text-muted">Кому из слонов</span>
             <div className="flex flex-wrap gap-2">
-              <Chip on={!assignee} onClick={() => setAssignee(null)}>
-                Кто на смене
-              </Chip>
-              {people.map((p) => (
-                <Chip key={p.id} on={assignee === p.id} onClick={() => setAssignee(p.id)}>
-                  {p.full_name}
+              {[...ELEPHANTS, 'all' as const].map((e) => (
+                <Chip key={e} on={who === e} onClick={() => setWho(e)}>
+                  {whoLabel(e)}
                 </Chip>
               ))}
             </div>
-            {resting && (
-              <Plate glow="amber" className="px-3.5 py-2.5 text-[14px] font-bold text-amber-fg">
-                Внимание: {resting.full_name} на отсыпном после суточного дежурства
-              </Plate>
-            )}
           </div>
-        )}
-        {who === 'work' && onBuy && (
-          <button type="button" onClick={onBuy} className="-mt-2 flex h-11 items-center self-start px-1 text-[14px] font-bold text-teal">
-            Купить? → Закупки
-          </button>
         )}
         <Field label="Что сделать">
           <textarea
@@ -542,8 +545,36 @@ export function NewRequestSheet({
             placeholder={who === 'work' ? 'Например: перебрать сенник, сухие тюки ближе к выходу' : 'Например: марганцевые ванночки для ног, 15 мин'}
           />
         </Field>
+        {who === 'work' ? (
+          <div className="flex flex-col gap-2">
+            <button type="button" onClick={() => setChoosing(!choosing)} aria-expanded={choosing} className="flex min-h-11 items-center gap-2 px-1 text-left">
+              <span className="text-[14px] font-bold text-muted">Кто сделает:</span>
+              <span className="min-w-0 flex-1 truncate text-[15px] font-bold">{people.find((p) => p.id === assignee)?.full_name ?? 'любой на смене'}</span>
+              <span className="text-[14px] font-bold text-teal">{choosing ? 'готово' : 'изменить'}</span>
+            </button>
+            {choosing && (
+              <div className="flex flex-wrap gap-2">
+                <Chip on={!assignee} onClick={() => setAssignee(null)}>
+                  Любой на смене
+                </Chip>
+                {people.map((p) => (
+                  <Chip key={p.id} on={assignee === p.id} onClick={() => setAssignee(p.id)}>
+                    {p.full_name}
+                  </Chip>
+                ))}
+              </div>
+            )}
+            {resting && (
+              <Plate glow="amber" className="px-3.5 py-2.5 text-[14px] font-bold text-amber-fg">
+                Внимание: {resting.full_name} на отсыпном после суточного дежурства
+              </Plate>
+            )}
+          </div>
+        ) : (
+          <p className="m-0 px-1 text-[14px] font-semibold text-muted">Сделает дежурный кипер — увидит на «Дежурстве».</p>
+        )}
         <div className="flex flex-col gap-3">
-          <Segmented label="Когда" value={when} onChange={setWhen} options={WHEN} />
+          <Segmented label="Когда" value={when} onChange={setWhen} options={who === 'work' ? WHEN.map((w) => (w.value === 'course' ? { ...w, label: 'Регулярно' } : w)) : WHEN} />
           {when === 'course' ? (
             <>
               <div className="flex flex-wrap gap-2">
