@@ -1,5 +1,5 @@
 import { isoDate, localDay } from '../lib/dates';
-import { overdue } from './shift';
+import { byPriority, deadlineKey } from './shift';
 import type { Purchase, RequestMark, VetRequest } from './types';
 
 /*
@@ -22,22 +22,29 @@ const requestType = (r: VetRequest): 'elephants' | 'work' => (r.elephant === 'wo
 
 function requestGroup(r: VetRequest, marks: RequestMark[], today: string): BoardGroup {
   if (r.status === 'closed') return 'closed';
-  if (r.frequency !== 'once') return r.due_date && r.due_date < today ? 'closed' : 'courses';
+  if (r.frequency !== 'once') return r.due_date && r.due_date < today ? 'closed' : r.urgent ? 'today' : 'courses';
   if (marks.some((m) => m.request_id === r.id && !m.deleted)) return 'closed';
-  return r.on_date && r.on_date > today ? 'planned' : 'today';
+  // срочное — всегда в «Сегодня», даже если поставлено на будущий день
+  return r.on_date && r.on_date > today && !r.urgent ? 'planned' : 'today';
 }
 
 function purchaseGroup(p: Purchase): BoardGroup {
-  return p.status === 'new' ? 'today' : p.status === 'ordered' ? 'planned' : 'closed';
+  if (p.status === 'done' || p.status === 'cancelled') return 'closed';
+  return p.status === 'new' || p.urgent ? 'today' : 'planned';
 }
 
-/** Когда это было или будет — для порядка внутри группы */
-const dayOf = (i: BoardItem) =>
-  i.kind === 'request' ? `${i.req.on_date ?? ''} ${i.req.at_time?.slice(0, 5) ?? '99:99'}` : (i.p.delivery_date ?? '9999');
+/** Срок: у задачи — день и час (или «до какого числа»), у закупки — когда привезут; без срока — в конец */
+const deadline = (i: BoardItem) => (i.kind === 'request' ? deadlineKey(i.req) : i.p.delivery_date ? `${i.p.delivery_date} 99:99` : '9999');
 const touched = (i: BoardItem) => (i.kind === 'request' ? i.req.updated_at : i.p.updated_at);
 const urgent = (i: BoardItem) => (i.kind === 'request' ? i.req.urgent : i.p.urgent);
-const late = (i: BoardItem, now: Date) => i.kind === 'request' && overdue(i.req, false, now);
+const created = (i: BoardItem) => (i.kind === 'request' ? i.req.created_at : i.p.created_at);
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Тот же порядок, что в смене (byPriority): срочное наверху, потом по сроку, потом кто раньше поставлен */
+const byItemPriority = (a: BoardItem, b: BoardItem) =>
+  a.kind === 'request' && b.kind === 'request'
+    ? byPriority(a.req, b.req)
+    : Number(urgent(b)) - Number(urgent(a)) || cmp(deadline(a), deadline(b)) || cmp(created(a), created(b));
 
 export function boardGroups(
   requests: VetRequest[],
@@ -57,10 +64,9 @@ export function boardGroups(
   if (filter === 'all' || filter === 'purchases') {
     for (const p of purchases) if (!p.deleted) out[purchaseGroup(p)].push({ kind: 'purchase', type: 'purchases', p });
   }
-  // сегодня: просроченное, срочное, потом по часу
-  out.today.sort((a, b) => Number(late(b, now)) - Number(late(a, now)) || Number(urgent(b)) - Number(urgent(a)) || cmp(dayOf(a), dayOf(b)));
-  out.courses.sort((a, b) => cmp(touched(b), touched(a)));
-  out.planned.sort((a, b) => cmp(dayOf(a), dayOf(b)));
+  out.today.sort(byItemPriority);
+  out.courses.sort(byItemPriority);
+  out.planned.sort(byItemPriority);
   out.closed = out.closed.sort((a, b) => cmp(touched(b), touched(a))).slice(0, CLOSED_LIMIT);
   return out;
 }

@@ -36,11 +36,16 @@ describe('разовая задача на конкретный день', () =>
     expect(overdue(req('b', { frequency: 'shift', on_date: '2026-10-20' }), false, new Date(2026, 9, 26))).toBe(false);
   });
 
-  it('порядок: просроченное, срочное, потом по часу, потом без времени', () => {
-    const list = [req('plain'), req('late', { on_date: '2026-10-26', at_time: '18:00' }), req('early', { on_date: '2026-10-26', at_time: '09:00' }), req('hot', { urgent: true })];
-    expect(requestTodos(list, [], shift('2026-10-26'), new Date(2026, 9, 26, 8, 0)).map((t) => t.req.id)).toEqual(['hot', 'early', 'late', 'plain']);
-    // в 10:00 «early» (к 09:00) просрочена — она первой, раньше срочной
-    expect(requestTodos(list, [], shift('2026-10-26'), new Date(2026, 9, 26, 10, 0)).map((t) => t.req.id)).toEqual(['early', 'hot', 'late', 'plain']);
+  it('порядок: срочное всегда наверху, дальше по сроку (просроченное — самое раннее), без срока — в конце', () => {
+    const list = [
+      req('plain'),
+      req('late', { on_date: '2026-10-26', at_time: '18:00' }),
+      req('early', { on_date: '2026-10-26', at_time: '09:00' }),
+      req('yesterday', { on_date: '2026-10-25' }),
+      req('hot', { urgent: true }),
+      req('hot-tomorrow-course', { urgent: true, frequency: 'shift', due_date: '2026-10-30' }),
+    ];
+    expect(ids(list, [], shift('2026-10-26'))).toEqual(['hot-tomorrow-course', 'hot', 'yesterday', 'early', 'late', 'plain']);
   });
 
   it('подпись: «сегодня к 16:00», «27.10»', () => {

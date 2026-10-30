@@ -101,7 +101,7 @@ export interface RequestTodo {
   done: boolean;
 }
 
-export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift: Shift, now = new Date()): RequestTodo[] {
+export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift: Shift): RequestTodo[] {
   return requests
     .filter((r) => r.status === 'active' && (!r.due_date || r.due_date >= shift.date) && (!r.on_date || r.on_date <= shift.date))
     .map((req) => {
@@ -112,23 +112,24 @@ export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift
       return { req, marks: here, allMarks, needed, done };
     })
     .filter((t) => !(t.req.frequency === 'once' && t.done && t.marks.length === 0))
-    // невыполненное: просроченное, потом срочное, потом по дню и часу
-    .sort(
-      (a, b) =>
-        Number(a.done) - Number(b.done) ||
-        Number(overdue(b.req, b.done, now)) - Number(overdue(a.req, a.done, now)) ||
-        Number(b.req.urgent) - Number(a.req.urgent) ||
-        byWhen(a.req, b.req),
-    );
+    // невыполненное: срочное всегда наверху, дальше по сроку (у просроченного он самый ранний), при равном — кто раньше поставлен
+    .sort((a, b) => Number(a.done) - Number(b.done) || byPriority(a.req, b.req));
 }
 
-/** Порядок по времени: сначала задачи на день и час (раньше — выше), потом остальные. */
-const whenKey = (r: VetRequest) => (r.on_date ? `${r.on_date} ${r.at_time?.slice(0, 5) ?? '99:99'}` : '9999');
-const byWhen = (a: VetRequest, b: VetRequest) => {
-  const x = whenKey(a);
-  const y = whenKey(b);
-  return x < y ? -1 : x > y ? 1 : 0;
-};
+/**
+ * Срок задачи для порядка: разовая — день и час (у старых — «до какого числа»), курс — до какого числа.
+ * Без срока — в конец. Строки сравниваются как есть: «2026-10-26 16:00» < «2026-10-27 99:99» < «9999».
+ */
+export function deadlineKey(r: VetRequest): string {
+  const day = r.frequency === 'once' ? (r.on_date ?? r.due_date) : r.due_date;
+  return day ? `${day} ${r.at_time?.slice(0, 5) ?? '99:99'}` : '9999';
+}
+
+const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+
+/** Порядок задач везде одинаковый: срочное наверху, потом по сроку, потом кто раньше поставлен. */
+export const byPriority = (a: VetRequest, b: VetRequest) =>
+  Number(b.urgent) - Number(a.urgent) || cmp(deadlineKey(a), deadlineKey(b)) || cmp(a.created_at, b.created_at);
 
 /**
  * Разовая задача на день просрочена: день прошёл, а отметки нет, или сегодня — и время уже наступило.

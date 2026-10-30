@@ -27,8 +27,26 @@ describe('доска «Задачи»: группы', () => {
   const purchases = [buy('hay', 'new', { urgent: true }), buy('oats', 'ordered', { delivery_date: '2026-10-28' }), buy('bags', 'done')];
   const g = boardGroups(requests, purchases, [mark('done-once')], 'all', now);
 
-  it('сегодня: просроченное первым, потом срочное, потом по часу; закупки «нужно купить» — тоже сегодня', () => {
-    expect(ids(g.today)).toEqual(['late-yesterday', 'hot', 'hay', 'today-pills']);
+  it('сегодня: срочное наверху, дальше по сроку (вчерашнее раньше сегодняшнего); закупки «нужно купить» — тоже сегодня', () => {
+    expect(ids(g.today)).toEqual(['hot', 'hay', 'late-yesterday', 'today-pills']);
+  });
+
+  it('срочное — в «Сегодня» и наверху, даже курс и задача на будущий день', () => {
+    const list = [
+      req('plain-today', { on_date: '2026-10-26' }),
+      req('urgent-course', { frequency: 'shift', due_date: '2026-11-03', urgent: true }),
+      req('urgent-later', { on_date: '2026-10-28', urgent: true }),
+      req('plain-later', { on_date: '2026-10-28' }),
+    ];
+    const u = boardGroups(list, [], [], 'all', now);
+    expect(ids(u.today)).toEqual(['urgent-later', 'urgent-course', 'plain-today']);
+    expect(ids(u.planned)).toEqual(['plain-later']);
+    expect(u.courses).toHaveLength(0);
+  });
+
+  it('курсы — по сроку: раньше кончается — выше', () => {
+    const c = boardGroups([req('long', { frequency: 'shift', due_date: '2026-11-20' }), req('short', { frequency: 'shift', due_date: '2026-10-29' })], [], [], 'all', now);
+    expect(ids(c.courses)).toEqual(['short', 'long']);
   });
 
   it('курсы — идущие регулярные; закончившийся курс и выполненная разовая — в закрытых', () => {
