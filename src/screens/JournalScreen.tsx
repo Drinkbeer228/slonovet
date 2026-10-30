@@ -4,7 +4,7 @@ import { FEED_TIMES, acceptedBy, shiftFlags, sortShifts } from '../domain/shift'
 import type { Shift } from '../domain/types';
 import { useRows } from '../lib/store';
 import { addDays, isoDate, localDay, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
-import { CalendarSheet, Card, Empty, IconButton, Section } from '../ui/kit';
+import { CalendarSheet, Card, Empty, IconButton, KEY, PAD, Section } from '../ui/kit';
 import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
@@ -23,7 +23,7 @@ const SHORT: Record<string, string> = { behavior: 'Общ.', sleep: 'Сон', fo
 
 const WEEKS = 12;
 const MONTH_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-const DAY_CLS = ['bg-teal', 'bg-dot1', 'bg-dot2'];
+const DAY_CLS = [PAD.teal, PAD.amber, PAD.coral];
 
 /** Худшее за день: 0 — всё норма, 1 — было «внимание», 2 — было «плохо». */
 function worst(shifts: Shift[]): number {
@@ -75,7 +75,7 @@ function DaysView() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2" data-tour="journal-day">
         <IconButton icon="back" label="День раньше" onClick={() => step(1)} />
-        <DateJump value={selected} onPick={jump} className="h-11 flex-1 rounded-xl border border-line text-[15px] font-extrabold">
+        <DateJump value={selected} onPick={jump} className={`h-11 flex-1 rounded-xl text-[15px] font-extrabold text-ink ${KEY}`}>
           {longDate(selected)}
         </DateJump>
         <IconButton icon="next" label="День позже" onClick={() => step(-1)} className={selected >= isoDate() ? 'opacity-30' : ''} />
@@ -116,7 +116,7 @@ function DaysView() {
                         onClick={() => setDay(d)}
                         aria-label={`${shortDate(d)}${list ? `, дежурный ${list.map((x) => x.keeper_name).join(', ')}` : ', дежурства нет'}`}
                         className={`aspect-square w-full rounded-[3px] ${
-                          list ? DAY_CLS[worst(list)] : future ? 'bg-transparent' : 'bg-empty'
+                          list ? DAY_CLS[worst(list)] : future ? 'bg-transparent' : PAD.empty
                         } ${d === selected ? 'ring-2 ring-ink' : ''} ${list?.some((x) => x.status === 'open') ? 'opacity-60' : ''}`}
                       />
                     );
@@ -127,19 +127,19 @@ function DaysView() {
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] font-semibold text-muted">
             <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-[3px] bg-empty" />
+              <span className={`h-2.5 w-2.5 rounded-[3px] ${PAD.empty}`} />
               нет дежурства
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-[3px] bg-teal" />
+              <span className={`h-2.5 w-2.5 rounded-[3px] ${PAD.teal}`} />
               норма
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-[3px] bg-dot1" />
+              <span className={`h-2.5 w-2.5 rounded-[3px] ${PAD.amber}`} />
               внимание
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-[3px] bg-dot2" />
+              <span className={`h-2.5 w-2.5 rounded-[3px] ${PAD.coral}`} />
               плохо
             </span>
           </div>

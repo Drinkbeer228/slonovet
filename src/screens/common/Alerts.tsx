@@ -4,7 +4,7 @@ import { FEED_TIMES, sortShifts } from '../../domain/shift';
 import type { ElephantName, Level, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { addDays, isoDate, relDate } from '../../lib/dates';
-import { Card, LEVEL_DOT } from '../../ui/kit';
+import { LEVEL_DOT, Plate } from '../../ui/kit';
 
 /** Сколько последних дней смотрим, чтобы заметить, что тянется несколько дежурств подряд. */
 const DAYS = 14;
@@ -71,8 +71,8 @@ export function AlertsCard() {
   const { alerts } = useRecent();
   if (!alerts.length) return null;
   return (
-    <Card className="flex flex-col gap-1.5 p-4 ring-1 ring-amber/40">
-      <span className="text-[12px] font-extrabold tracking-wide text-amber">ТРЕБУЕТ ВНИМАНИЯ</span>
+    <Plate glow={alerts.some((a) => a.level >= 2) ? 'coral' : 'amber'} halo className="flex flex-col gap-1.5 p-4">
+      <span className="text-[12px] font-extrabold tracking-wide text-amber-fg">ТРЕБУЕТ ВНИМАНИЯ</span>
       {alerts.map((a, i) => (
         <span key={i} className="flex items-start gap-2 text-[15px] font-bold leading-snug">
           <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${LEVEL_DOT[a.level]}`} />
@@ -81,6 +81,6 @@ export function AlertsCard() {
           </span>
         </span>
       ))}
-    </Card>
+    </Plate>
   );
 }

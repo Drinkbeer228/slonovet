@@ -19,14 +19,16 @@ export function DevRoleSwitcher() {
   if (!demo && session.user.role !== 'admin') return null;
   const current = demo ? session.user.role : (preview ?? 'admin');
   return (
-    <div className="fixed bottom-24 left-2 z-40 flex gap-1 rounded-2xl border border-line bg-bg/95 p-1 shadow-xl backdrop-blur md:bottom-3" aria-label="Роль для проверки (разработка)">
+    <div className="fixed bottom-24 left-2 z-40 flex gap-1 rounded-2xl border border-edge-hi bg-surface/70 p-1 shadow-(--shadow-plate) backdrop-blur-xl md:bottom-3" aria-label="Роль для проверки (разработка)">
       {ROLES.map((r) => (
         <button
           key={r}
           type="button"
           title={ROLE_LABEL[r]}
           onClick={() => (demo ? switchDemoRole(r) : setPreviewRole(r === 'admin' ? null : r))}
-          className={`h-8 rounded-xl px-2 text-[12px] font-extrabold ${current === r ? 'bg-teal text-teal-ink' : 'text-muted'}`}
+          className={`h-8 rounded-xl px-2 text-[12px] font-extrabold transition-transform active:scale-95 ${
+            current === r ? 'bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/0.22),transparent_55%)] text-teal-ink shadow-(--shadow-glow-teal)' : 'text-muted'
+          }`}
         >
           {SHORT[r]}
         </button>

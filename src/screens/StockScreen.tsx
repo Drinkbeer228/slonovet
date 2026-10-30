@@ -7,7 +7,7 @@ import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, delete
 import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
 import { newId, put, useRows } from '../lib/store';
 import { localDay, plural, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, Field, ReadOnlyNote, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 const MOVE_LABEL: Partial<Record<string, string>> = { in: 'приход', fix: 'поправка', waste: 'брак', extra: 'вне рациона' };
@@ -58,8 +58,8 @@ function Battery({ frac, low }: { frac: number; low: boolean }) {
   const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
   return (
     <div className="flex items-center gap-1" role="img" aria-label={`Открытый мешок заполнен на ${pct}%`}>
-      <div className="relative h-6 w-16 overflow-hidden rounded-md border-2 border-track">
-        <div className={`absolute inset-y-0 left-0 ${low ? 'bg-dot1' : 'bg-teal'}`} style={{ width: `${pct}%` }} />
+      <div className={`relative h-6 w-16 overflow-hidden rounded-md ${TONE.sunken}`}>
+        <div className={`absolute inset-y-0 left-0 ${low ? PAD.amber : PAD.teal}`} style={{ width: `${pct}%` }} />
         {[25, 50, 75].map((t) => (
           <span key={t} className="absolute inset-y-0 w-px bg-bg/60" style={{ left: `${t}%` }} />
         ))}
@@ -74,7 +74,7 @@ function Sacks({ v }: { v: StockView }) {
   return (
     <div className="flex items-center gap-1.5">
       {Array.from({ length: shown }).map((_, i) => (
-        <span key={i} className={`h-6 w-4 rounded-[4px] ${v.low ? 'bg-dot1' : 'bg-teal'}`} aria-hidden="true" />
+        <span key={i} className={`h-6 w-4 rounded-[4px] ${v.low ? PAD.amber : PAD.teal}`} aria-hidden="true" />
       ))}
       {v.full > shown && <span className="text-[12px] font-bold text-muted">+{v.full - shown}</span>}
       {(v.openFrac > 0 || v.full === 0) && <Battery frac={v.openFrac} low={v.low} />}
@@ -121,14 +121,14 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       </header>
 
       {low.length > 0 && (
-        <Card className="flex flex-col gap-1 p-4 ring-1 ring-amber/40" data-tour="stock-low">
-          <span className="text-[12px] font-extrabold tracking-wide text-amber">ЗАКАНЧИВАЕТСЯ</span>
+        <Plate glow="amber" halo className="flex flex-col gap-1 p-4" data-tour="stock-low">
+          <span className="text-[12px] font-extrabold tracking-wide text-amber-fg">ЗАКАНЧИВАЕТСЯ</span>
           {low.map((v) => (
             <span key={v.item.id} className="text-[15px] font-bold">
               {v.item.name} — {v.balance <= 0 ? amountText(v) : daysText(v, false)}
             </span>
           ))}
-        </Card>
+        </Plate>
       )}
 
       <div data-tour="purchases">
@@ -143,7 +143,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         if (!ids.length) return null;
         return (
           <Section key={g.id} id={`stock-${g.id}`} title={g.title}>
-            <Card className="divide-y divide-surface2 overflow-hidden">
+            <Card className="divide-y divide-edge overflow-hidden">
               {ids.map((id) => {
                 const v = views.get(id);
                 if (!v) return null;
@@ -184,7 +184,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
 
       {history.length > 0 && (
         <Section id="stock-history" title="Приход, выдачи и брак">
-          <Card className="divide-y divide-surface2 overflow-hidden">
+          <Card className="divide-y divide-edge overflow-hidden">
             {history.map((m) => {
               const it = items.find((i) => i.id === m.item_id);
               const unit = it?.kind === 'count' ? countWords(it.id, it.unit)[2] : 'кг';
@@ -288,7 +288,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             </Field>
             <div className="grid grid-cols-4 gap-1.5">
               {[-10, -5, 5, 10].map((d) => (
-                <button key={d} type="button" onClick={() => bump(d)} className="h-11 rounded-xl border border-line text-[15px] font-bold text-ink2">
+                <button key={d} type="button" onClick={() => bump(d)} className={`h-11 rounded-xl text-[15px] font-bold text-ink ${KEY}`}>
                   {d > 0 ? '+' : '−'}
                   {Math.abs(d)} кг
                 </button>
@@ -320,12 +320,12 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
                       setCounted(true);
                       setFrac(f.v);
                     }}
-                    className={`flex h-20 flex-col items-center justify-end gap-1.5 rounded-xl border pb-2 text-[13px] font-bold ${
-                      frac === f.v ? 'border-ink text-ink' : 'border-line text-muted'
+                    className={`flex h-20 flex-col items-center justify-end gap-1.5 rounded-xl border pb-2 text-[13px] font-bold transition-transform active:scale-[0.97] ${
+                      frac === f.v ? 'border-teal/60 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-ink shadow-(--shadow-key-on)' : 'border-edge bg-well text-muted shadow-(--shadow-well)'
                     }`}
                   >
-                    <span className="relative h-9 w-6 overflow-hidden rounded-[5px] border-2 border-track">
-                      <span className="absolute inset-x-0 bottom-0 bg-teal" style={{ height: `${f.v * 100}%` }} />
+                    <span className={`relative h-9 w-6 overflow-hidden rounded-[5px] ${TONE.sunken}`}>
+                      <span className={`absolute inset-x-0 bottom-0 ${PAD.teal}`} style={{ height: `${f.v * 100}%` }} />
                     </span>
                     {f.label}
                   </button>
@@ -438,7 +438,9 @@ function IncomingSheet({
               type="button"
               aria-pressed={i.id === itemId}
               onClick={() => setItemId(i.id)}
-              className={`h-10 rounded-xl border px-3.5 text-[14px] font-bold ${i.id === itemId ? 'border-ink bg-ink text-bg' : 'border-line bg-surface text-ink2'}`}
+              className={`h-11 rounded-xl border px-3.5 text-[14px] font-bold transition-transform active:scale-[0.97] ${
+                i.id === itemId ? 'border-teal/60 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-ink shadow-(--shadow-key-on)' : 'border-edge bg-well text-ink2 shadow-(--shadow-well)'
+              }`}
             >
               {i.name}
             </button>
@@ -569,7 +571,9 @@ function AddItemSheet({
                 type="button"
                 aria-pressed={kind === k.id}
                 onClick={() => setKind(k.id)}
-                className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 text-center ${kind === k.id ? 'border-ink text-ink' : 'border-line text-muted'}`}
+                className={`flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 text-center transition-transform active:scale-[0.97] ${
+                  kind === k.id ? 'border-teal/60 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-ink shadow-(--shadow-key-on)' : 'border-edge bg-well text-muted shadow-(--shadow-well)'
+                }`}
               >
                 <span className="text-[14px] font-bold">{k.label}</span>
                 <span className="text-[11px] font-semibold">{k.hint}</span>
