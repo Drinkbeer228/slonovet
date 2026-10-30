@@ -42,7 +42,7 @@ export function WhyList() {
     <>
       {WHY.map((g) => (
         <Section key={g.title} title={g.title}>
-          <Card className="divide-y divide-surface2 overflow-hidden">
+          <Card className="divide-y divide-edge overflow-hidden">
             {g.items.map((it) => {
               const on = open === it.id;
               return (

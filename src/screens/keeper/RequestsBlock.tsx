@@ -83,7 +83,7 @@ function RequestCard({
       <p className={`m-0 text-[15px] font-medium leading-snug ${done ? 'text-ink2' : ''}`}>{req.text}</p>
       {req.photo_path && <PhotoThumb path={req.photo_path} size={72} />}
       <div className="flex flex-wrap gap-1.5">
-        <span className={late ? `${tag} !border-coral/40 !bg-coral/15 !text-coral` : tag}>
+        <span className={late ? `${tag} !border-coral/40 !bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] !text-coral-fg` : tag}>
           {late && <Icon name="alert" size={12} stroke={3} />}
           {when || FREQ_LABEL[req.frequency]}
         </span>

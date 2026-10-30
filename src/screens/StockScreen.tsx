@@ -345,13 +345,13 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
           </Field>
         )}
         {it.kind === 'sack' && (
-          <div className="grid grid-cols-2 gap-3 border-t border-line pt-4">
+          <div className="grid grid-cols-2 gap-3 border-t border-edge pt-4">
             <Field label={`Вес: 1 ${packWords(it)[0]}, кг`}>
               <input className={inputCls} type="text" inputMode="decimal" value={sackKg} onChange={(e) => setSackKg(e.target.value)} />
             </Field>
           </div>
         )}
-        <div className="flex flex-col gap-3 border-t border-line pt-4">
+        <div className="flex flex-col gap-3 border-t border-edge pt-4">
           <Field label="Название">
             <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>

@@ -7,7 +7,7 @@ import { localDay, relDate, stampOf, timeOf } from '../lib/dates';
 import { useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
 import { Icon } from '../ui/Icon';
-import { Sheet, inputCls } from '../ui/kit';
+import { Sheet, TONE, inputCls } from '../ui/kit';
 
 /* Обсуждение внутри заявки: спросить врача, уточнить у кипера — прямо в карточке задачи, без общего чата. */
 
@@ -43,7 +43,9 @@ export function DiscussionThread({ req, user }: { req: VetRequest; user: Current
       {list.map((c) => {
         const mine = c.author_id === user.id;
         return (
-          <div key={c.id} className={`flex max-w-[85%] flex-col gap-0.5 rounded-2xl px-3.5 py-2.5 ${mine ? 'self-end bg-teal/15' : 'self-start bg-surface'}`}>
+          <div key={c.id} className={`flex max-w-[85%] flex-col gap-0.5 rounded-2xl px-3.5 py-2.5 ${
+              mine ? 'self-end border border-teal/30 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)]' : `self-start ${TONE.glass}`
+            }`}>
             <span className="text-[12px] font-bold text-muted">
               {mine ? 'Вы' : c.author_name} · {relDate(localDay(c.created_at))} {timeOf(c.created_at)}
             </span>
@@ -66,7 +68,7 @@ export function DiscussionThread({ req, user }: { req: VetRequest; user: Current
           onClick={send}
           disabled={!text.trim() || busy}
           aria-label="Отправить"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal text-teal-ink disabled:opacity-40"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-transparent bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/0.22),transparent_55%)] text-teal-ink shadow-(--shadow-glow-teal) transition-transform active:scale-[0.97] disabled:opacity-40"
         >
           <Icon name="next" size={22} />
         </button>
@@ -81,7 +83,7 @@ export function DiscussionSheet({ req, user, onClose }: { req: VetRequest | null
     <Sheet open={req !== null} onClose={onClose} title={req ? `Обсуждение · ${whoLabel(req.elephant)}` : ''}>
       {req && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1 rounded-2xl border border-line px-3.5 py-2.5">
+          <div className={`flex flex-col gap-1 rounded-2xl px-3.5 py-2.5 ${TONE.sunken}`}>
             <p className="m-0 text-[14px] font-medium leading-snug text-ink2">{req.text}</p>
             <span className="text-[13px] font-semibold text-muted">
               Поставил: {req.author_name}, {stampOf(req.created_at)}
@@ -106,7 +108,7 @@ export function DiscussionButton({ req, user, onOpen, compact }: { req: VetReque
         type="button"
         onClick={onOpen}
         aria-label={total ? `Обсуждение: ${total}${fresh ? `, новых ${fresh}` : ''}` : 'Спросить'}
-        className={`relative flex h-10 w-10 items-center justify-center rounded-xl ${fresh ? 'bg-coral/15 text-coral' : 'text-muted'}`}
+        className={`relative flex h-10 w-10 items-center justify-center rounded-xl ${fresh ? 'bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg' : 'text-muted'}`}
       >
         <Icon name="message" size={20} />
         {total > 0 && (
@@ -121,7 +123,7 @@ export function DiscussionButton({ req, user, onOpen, compact }: { req: VetReque
     <button
       type="button"
       onClick={onOpen}
-      className={`flex h-11 items-center gap-2 self-start rounded-xl px-3 text-[14px] font-bold ${fresh ? 'bg-coral/15 text-coral' : 'text-muted'}`}
+      className={`flex h-11 items-center gap-2 self-start rounded-xl px-3 text-[14px] font-bold ${fresh ? 'bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg' : 'text-muted'}`}
     >
       <Icon name="message" size={18} />
       {total ? `Обсуждение · ${total}` : 'Спросить'}

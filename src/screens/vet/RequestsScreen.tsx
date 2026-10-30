@@ -9,7 +9,7 @@ import type { CurrentUser, ElephantName, Purchase, RequestFrequency, VetRequest 
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast, type Glow } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast, type Glow } from '../../ui/kit';
 import { canCloseRequest, canEdit } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
@@ -281,7 +281,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
                       haptics.success();
                       toast(`Отмечено: ${o}`);
                     }}
-                    className="h-11 rounded-xl bg-ink px-2 text-[15px] font-extrabold text-bg"
+                    className={`h-11 rounded-xl px-2 text-[15px] font-extrabold text-ink ${KEY}`}
                   >
                     {o}
                   </button>
@@ -531,7 +531,7 @@ export function NewRequestSheet({
           {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кнопки ответа: {options.join(' · ')}</span>}
         </div>
         {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
-        <Card className="divide-y divide-surface2 overflow-hidden">
+        <Card className="divide-y divide-edge overflow-hidden">
           <Check on={photo} label="Нужно фото в ответ" sub="кипер отметит выполнение с фото" onChange={setPhoto} />
           <Check on={urgent} label="Срочно" sub="наверху экрана у кипера" onChange={setUrgent} />
         </Card>

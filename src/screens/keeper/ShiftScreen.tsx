@@ -97,7 +97,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       {/* компактный бар: кто дежурит, с какого часа и статус смены — в одну строку */}
       <header className="flex flex-col gap-1.5">
         <Card tone="glass" className="flex items-center gap-3 px-3.5 py-2.5">
-          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal/15 text-[16px] font-extrabold text-teal">
+          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-[16px] font-extrabold text-teal-fg">
             {shift.keeper_name.trim().charAt(0).toUpperCase()}
           </span>
           <div className="flex min-w-0 flex-1 flex-col">

@@ -197,13 +197,13 @@ function ShiftCard({ shift: s }: { shift: Shift }) {
           ))}
           {ELEPHANTS.map((el) => (
             <Fragment key={el}>
-              <span className="border-t border-surface2 py-1 text-left text-[13px] font-bold text-ink2">{el}</span>
+              <span className="border-t border-edge py-1 text-left text-[13px] font-bold text-ink2">{el}</span>
               {METRICS.map((m) => {
                 // нетронутая клетка — норма, только если кипер подтвердил «осмотрел всех» при сдаче
                 const level = s.state?.[el]?.[m.key]?.level ?? (s.checked_at ? 0 : null);
                 const mark = level == null ? UNSET : MARK[level];
                 return (
-                  <span key={m.key} className={`border-t border-surface2 py-1 text-[16px] font-extrabold ${mark.cls}`}>
+                  <span key={m.key} className={`border-t border-edge py-1 text-[16px] font-extrabold ${mark.cls}`}>
                     {mark.sym}
                   </span>
                 );
@@ -283,7 +283,7 @@ function ShiftDetails({ shift }: { shift: Shift }) {
         )}
 
         <Section title="Кормление">
-          <Card className="divide-y divide-surface2 overflow-hidden">
+          <Card className="divide-y divide-edge overflow-hidden">
             {FEED_TIMES.map((t) => {
               const f = shift.feeds[t];
               const eaten = f?.done ? ELEPHANTS.filter((e) => (f.eaten?.[e] ?? 'all') !== 'all') : [];
@@ -320,7 +320,7 @@ function ShiftDetails({ shift }: { shift: Shift }) {
 
         {sMarks.length > 0 && (
           <Section title="Назначения и задачи">
-            <Card className="divide-y divide-surface2 overflow-hidden">
+            <Card className="divide-y divide-edge overflow-hidden">
               {sMarks.map((m) => (
                 <div key={m.id} className="flex flex-col gap-0.5 px-4 py-2.5">
                   <span className="text-[14px] font-semibold">{requests.find((r) => r.id === m.request_id)?.text ?? 'Заявка'}</span>
