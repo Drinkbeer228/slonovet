@@ -8,7 +8,7 @@ import { arrivePurchase, setPurchaseStatus } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { currentStop } from '../domain/stops';
 import { QUALITY, suppliersFor } from '../domain/suppliers';
-import { balances, categoryOf, countWords, fmtNum, orderHint, packWords, stockPerDay, stockView, toStockUnits } from '../domain/stock';
+import { STOCK_CATEGORIES, balances, categoryOf, countWords, fmtNum, orderHint, packWords, stockPerDay, stockView, toStockUnits } from '../domain/stock';
 import { Button, Card, Check, Chip, DateInput, Field, KEY, Section, Sheet, UrgentBadge, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
@@ -279,7 +279,8 @@ export function NewPurchaseSheet({
   const weekHint = item ? (orderHint(stockView(item, balances(moves).get(item.id) ?? 0, stockPerDay(items, diets, moves).get(item.id) ?? null))?.text ?? '') : '';
   const title = itemId === 'other' ? other.trim() : (item?.name ?? '');
   const sorted = [...items].sort((a, b) => a.sort - b.sort);
-  const produce = sorted.filter((i) => categoryOf(i) === 'veg');
+  // по группам, как на «Фураже»; пустые группы не показываем
+  const groups = STOCK_CATEGORIES.map((g) => ({ ...g, list: sorted.filter((i) => categoryOf(i) === g.id) })).filter((g) => g.list.length);
 
   return (
     <Sheet
@@ -317,26 +318,22 @@ export function NewPurchaseSheet({
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <span className="px-1 text-[14px] font-bold text-muted">Что</span>
+        <div className="flex flex-col gap-3">
+          {groups.map((g) => (
+            <div key={g.id} className="flex flex-col gap-2">
+              <span className="px-1 text-[14px] font-bold text-muted">{g.title}</span>
+              <div className="flex flex-wrap gap-2">
+                {g.list.map((i) => (
+                  <Chip key={i.id} on={itemId === i.id} onClick={() => setItemId(i.id)}>
+                    {i.name}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          ))}
           <div className="flex flex-wrap gap-2">
-            {sorted
-              .filter((i) => categoryOf(i) !== 'veg')
-              .map((i) => (
-                <Chip key={i.id} on={itemId === i.id} onClick={() => setItemId(i.id)}>
-                  {i.name}
-                </Chip>
-              ))}
-          </div>
-          <span className="px-1 pt-1 text-[13px] font-bold text-muted">Овощи и фрукты</span>
-          <div className="flex flex-wrap gap-2">
-            {produce.map((i) => (
-              <Chip key={i.id} on={itemId === i.id} onClick={() => setItemId(i.id)}>
-                {i.name}
-              </Chip>
-            ))}
             <Chip on={itemId === 'other'} onClick={() => setItemId('other')}>
-              Другое
+              Другое — вписать
             </Chip>
           </div>
         </div>
