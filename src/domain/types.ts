@@ -21,6 +21,8 @@ export interface Profile extends Base {
   full_name: string;
   role: Role;
   active: boolean;
+  /** телефон для звонка с экрана (у врача — кнопка «Позвонить врачу») */
+  phone?: string | null;
 }
 
 export interface CellState {
@@ -126,11 +128,13 @@ export interface RequestMark extends Base {
   photo_path: string | null;
 }
 
-export type NoteKind = 'observation' | 'procedure' | 'medication';
+/** incident — «ЧП»: не про слона (вода, свет, инвентарь, манеж, стресс) */
+export type NoteKind = 'observation' | 'procedure' | 'medication' | 'incident';
 
 export interface Note extends Base {
   shift_id: string;
-  elephant: ElephantName;
+  /** 'none' — запись «ЧП», не про конкретную слониху */
+  elephant: ElephantName | 'none';
   kind: NoteKind;
   metric: MetricKey | null;
   text: string;

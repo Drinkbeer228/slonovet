@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ELEPHANTS, LEVEL_LABEL, METRICS, METRIC_LABEL } from '../../domain/elephants';
-import { setCell, toggleSymptom } from '../../domain/actions';
-import { shiftFlags } from '../../domain/shift';
+import { fillNorm, setCell, toggleSymptom } from '../../domain/actions';
+import { shiftFlags, unsetCount } from '../../domain/shift';
 import type { ElephantName, Level, MetricKey, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
-import { Button, Card, Chip, LEVEL_CELL, LEVEL_DOT, Section, Segmented, Sheet, TONE } from '../../ui/kit';
+import { Button, Card, Chip, LEVEL_CELL, LEVEL_DOT, LEVEL_UNSET, Section, Segmented, Sheet, TONE } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import type { NoteDraft } from '../common/NoteSheet';
 
@@ -14,15 +14,26 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
   // открытая ячейка: признаки, уровень и запись — в шторке, чтобы таблица 7×3 не разъезжалась
   const [open, setOpen] = useState<{ el: ElephantName; m: MetricKey } | null>(null);
 
-  // норма → сразу «внимание» и шторка с признаками; не норма — шторка (там же «плохо» и вернуть «норму»)
+  // отмеченная «норма» → сразу «внимание» и шторка с признаками; не отмеченная — шторка с выбором (ничего не ставим сами)
   const tap = (el: ElephantName, m: MetricKey) => {
-    const cur = shift.state?.[el]?.[m]?.level ?? 0;
+    const cur = shift.state?.[el]?.[m]?.level;
     if (cur === 0) setCell(shift, el, m, 1);
     setOpen({ el, m });
   };
+  const unset = unsetCount(shift);
 
   return (
-    <Section title="Состояние" id="sec-state">
+    <Section
+      title="Состояние"
+      id="sec-state"
+      aside={
+        !readOnly && unset > 0 ? (
+          <button type="button" onClick={() => fillNorm(shift, [...ELEPHANTS], METRICS.map((x) => x.key))} className="-my-2 -mr-2 flex h-11 items-center px-2 font-bold text-teal">
+            Остальное — норма ({unset})
+          </button>
+        ) : undefined
+      }
+    >
       <Card tone="sunken" className="flex flex-col gap-1 p-2">
         <div className="grid grid-cols-[88px_repeat(3,minmax(0,1fr))] gap-1 pb-1.5 pt-1">
           <span />
@@ -38,7 +49,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
             {ELEPHANTS.map((el) => {
               const cell = shift.state?.[el]?.[m.key];
               const level = cell?.level ?? 0;
-              const label = LEVEL_LABEL[level];
+              const label = cell ? LEVEL_LABEL[level] : 'не отм.';
               const n = cell?.symptoms?.length ?? 0;
               return (
                 <button
@@ -47,7 +58,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
                   disabled={readOnly}
                   aria-label={`${el}, ${m.label}: ${label}${n ? `, признаков: ${n}` : ''}`}
                   onClick={() => tap(el, m.key)}
-                  className={`relative h-11 rounded-[10px] border text-[13px] transition-transform active:scale-[0.97] ${LEVEL_CELL[level]}`}
+                  className={`relative h-11 rounded-[10px] border text-[13px] transition-transform active:scale-[0.97] ${cell ? LEVEL_CELL[level] : LEVEL_UNSET}`}
                 >
                   {label}
                   {/* сколько признаков отмечено — уголком, чтобы не теснить слово */}
@@ -125,6 +136,7 @@ function CellSheet({
   const meta = METRICS.find((x) => x.key === m)!;
   const cur = shift.state?.[el]?.[m];
   const level = cur?.level ?? 0;
+  const value = cur ? String(level) : ''; // не отмечено — ни один вариант не выбран
   const symptoms = cur?.symptoms ?? [];
   return (
     <Sheet
@@ -140,14 +152,14 @@ function CellSheet({
       <div className="flex flex-col gap-4">
         <Segmented
           label="Состояние"
-          value={String(level)}
+          value={value}
           onChange={(v) => {
             setCell(shift, el, m, Number(v) as Level);
             if (v === '0') onClose();
           }}
           options={LEVELS}
         />
-        {level > 0 && (
+        {cur && level > 0 && (
           <>
             <div className="flex flex-wrap gap-2">
               {meta.symptoms.map((sym) => {

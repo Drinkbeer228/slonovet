@@ -1,86 +1,72 @@
 import { useMemo } from 'react';
-import { ELEPHANTS, METRICS } from '../../domain/elephants';
-import { FEED_TIMES, sortShifts } from '../../domain/shift';
-import type { ElephantName, Level, Shift } from '../../domain/types';
+import { healthAlerts, type HealthItem } from '../../domain/health';
 import { useRows } from '../../lib/store';
-import { addDays, isoDate, relDate } from '../../lib/dates';
-import { LEVEL_DOT, Plate } from '../../ui/kit';
+import { relDate, shortDate } from '../../lib/dates';
+import { Card, LEVEL_DOT, Plate } from '../../ui/kit';
+import { Icon } from '../../ui/Icon';
 
-/** Сколько последних дней смотрим, чтобы заметить, что тянется несколько дежурств подряд. */
-const DAYS = 14;
+const dayText = (a: HealthItem) => (a.day <= 1 ? relDate(a.since) : `${a.day}-й день, с ${shortDate(a.since)}`);
 
-function eatenLevel(s: Shift | undefined, el: ElephantName): Level | null {
-  if (!s) return null;
-  const done = FEED_TIMES.map((t) => s.feeds[t]).filter((f) => f?.done);
-  if (!done.length) return null;
-  if (done.some((f) => f!.eaten?.[el] === 'none')) return 2;
-  if (done.some((f) => f!.eaten?.[el] === 'half')) return 1;
-  return 0;
-}
-
-interface Alert {
-  el: ElephantName;
-  text: string;
-  level: Level;
-}
-
-/** Что показать врачу наверху: повторяющиеся отклонения и «плохо» в последней смене. */
-function computeAlerts(byDate: Map<string, Shift>, dates: string[]): Alert[] {
-  const out: Alert[] = [];
-  const recent = [...dates].reverse().filter((d) => byDate.has(d)); // от свежих к старым
-  const latest = byDate.get(recent[0]);
-  for (const el of ELEPHANTS) {
-    for (const m of METRICS) {
-      const lv = (d: string) => byDate.get(d)?.state?.[el]?.[m.key]?.level ?? null;
-      let streak = 0;
-      for (const d of recent) {
-        if ((lv(d) ?? 0) > 0) streak++;
-        else break;
-      }
-      const last = latest ? lv(recent[0]) : null;
-      if (last === 2) out.push({ el, level: 2, text: `${m.label.toLowerCase()} — плохо${streak > 1 ? `, ${streak} дежурства подряд` : ''}` });
-      else if (streak >= 2) out.push({ el, level: 1, text: `${m.label.toLowerCase()} — внимание ${streak} ${streak < 5 ? 'дежурства' : 'дежурств'} подряд` });
-    }
-    const eaten = eatenLevel(latest, el);
-    if (latest && eaten && eaten > 0) {
-      const which = FEED_TIMES.filter((t) => latest.feeds[t]?.done && (latest.feeds[t]!.eaten?.[el] ?? 'all') !== 'all');
-      out.push({ el, level: eaten, text: `не доела: ${which.join(', ')} (${relDate(latest.date)})` });
-    }
-  }
-  return out.sort((a, b) => b.level - a.level);
-}
-
-/** Последние 14 дней: дежурство на каждую дату и тревоги по слонихам. */
-function useRecent() {
-  const shifts = sortShifts(useRows('shifts'));
-  const latest = shifts[0];
-  const end = latest && latest.date > isoDate() ? latest.date : isoDate();
-  const dates = useMemo(() => Array.from({ length: DAYS }, (_, i) => addDays(end, i - DAYS + 1)), [end]);
-  const byDate = useMemo(() => {
-    const m = new Map<string, Shift>();
-    // если за дату несколько смен — берём последнюю
-    for (const s of [...shifts].reverse()) m.set(s.date, s);
-    return m;
-  }, [shifts]);
-  const alerts = useMemo(() => computeAlerts(byDate, dates), [byDate, dates]);
-  return { alerts };
-}
-
-/** Тревоги сверху журнала: что плохо или повторяется несколько дежурств подряд. Пусто — плашки нет. */
-export function AlertsCard() {
-  const { alerts } = useRecent();
-  if (!alerts.length) return null;
+function Line({ a, level }: { a: HealthItem; level: 1 | 2 }) {
   return (
-    <Plate glow={alerts.some((a) => a.level >= 2) ? 'coral' : 'amber'} halo className="flex flex-col gap-1.5 p-4">
-      <span className="text-[12px] font-extrabold tracking-wide text-amber-fg">ТРЕБУЕТ ВНИМАНИЯ</span>
-      {alerts.map((a, i) => (
-        <span key={i} className="flex items-start gap-2 text-[15px] font-bold leading-snug">
-          <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${LEVEL_DOT[a.level]}`} />
-          <span>
-            {a.el}: {a.text}
-          </span>
-        </span>
+    <span className="flex items-start gap-2 text-[15px] font-bold leading-snug">
+      <span className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${LEVEL_DOT[level]}`} />
+      <span>
+        {a.el}: {a.text}
+        {a.symptoms.length > 0 && <span className="font-semibold text-ink2"> ({a.symptoms.join(', ')})</span>}
+        <span className="font-semibold text-muted"> · {dayText(a)}</span>
+      </span>
+    </span>
+  );
+}
+
+/** Кнопки звонка врачам, у которых в профиле есть телефон. */
+export function CallVet() {
+  const vets = useRows('profiles').filter((p) => p.active && p.role === 'vet' && p.phone?.trim());
+  if (!vets.length) return <span className="text-[13px] font-semibold text-muted">Телефона врача в «Персонале» нет — директор может его вписать.</span>;
+  return (
+    <div className="flex flex-col gap-2">
+      {vets.map((v) => (
+        <a
+          key={v.id}
+          href={`tel:${v.phone!.replace(/[^\d+]/g, '')}`}
+          className="flex h-12 items-center justify-center gap-2 rounded-xl bg-coral text-[16px] font-extrabold text-bg"
+        >
+          <Icon name="phone" size={18} />
+          Позвонить врачу: {v.full_name}
+        </a>
       ))}
-    </Plate>
+    </div>
+  );
+}
+
+/**
+ * Наверху журнала. «Тревога» (плохо, отказ от еды) — коралловая плита со звонком врачу.
+ * «В процедурах» — спокойный список: «внимание» тут рабочая пометка (лечение, наблюдение), а не повод для паники.
+ */
+export function AlertsCard() {
+  const shifts = useRows('shifts');
+  const { alarms, procedures } = useMemo(() => healthAlerts(shifts), [shifts]);
+  if (!alarms.length && !procedures.length) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      {alarms.length > 0 && (
+        <Plate glow="coral" halo className="flex flex-col gap-2 p-4">
+          <span className="text-[12px] font-extrabold tracking-wide text-coral-fg">ТРЕВОГА</span>
+          {alarms.map((a, i) => (
+            <Line key={i} a={a} level={2} />
+          ))}
+          <CallVet />
+        </Plate>
+      )}
+      {procedures.length > 0 && (
+        <Card className="flex flex-col gap-1.5 p-4">
+          <span className="text-[12px] font-extrabold tracking-wide text-muted">В ПРОЦЕДУРАХ И ПОД НАБЛЮДЕНИЕМ</span>
+          {procedures.map((a, i) => (
+            <Line key={i} a={a} level={1} />
+          ))}
+        </Card>
+      )}
+    </div>
   );
 }

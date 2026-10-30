@@ -5,7 +5,7 @@ import type { CurrentUser, ElephantName, MetricKey, NoteKind } from '../../domai
 import { Button, Chip, FilePreview, PhotoPick, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
 
 export interface NoteDraft {
-  elephant: ElephantName;
+  elephant: ElephantName | 'none';
   metric: MetricKey | null;
   kind: NoteKind;
 }
@@ -28,7 +28,7 @@ export function NoteSheet({
   user: CurrentUser;
   onClose: () => void;
 }) {
-  const [el, setEl] = useState<ElephantName>('Претти');
+  const [el, setEl] = useState<ElephantName | 'none'>('Претти');
   const [kind, setKind] = useState<NoteKind>('observation');
   const [text, setText] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
@@ -47,8 +47,9 @@ export function NoteSheet({
     if (!draft || (!text.trim() && !photo)) return;
     setBusy(true);
     try {
-      await addNote({ shift_id: shiftId, elephant: el, kind, metric: draft.metric, text, photo, user });
-      toast('Записано — видно в журнале и у врача');
+      // «ЧП» — запись не про слониху: вода, свет, инвентарь, манеж, стресс
+      await addNote({ shift_id: shiftId, elephant: el, kind: el === 'none' ? 'incident' : kind, metric: draft.metric, text, photo, user });
+      toast(el === 'none' ? 'ЧП записано — видно в журнале' : 'Записано — видно в журнале и у врача');
       onClose();
     } catch {
       toast('Не удалось сохранить', 'error');
@@ -58,13 +59,15 @@ export function NoteSheet({
   };
 
   const placeholder =
-    kind === 'medication' ? 'Препарат, доза, как давали' : kind === 'procedure' ? 'Что сделали: стопы, железа, бивни…' : 'Что видно';
+    el === 'none'
+      ? 'Что случилось: вода, свет, сломалось, слоны тянули аппаратуру, стресс…'
+      : kind === 'medication' ? 'Препарат, доза, как давали' : kind === 'procedure' ? 'Что сделали: стопы, железа, бивни…' : 'Что видно';
 
   return (
     <Sheet
       open={draft !== null}
       onClose={onClose}
-      title={draft?.metric ? `${draft.elephant} · ${METRIC_LABEL[draft.metric].toLowerCase()} — что видно` : 'Запись'}
+      title={draft?.metric ? `${draft.elephant} · ${METRIC_LABEL[draft.metric].toLowerCase()} — что видно` : el === 'none' ? 'ЧП' : 'Запись'}
       footer={
         <Button kind="primary" big full onClick={save} disabled={busy || (!text.trim() && !photo)}>
           Сохранить
@@ -74,8 +77,13 @@ export function NoteSheet({
       <div className="flex flex-col gap-4">
         {!draft?.metric && (
           <>
-            <Segmented label="Слониха" value={el} onChange={setEl} options={ELEPHANTS.map((e) => ({ value: e, label: e }))} />
-            <div className="flex flex-wrap gap-2">
+            <Segmented
+              label="Слониха"
+              value={el}
+              onChange={setEl}
+              options={[...ELEPHANTS.map((e) => ({ value: e as ElephantName | 'none', label: e })), { value: 'none', label: 'ЧП' }]}
+            />
+            <div className={`flex flex-wrap gap-2 ${el === 'none' ? 'hidden' : ''}`}>
               {KINDS.map((k) => (
                 <Chip key={k.value} on={kind === k.value} onClick={() => setKind(k.value)}>
                   {k.label}

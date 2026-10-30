@@ -3,7 +3,7 @@ import type { Note } from '../../domain/types';
 import { localDay, relDate, timeOf } from '../../lib/dates';
 import { Card, PhotoThumb } from '../../ui/kit';
 
-const KIND: Record<Note['kind'], string> = { observation: '', procedure: '💉 процедура', medication: '💊 препарат' };
+const KIND: Record<Note['kind'], string> = { observation: '', procedure: '💉 процедура', medication: '💊 препарат', incident: '⚠ ЧП' };
 
 export function NotesList({ notes, showElephant = true, showDate = false }: { notes: Note[]; showElephant?: boolean; showDate?: boolean }) {
   return (
@@ -16,7 +16,7 @@ export function NotesList({ notes, showElephant = true, showDate = false }: { no
               {[
                 showDate ? relDate(localDay(n.created_at)) : null,
                 timeOf(n.created_at),
-                showElephant ? n.elephant : null,
+                showElephant && n.elephant !== 'none' ? n.elephant : null,
                 n.metric ? METRIC_LABEL[n.metric].toLowerCase() : KIND[n.kind] || null,
                 n.author_name,
               ]

@@ -1,7 +1,7 @@
 import { canReceiveHandover, canTakeShift, canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, rolloverShift, updateShift } from '../../domain/actions';
-import { FEED_TIMES, acceptedBy, currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
+import { FEED_TIMES, acceptedBy, currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags, unsetCount } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
@@ -246,6 +246,7 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   const warnings = [
     feedsLeft.length ? `Не отмечено кормление: ${feedsLeft.join(', ')}` : null,
     reqLeft.length ? `Не выполнено назначений и задач: ${reqLeft.length}` : null,
+    unsetCount(shift) ? `Не отмечено в «Состоянии»: ${unsetCount(shift)} — с галочкой «осмотрел всех» станет нормой` : null,
   ].filter(Boolean) as string[];
 
   return (

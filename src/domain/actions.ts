@@ -269,7 +269,7 @@ export async function addComment(requestId: string, user: CurrentUser, text: str
 
 export async function addNote(input: {
   shift_id: string;
-  elephant: ElephantName;
+  elephant: ElephantName | 'none';
   kind: NoteKind;
   metric: MetricKey | null;
   text: string;
