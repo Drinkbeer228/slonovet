@@ -194,3 +194,25 @@ describe('Фураж — правка после пересчёта склада
     expect(s1().feeds['13:00']?.eaten?.['Марго']).toBe('half');
   });
 });
+
+describe('Фураж — приём смены без сдачи и приходы (этап 1C аудита 30.10)', () => {
+  it('кормление отмечено в двух сменах одного дня (приём без сдачи офлайн) — списывается один раз', async () => {
+    const s2: Shift = { ...shift, id: 's2', keeper_id: 'user-b', keeper_name: 'Кипер Б', accepted_from: 's1' };
+    await p.store.seedRows('shifts', [s2]);
+    await p.actions.setFeedDone(s1(), '13:00', true, keeperA);
+    await p.actions.setFeedDone(p.store.getRow('shifts', 's2')!, '13:00', true, keeperA);
+    expect(activeFeed()).toEqual([['formamax', -2]]);
+    await p.actions.setFeedDone(p.store.getRow('shifts', 's2')!, '13:00', false, keeperA); // снял второй — вернулось всё
+    expect(activeFeed()).toEqual([]);
+  });
+
+  it('вторая часть поставки — отдельный приход, а то же количество дважды — один', async () => {
+    const oats = { ...item('oats', 'Овёс', 'grain'), sack_kg: 40 };
+    const purchase = { id: 'p2', item_id: 'oats', title: 'Овёс', amount: '5 мешков', note: '', urgent: false, status: 'ordered' as const, author_id: 'user-a', author_name: 'Кипер А', status_by: null, status_at: null, created_at: now, updated_at: now };
+    await p.actions.arrivePurchase(purchase, oats, 3, keeperA, null);
+    await p.actions.arrivePurchase(purchase, oats, 3, keeperA, null);
+    await p.actions.arrivePurchase(purchase, oats, 2, keeperA, null);
+    const total = p.store.getRows('stock_moves').filter((m) => m.item_id === 'oats').reduce((s, m) => s + Number(m.delta), 0);
+    expect(total).toBe(200); // 3 мешка (120 кг) + 2 мешка (80 кг), повтор не задвоил
+  });
+});

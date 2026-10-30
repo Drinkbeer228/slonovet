@@ -71,9 +71,16 @@ export function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase
       }
     >
       {it ? (
-        <Field label={`Сколько привезли, ${unit}`} hint={it.kind === 'sack' && it.sack_kg ? `мешок ${fmtNum(it.sack_kg)} кг` : undefined}>
-          <input className={inputCls} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
-        </Field>
+        <div className="flex flex-col gap-2">
+          <Field label={`Сколько привезли, ${unit}`} hint={it.kind === 'sack' && it.sack_kg ? `мешок ${fmtNum(it.sack_kg)} кг` : undefined}>
+            <input className={inputCls} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
+          </Field>
+          {it.kind === 'sack' && /кг|килог/i.test(p.amount) && (
+            <span className="text-[13px] font-semibold text-amber-fg">
+              В заявке «{p.amount}», а здесь считаем мешками — проверьте число.
+            </span>
+          )}
+        </div>
       ) : (
         <p className="m-0 text-[15px] text-ink2">Этой позиции уже нет в фураже — заявка просто закроется.</p>
       )}

@@ -118,6 +118,9 @@ export async function fillNorm(shift: Shift, els: ElephantName[], metrics: Metri
   });
 }
 
+/** Кормление в сутках: дата смены и час. Две смены одного дня (приём без сдачи офлайн) списывают одно кормление один раз. */
+const feedSlot = (shift: Shift, time: string) => `${shift.date}:${time}`;
+
 /**
  * Движение с постоянным id (кормление, вес, сено, мешки): правка заменяет прежнее. Но если прежнее лежит до
  * пересчёта склада, оно в остатке уже не учитывается, и замена потерялась бы (или, наоборот, посчиталась бы
@@ -158,10 +161,12 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
   });
   if (!done) {
     // снимаем именно то, что записано за эту смену и это кормление, — даже если рацион с тех пор поменялся
-    const feedPrefix = `feed:${shift.id}:${time}:`;
+    // новые id — по дате смены, старые (до 30.10) — по номеру смены: снимаем и те и другие
+    const feedPrefixes = [`feed:${feedSlot(shift, time)}:`, `feed:${shift.id}:${time}:`];
+    const vegIds = [`veg:${feedSlot(shift, time)}`, `veg:${shift.id}:${time}`];
     for (const m of getRows('stock_moves')) {
       if (m.id.includes(':adj:')) continue; // поправки уйдут вместе со своим движением (см. putKeyedMove)
-      if (m.id.startsWith(feedPrefix) || m.id === `veg:${shift.id}:${time}`) {
+      if (feedPrefixes.some((f) => m.id.startsWith(f)) || vegIds.includes(m.id)) {
         await putKeyedMove({ ...m, deleted: true, author_name: user.full_name });
       }
     }
@@ -171,13 +176,13 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
   // (getRow не видит удалённые строки, поэтому при повторной галочке списание пересоздаём из кг смены)
   const kg = getRow('shifts', shift.id)?.feeds[time]?.kg ?? 0;
   const weighedId = weighedItem(getRows('diets'), time);
-  if (kg > 0 && weighedId && !getRow('stock_moves', `veg:${shift.id}:${time}`)) await setFeedKg(shift, time, weighedId, kg, user);
+  if (kg > 0 && weighedId && !getRow('stock_moves', `veg:${feedSlot(shift, time)}`)) await setFeedKg(shift, time, weighedId, kg, user);
   const usage = feedUsage(getRows('diets'), time, getRows('stock_items'));
   // поправленное кипером (сетками) — важнее рациона
   const given = getRow('shifts', shift.id)?.feeds[time]?.given ?? {};
   for (const [item, kg] of Object.entries(given)) usage.set(item, kg);
   for (const [item, qty] of usage) {
-    const id = `feed:${shift.id}:${time}:${item}`;
+    const id = `feed:${feedSlot(shift, time)}:${item}`;
     await putKeyedMove({ id, item_id: item, delta: -qty, reason: 'feed', shift_id: shift.id, author_name: user.full_name, deleted: false });
   }
   void reportLowStock(); // что-то стало «заканчивается» — закупщикам уйдёт уведомление
@@ -190,7 +195,7 @@ export async function setFeedGiven(shift: Shift, time: string, itemId: string, k
     const f = s.feeds[time];
     if (f) f.given = { ...(f.given ?? {}), [itemId]: kg };
   });
-  const id = `feed:${shift.id}:${time}:${itemId}`;
+  const id = `feed:${feedSlot(shift, time)}:${itemId}`;
   await putKeyedMove({ id, item_id: itemId, delta: -kg, reason: 'feed', shift_id: shift.id, author_name: user.full_name, deleted: false });
 }
 
@@ -208,7 +213,7 @@ export async function setFeedKg(shift: Shift, time: string, itemId: string, kg: 
     const f = s.feeds[time];
     if (f) f.kg = kg;
   });
-  const id = `veg:${shift.id}:${time}`;
+  const id = `veg:${feedSlot(shift, time)}`;
   await putKeyedMove({ id, item_id: itemId, delta: -kg, reason: 'feed', shift_id: shift.id, author_name: user.full_name, deleted: kg <= 0 });
 }
 
@@ -338,11 +343,12 @@ export async function setPurchaseStatus(p: Purchase, status: PurchaseStatus, use
 
 /**
  * «Привезли» по закупке: зачислить приход (n — мешков, кг или штук, как считается позиция) и закрыть закупку.
- * id прихода — по закупке: два нажатия или два телефона дают один приход. Возвращает, сколько зачислено.
+ * id прихода — по закупке и количеству: два нажатия или два телефона дают один приход, а вторая часть поставки — отдельный. Возвращает, сколько зачислено.
  */
 export async function arrivePurchase(p: Purchase, item: StockItem | undefined, n: number, user: CurrentUser, shiftId: string | null): Promise<number> {
   const delta = item ? toStockUnits(item, n) : 0;
-  if (item && delta > 0) await addStockMove(item.id, delta, 'in', user, shiftId, `in:purchase:${p.id}`);
+  // то же количество дважды (два нажатия, два телефона) — один приход; другое (вторая часть поставки) — отдельный
+  if (item && delta > 0) await addStockMove(item.id, delta, 'in', user, shiftId, `in:purchase:${p.id}:${delta}`);
   await setPurchaseStatus(p, 'done', user);
   return delta;
 }
