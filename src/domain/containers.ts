@@ -22,7 +22,7 @@ export const PURPOSES: { id: ContainerPurpose; label: string }[] = [
   { id: 'personal', label: 'Личное' },
 ];
 
-/** Где лежит: в туре (едет, идёт в погрузку) или на базе. */
+/** Где лежит: на гастролях (едет, идёт в погрузку) или на базе. */
 export type Place = 'tour' | 'base';
 export const placeOf = (c: Pick<Container, 'in_tour'>): Place => (c.in_tour === false ? 'base' : 'tour');
 
@@ -65,7 +65,7 @@ export interface ContainerFilter {
 /**
  * Поиск реквизита: «синяя шляпа» → контейнер №6 и сама строка описи, где нашлось.
  * Ищем по номеру, таре, «что внутри», заметке и каждой строке описи; все слова запроса должны найтись.
- * Фильтр — по таре, по «что внутри» и по месту (в туре / на базе).
+ * Фильтр — по таре, по «что внутри» и по месту (на гастролях / на базе).
  */
 export function findInContainers(list: Container[], query: string, f: ContainerFilter = {}): { c: Container; lines: string[] }[] {
   const words = norm(query).split(/\s+/).filter(Boolean);

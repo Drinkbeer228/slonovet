@@ -236,7 +236,7 @@ export type ContainerKind = 'wheels' | 'case' | 'box' | 'pallet' | 'bag' | 'othe
 export type ContainerPurpose = 'elephants' | 'props' | 'light_sound' | 'costumes' | 'household' | 'personal';
 
 /**
- * Контейнер: номер как на ящике («6», «6А», «Кофр звук 2»), тип, габариты в см, едет ли в этом туре,
+ * Контейнер: номер как на ящике («6», «6А», «Кофр звук 2»), тип, габариты в см, едет ли на гастроли,
  * опись по строке на предмет. К фуре не привязан — погрузка отдельно (LoadPlan).
  */
 export interface Container extends Base {
@@ -248,7 +248,7 @@ export interface Container extends Base {
   length_cm?: number | null;
   width_cm?: number | null;
   height_cm?: number | null;
-  /** true — в туре (идёт в погрузку), false — на базе: в погрузку не идёт, в описи остаётся */
+  /** true — на гастролях (идёт в погрузку), false — на базе: в погрузку не идёт, в описи остаётся */
   in_tour?: boolean;
   contents: string;
   note: string;

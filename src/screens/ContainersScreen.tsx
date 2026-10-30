@@ -46,7 +46,7 @@ export function ContainersScreen({ user }: { user: CurrentUser }) {
 }
 
 const PLACES: { id: Place; label: string }[] = [
-  { id: 'tour', label: 'В туре' },
+  { id: 'tour', label: 'На гастролях' },
   { id: 'base', label: 'На базе' },
 ];
 
@@ -74,7 +74,7 @@ function Inventory({ user, canWrite }: { user: CurrentUser; canWrite: boolean })
         )}
       </div>
       {count('base') > 0 && (
-        <div className="flex gap-2">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&>*]:shrink-0">
           <Chip on={!place} onClick={() => setPlace(null)}>
             Все · {live.length}
           </Chip>
