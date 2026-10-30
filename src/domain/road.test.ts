@@ -20,9 +20,9 @@ describe('в дороге', () => {
     expect(roadMode([{ id: '_road', qty: 1, done_at: '2026-10-30T08:00:00Z', done_by: 'Андрей' } as MoveItem]).on).toBe(true);
   });
 
-  it('каши убраны из рациона, остальное — как было; кормление только из каши отменено', () => {
+  it('каши и зерносмесь убраны из рациона, остальное — как было; кормление только из каши отменено', () => {
     const road = effectiveDiets([diet], items, true);
-    expect(road[0].meals.map((m) => m.items.map((i) => i.item))).toEqual([[], ['carrot', 'oats']]);
+    expect(road[0].meals.map((m) => m.items.map((i) => i.item))).toEqual([[], ['carrot']]); // каша и овёс убраны
     expect(mealCancelled([diet], road, '13:00')).toBe(true);
     expect(mealCancelled([diet], road, '19:00')).toBe(false);
     expect(effectiveDiets([diet], items, false)).toEqual([diet]);

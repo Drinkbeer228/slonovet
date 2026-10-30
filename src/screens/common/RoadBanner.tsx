@@ -13,7 +13,7 @@ export function RoadBanner() {
       <Icon name="truck" size={20} className="mt-0.5 shrink-0 text-amber-fg" />
       <span className="flex flex-col gap-0.5">
         <span className="text-[15px] font-extrabold text-amber-fg">В дороге</span>
-        <span className="text-[13px] font-semibold text-ink2">Каши отменены · овощи вечером по расписанию · сено и вода вволю</span>
+        <span className="text-[13px] font-semibold text-ink2">Каши и зерносмесь отменены · овощи вечером по расписанию · сено и вода вволю</span>
         {mode.since && (
           <span className="text-[12px] font-semibold text-muted">
             с {relDate(localDay(mode.since))} {timeOf(mode.since)}

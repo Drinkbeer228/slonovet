@@ -2,7 +2,7 @@ import { categoryOf } from './stock';
 import type { Diet, MoveItem, StockItem } from './types';
 
 /*
- * «В дороге»: на время переезда каши отменяются полностью (запаривать негде и некогда);
+ * «В дороге»: на время переезда каши и зерносмесь отменяются полностью (запаривать негде и некогда);
  * овощи — вечером по расписанию, сено и вода — вволю. Режим — одна строка в move_items, без новой таблицы:
  * qty = 1 — в дороге, done_at — с какого момента, done_by — кто включил.
  */
@@ -23,10 +23,13 @@ export function roadMode(rows: MoveItem[]): RoadMode {
   return { on: r?.qty === 1, since: r?.done_at ?? null, by: r?.done_by ?? null };
 }
 
-/** Рацион с учётом режима: в дороге из кормлений убраны каши. */
+/** Что в дороге не дают: каши и зерносмесь (зерно и крупы). */
+export const ROAD_OFF: string[] = ['porridge', 'grain'];
+
+/** Рацион с учётом режима: в дороге из кормлений убраны каши и зерносмесь. */
 export function effectiveDiets(diets: Diet[], items: StockItem[], road: boolean): Diet[] {
   if (!road) return diets;
-  const porridge = new Set(items.filter((i) => categoryOf(i) === 'porridge').map((i) => i.id));
+  const porridge = new Set(items.filter((i) => ROAD_OFF.includes(categoryOf(i))).map((i) => i.id));
   return diets.map((d) => ({ ...d, meals: d.meals.map((m) => ({ ...m, items: m.items.filter((mi) => !mi.item || !porridge.has(mi.item)) })) }));
 }
 

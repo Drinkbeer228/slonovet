@@ -101,7 +101,7 @@ export interface MoveNeed {
 
 /**
  * Что брать с собой: дни в дороге + запас на первые дни на новом месте (пока не наладятся поставки).
- * В дороге каши отменены — они нужны только на запас; овощи и сено — на всё время; сено на запас — только если
+ * В дороге каши и зерносмесь отменены — они нужны только на запас; овощи и сено — на всё время; сено на запас — только если
  * на новой точке его нет.
  */
 export function moveNeeds(days: number, diets: Diet[], items: StockItem[], moves: StockMove[], opts: { reserve?: number; hayThere?: boolean } = {}): MoveNeed[] {
@@ -115,7 +115,8 @@ export function moveNeeds(days: number, diets: Diet[], items: StockItem[], moves
   const out: MoveNeed[] = [
     { label: 'Коробок овощей', value: `${all * heads}`, item: 'feed-veg' },
     { label: 'Сена, тюков', value: `≈ ${Math.round(hay * (days + (opts.hayThere ? 0 : reserve)))}`, item: 'feed-hay' },
-    { label: 'Зерносмеси', value: `≈ ${fmtNum(kg(['hercules', 'bran', 'oats', 'corn', 'seeds'], all), 0)} кг`, item: 'feed-grain' },
+    // зерносмесь и каши в дороге не дают — только запас на новое место
+    { label: 'Зерносмеси', value: `≈ ${fmtNum(kg(['hercules', 'bran', 'oats', 'corn', 'seeds'], reserve), 0)} кг`, item: 'feed-grain' },
   ];
   for (const it of items.filter((i) => ['formamax', 'optiform', 'monograss'].includes(i.id))) {
     // каши в дороге не дают — только запас на новое место

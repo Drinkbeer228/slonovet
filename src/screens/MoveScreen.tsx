@@ -44,7 +44,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
   const setRoad = async (on: boolean) => {
     logEvent('road.toggle', { on });
     await put('move_items', { ...row(ROAD_ID, '', ''), qty: on ? 1 : 0, done_by: on ? user.full_name : null, done_at: on ? new Date().toISOString() : null });
-    toast(on ? 'В дороге: каши отменены' : 'Приехали: рацион обычный');
+    toast(on ? 'В дороге: каши и зерносмесь отменены' : 'Приехали: рацион обычный');
   };
 
   return (
@@ -61,7 +61,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
         <Check
           on={road.on}
           label="В дороге"
-          sub={canRoad ? 'каши отменяются у всех, овощи вечером, сено и вода вволю' : 'включает директор, врач или администратор'}
+          sub={canRoad ? 'каши и зерносмесь отменяются у всех, овощи вечером, сено и вода вволю' : 'включает директор, врач или администратор'}
           onChange={(v) => canRoad && setRoad(v)}
         />
       </Card>
@@ -88,7 +88,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
           ))}
         </Card>
         <p className="m-0 px-1 text-[12px] font-semibold text-muted">
-          Считаем по рациону и по реальному расходу сена и мешков за неделю. В дороге каши не дают — их берём только на запас. Коробка — одна голова на один ужин.
+          Считаем по рациону и по реальному расходу сена и мешков за неделю. В дороге каши и зерносмесь не дают — их берём только на запас. Коробка — одна голова на один ужин.
         </p>
       </Section>
 
