@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getClient } from './supabase';
 import { getSession } from './auth';
 import { isStandalone, platform } from './install';
-import { getRows } from './store';
+import { getRows, getEffectiveDiets } from './store';
 import { isoDate } from './dates';
 import { balances, stockPerDay, stockView } from '../domain/stock';
 import { EDITORS } from '../domain/access';
@@ -106,7 +106,7 @@ export async function reportLowStock() {
   const stocked = new Set(moves.filter((m) => m.reason === 'in' || m.counted != null).map((m) => m.item_id));
   const items = getRows('stock_items').filter((it) => stocked.has(it.id));
   const bal = balances(moves);
-  const perDay = stockPerDay(items, getRows('diets'), moves);
+  const perDay = stockPerDay(items, getEffectiveDiets(), moves);
   const low = items.map((it) => stockView(it, bal.get(it.id) ?? 0, perDay.get(it.id) ?? null)).filter((v) => v.low);
   if (!low.length) return;
   const today = isoDate();

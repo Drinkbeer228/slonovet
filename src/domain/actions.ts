@@ -1,4 +1,4 @@
-import { getRow, getRows, newId, put } from '../lib/store';
+import { getEffectiveDiets, getRow, getRows, newId, put } from '../lib/store';
 import { ELEPHANTS, METRICS } from './elephants';
 import { savePhoto } from '../lib/photos';
 import { logEvent } from '../lib/log';
@@ -177,7 +177,8 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
   const kg = getRow('shifts', shift.id)?.feeds[time]?.kg ?? 0;
   const weighedId = weighedItem(getRows('diets'), time);
   if (kg > 0 && weighedId && !getRow('stock_moves', `veg:${feedSlot(shift, time)}`)) await setFeedKg(shift, time, weighedId, kg, user);
-  const usage = feedUsage(getRows('diets'), time, getRows('stock_items'));
+  // в дороге каши отменены — по ним не списываем
+  const usage = feedUsage(getEffectiveDiets(), time, getRows('stock_items'));
   // поправленное кипером (сетками) — важнее рациона
   const given = getRow('shifts', shift.id)?.feeds[time]?.given ?? {};
   for (const [item, kg] of Object.entries(given)) usage.set(item, kg);

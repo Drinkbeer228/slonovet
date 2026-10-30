@@ -99,20 +99,27 @@ export interface MoveNeed {
   item?: string;
 }
 
-/** Что нужно на N дней дороги — по рациону и реальному расходу со склада. */
-export function moveNeeds(days: number, diets: Diet[], items: StockItem[], moves: StockMove[]): MoveNeed[] {
+/**
+ * Что брать с собой: дни в дороге + запас на первые дни на новом месте (пока не наладятся поставки).
+ * В дороге каши отменены — они нужны только на запас; овощи и сено — на всё время; сено на запас — только если
+ * на новой точке его нет.
+ */
+export function moveNeeds(days: number, diets: Diet[], items: StockItem[], moves: StockMove[], opts: { reserve?: number; hayThere?: boolean } = {}): MoveNeed[] {
+  const reserve = opts.reserve ?? 0;
+  const all = days + reserve;
   const heads = ELEPHANTS.length;
   const usage = dailyUsage(diets, items);
   const hay = countPerDay(moves, 'hay') || 9;
   const bags = countPerDay(moves, 'bags') || 2;
-  const kg = (ids: string[]) => ids.reduce((s, id) => s + (usage.get(id) ?? 0), 0) * days;
+  const kg = (ids: string[], n: number) => ids.reduce((s, id) => s + (usage.get(id) ?? 0), 0) * n;
   const out: MoveNeed[] = [
-    { label: 'Коробок овощей', value: `${days * heads}`, item: 'feed-veg' },
-    { label: 'Сена, тюков', value: `≈ ${Math.ceil(hay * days)}`, item: 'feed-hay' },
-    { label: 'Зерносмеси', value: `≈ ${fmtNum(kg(['hercules', 'bran', 'oats', 'corn', 'seeds']), 0)} кг`, item: 'feed-grain' },
+    { label: 'Коробок овощей', value: `${all * heads}`, item: 'feed-veg' },
+    { label: 'Сена, тюков', value: `≈ ${Math.round(hay * (days + (opts.hayThere ? 0 : reserve)))}`, item: 'feed-hay' },
+    { label: 'Зерносмеси', value: `≈ ${fmtNum(kg(['hercules', 'bran', 'oats', 'corn', 'seeds'], all), 0)} кг`, item: 'feed-grain' },
   ];
   for (const it of items.filter((i) => ['formamax', 'optiform', 'monograss'].includes(i.id))) {
-    const need = (usage.get(it.id) ?? 0) * days;
+    // каши в дороге не дают — только запас на новое место
+    const need = (usage.get(it.id) ?? 0) * reserve;
     if (need > 0) {
       out.push({
         label: it.name,
@@ -121,6 +128,6 @@ export function moveNeeds(days: number, diets: Diet[], items: StockItem[], moves
       });
     }
   }
-  out.push({ label: 'Мешков 240 л', value: `≈ ${Math.ceil(bags * days)}`, item: 'clean-bags' });
+  out.push({ label: 'Мешков 240 л', value: `≈ ${Math.ceil(bags * all)}`, item: 'clean-bags' });
   return out;
 }
