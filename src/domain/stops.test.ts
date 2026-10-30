@@ -1,4 +1,4 @@
-// Гастроли (этап C1): текущий город и лента фуража по городам.
+// Гастроли (этап C1): текущий город и лента «Привозили».
 import { describe, expect, it } from 'vitest';
 import { currentStop, ledger } from './stops';
 import type { StockMove, TourStop } from './types';
@@ -14,16 +14,10 @@ describe('гастроли: город и лента фуража', () => {
     expect(currentStop(stops, '2026-10-01')?.city).toBe('Казань');
   });
 
-  it('«Привозили»: только приходы и пересчёты; текущий город отдельно, прошлое — архивом по городам', () => {
+  it('«Привозили»: только приходы и пересчёты за 30 дней, старше — по месяцам; город не влияет', () => {
     const moves = [mv('a', 'in', '2026-10-25'), mv('f', 'fix', '2026-10-26'), mv('b', 'extra', '2026-10-26', -1), mv('c', 'in', '2026-09-15'), mv('d', 'feed', '2026-10-26', -2), mv('e', 'in', '2026-08-01')];
-    const r = ledger(moves, stops, '2026-10-30');
-    expect(r.current.map((m) => m.id)).toEqual(['f', 'a']); // выдачи и кормление — не здесь
-    expect(r.archive.map((g) => [g.stop?.city ?? 'Раньше', g.moves.map((m) => m.id)])).toEqual([['Казань', ['c']], ['Раньше', ['e']]]);
-  });
-
-  it('без отмеченных городов — последние 30 дней, остальное «Раньше»', () => {
-    const r = ledger([mv('new', 'in', '2026-10-25'), mv('old', 'in', '2026-09-01')], [], '2026-10-30');
-    expect(r.current.map((m) => m.id)).toEqual(['new']);
-    expect(r.archive[0].moves.map((m) => m.id)).toEqual(['old']);
+    const r = ledger(moves, '2026-10-30');
+    expect(r.current.map((m) => m.id)).toEqual(['f', 'a']);
+    expect(r.archive.map((g) => [g.label, g.moves.map((m) => m.id)])).toEqual([['сентябрь 2026', ['c']], ['август 2026', ['e']]]);
   });
 });

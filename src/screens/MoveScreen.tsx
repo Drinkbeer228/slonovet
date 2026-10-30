@@ -209,7 +209,7 @@ function StopCard({ user }: { user: CurrentUser }) {
               <DateInput value={day} onChange={setDay} label="Когда приехали" />
             </Field>
             <span className="text-[13px] font-semibold text-muted">
-              В «Фураже» лента приходов и выдач начнётся с этого дня, прошлое уйдёт в архив по городам.
+              По городу поставщики покажут, кто возит здесь.
             </span>
           </div>
         </Sheet>

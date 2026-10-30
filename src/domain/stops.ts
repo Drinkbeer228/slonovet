@@ -9,18 +9,8 @@ export function currentStop(stops: TourStop[], today = isoDate()): TourStop | un
   return sortStops(stops).find((s) => s.arrive_on <= today);
 }
 
-/** Пока ни одного города не отмечено, «текущий период» — последние 30 дней. */
-export const NO_STOP_DAYS = 30;
-
-/** С какого дня считается текущий период ленты: дата приезда в текущий город или 30 дней назад. */
-export function periodStart(stops: TourStop[], today = isoDate()): string {
-  return currentStop(stops, today)?.arrive_on ?? addDays(today, -NO_STOP_DAYS + 1);
-}
-
-/** В каком городе было движение: последний город, куда приехали не позже дня движения. */
-export function stopOfDay(stops: TourStop[], day: string): TourStop | undefined {
-  return sortStops(stops).find((s) => s.arrive_on <= day);
-}
+/** «Привозили» показывает последние 30 дней — от города не зависит. */
+export const LEDGER_DAYS = 30;
 
 /**
  * Лента «Привозили»: приходы и пересчёты — чтобы помнить, когда и что привозили, и вовремя заказать снова.
@@ -28,21 +18,21 @@ export function stopOfDay(stops: TourStop[], day: string): TourStop | undefined 
  */
 const IN_LEDGER: StockMove['reason'][] = ['in', 'fix'];
 
-/**
- * Лента фуража: текущий город отдельно, прошлые — архивом по городам (свежие сверху).
- * Без отмеченных городов архив — всё старше 30 дней одним блоком «Раньше».
- */
-export function ledger(moves: StockMove[], stops: TourStop[], today = isoDate()) {
-  const start = periodStart(stops, today);
+/** Название месяца для архива: «сентябрь 2026». */
+const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+const monthLabel = (day: string) => `${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}`;
+
+/** Лента «Привозили»: последние 30 дней отдельно, всё старше — архивом по месяцам (свежие сверху). */
+export function ledger(moves: StockMove[], today = isoDate()) {
+  const start = addDays(today, -LEDGER_DAYS + 1);
   const list = moves.filter((m) => !m.deleted && IN_LEDGER.includes(m.reason)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const current = list.filter((m) => localDay(m.created_at) >= start);
-  const groups = new Map<string, { stop: TourStop | undefined; moves: StockMove[] }>();
+  const groups = new Map<string, { label: string; moves: StockMove[] }>();
   for (const m of list) {
     const day = localDay(m.created_at);
     if (day >= start) continue;
-    const stop = stopOfDay(stops, day);
-    const key = stop?.id ?? '_before';
-    if (!groups.has(key)) groups.set(key, { stop, moves: [] });
+    const key = day.slice(0, 7);
+    if (!groups.has(key)) groups.set(key, { label: monthLabel(day), moves: [] });
     groups.get(key)!.moves.push(m);
   }
   return { start, current, archive: [...groups.values()] };

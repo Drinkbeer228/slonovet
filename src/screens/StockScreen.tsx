@@ -5,7 +5,7 @@ import { addStockMove, countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
-import { currentStop, ledger } from '../domain/stops';
+import { ledger } from '../domain/stops';
 import { newId, put, useRows } from '../lib/store';
 import { localDay, plural, relDate, shortDate, timeOf } from '../lib/dates';
 import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
@@ -600,19 +600,17 @@ function LedgerRow({ m, items }: { m: StockMove; items: StockItem[] }) {
 const LEDGER_PAGE = 20;
 
 /**
- * «Привозили»: приходы и пересчёты текущего города (с дня приезда); прошлые города — свёрнутым архивом.
+ * «Привозили»: приходы и пересчёты за 30 дней; старше — свёрнуто по месяцам. От города в «Переезде» не зависит.
  * Не бухгалтерия: только чтобы помнить, что и когда привозили, и вовремя заказать.
  */
 function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
-  const stops = useRows('tour_stops');
   const [more, setMore] = useState(false);
   const [archive, setArchive] = useState(false);
-  const { start, current, archive: past } = ledger(moves, stops);
-  const here = currentStop(stops);
+  const { start, current, archive: past } = ledger(moves);
   if (!current.length && !past.length) return null;
   const shown = more ? current : current.slice(0, LEDGER_PAGE);
   return (
-    <Section id="stock-history" title="Привозили" aside={here ? `${here.city} · с ${shortDate(here.arrive_on)}` : `с ${shortDate(start)}`}>
+    <Section id="stock-history" title="Привозили" aside={`за 30 дней, с ${shortDate(start)}`}>
       {current.length ? (
         <Card className="divide-y divide-edge overflow-hidden">
           {shown.map((m) => (
@@ -620,7 +618,7 @@ function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
           ))}
         </Card>
       ) : (
-        <Empty>{here ? `С ${shortDate(here.arrive_on)} пока ничего` : 'За последние 30 дней ничего'}</Empty>
+        <Empty>За последние 30 дней ничего не привозили</Empty>
       )}
       {current.length > LEDGER_PAGE && (
         <Button full onClick={() => setMore(!more)}>
@@ -630,14 +628,12 @@ function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
       {past.length > 0 && (
         <>
           <Button full onClick={() => setArchive(!archive)}>
-            {archive ? 'Скрыть архив' : `Архив прошлых гастролей · ${past.reduce((n, g) => n + g.moves.length, 0)}`}
+            {archive ? 'Скрыть' : `Раньше · ${past.reduce((n, g) => n + g.moves.length, 0)}`}
           </Button>
           {archive &&
             past.map((g) => (
-              <div key={g.stop?.id ?? '_before'} className="flex flex-col gap-1.5">
-                <span className="px-1 text-[13px] font-extrabold text-muted">
-                  {g.stop ? `${g.stop.city} · ${shortDate(g.stop.arrive_on)}${g.stop.depart_on ? `–${shortDate(g.stop.depart_on)}` : ''}` : 'Раньше'}
-                </span>
+              <div key={g.label} className="flex flex-col gap-1.5">
+                <span className="px-1 text-[13px] font-extrabold text-muted">{g.label}</span>
                 <Card className="divide-y divide-edge overflow-hidden">
                   {g.moves.map((m) => (
                     <LedgerRow key={m.id} m={m} items={items} />
