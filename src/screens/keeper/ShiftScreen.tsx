@@ -6,7 +6,7 @@ import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows, useEffectiveDiets } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Plate, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Field, Plate, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { RoadBanner } from '../common/RoadBanner';
@@ -216,7 +216,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
             ) : (
               <>
                 <HandoverNote shift={shift} />
-                <Button kind="primary" big full onClick={() => setHandoverOpen(true)}>
+                <Button kind="primary" big full icon="check" onClick={() => setHandoverOpen(true)}>
                   Сдать дежурство
                 </Button>
               </>
@@ -233,7 +233,8 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
 function HandoverNote({ shift }: { shift: Shift }) {
   const [text, setText] = useState(shift.note);
-  useEffect(() => setText(shift.note), [shift.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // заметку могли поправить в шторке «Сдать дежурство» — подхватываем, иначе выход из поля вернул бы старый текст
+  useEffect(() => setText(shift.note), [shift.id, shift.note]);
   return (
     <Section id="sec-note" title="Передать следующему дежурному">
       <textarea
@@ -254,12 +255,15 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   const people = useRows('profiles').filter((p) => p.active && canReceiveHandover(p.role) && p.id !== user.id);
   const [checked, setChecked] = useState(false);
   const [toId, setToId] = useState<string | null>(null);
+  // заметку пишут прямо здесь, не закрывая шторку; сохраняем при выходе из поля и при сдаче
+  const [note, setNote] = useState(shift.note);
   useEffect(() => {
     if (open) {
       setChecked(false);
       setToId(null);
+      setNote(shift.note);
     }
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const marks = useRows('request_marks');
 
   const { diets: roadDiets, base: baseDiets } = useEffectiveDiets();
@@ -286,7 +290,7 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
           full
           disabled={!checked}
           onClick={async () => {
-            await handOver(shift, shift.note.trim(), toId);
+            await handOver(shift, note.trim(), toId);
             toast('Дежурство сдано');
             onClose();
           }}
@@ -328,12 +332,16 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
             </div>
           </div>
         )}
-        <div className="flex flex-col gap-2">
-          <span className="px-1 text-[14px] font-bold text-muted">Следующему дежурному</span>
-          <Card className="px-4 py-3 text-[15px] leading-snug">
-            {shift.note.trim() ? shift.note : <span className="text-muted">Без заметки. Можно написать на экране, в блоке «Передать следующему дежурному».</span>}
-          </Card>
-        </div>
+        <Field label="Следующему дежурному" hint="Необязательно">
+          <textarea
+            rows={3}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onBlur={() => note !== shift.note && updateShift(shift, (s) => void (s.note = note))}
+            placeholder="Что важно знать следующему дежурному"
+            className={`${inputCls} resize-none`}
+          />
+        </Field>
         <Plate glow="teal" halo={checked}>
           <Check
             on={checked}
