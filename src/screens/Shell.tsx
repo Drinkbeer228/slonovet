@@ -14,7 +14,6 @@ import { haptics } from '../lib/haptics';
 import { currentShift, dutyTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
 import { balances, stockPerDay, stockView } from '../domain/stock';
-import { startTour } from './Tour';
 import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
 import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
@@ -24,14 +23,14 @@ export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' 
 export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   shift: { label: 'Дежурство', icon: 'shift' },
   requests: { label: 'Задачи', icon: 'message' },
-  diet: { label: 'Рацион', icon: 'bowl' },
+  diet: { label: 'Рацион слонов', icon: 'bowl' },
   stock: { label: 'Фураж', icon: 'box' },
   journal: { label: 'Журнал', icon: 'book' },
   users: { label: 'Персонал', icon: 'users' },
   guide: { label: 'Справка', icon: 'question' },
   rating: { label: 'Мои достижения', icon: 'trophy' },
   move: { label: 'Переезд', icon: 'truck' },
-  suppliers: { label: 'Поставщики', icon: 'phone' },
+  suppliers: { label: 'Контакты', icon: 'phone' },
   containers: { label: 'Контейнеры', icon: 'box' },
 };
 
@@ -44,7 +43,8 @@ export const TABS: Tab[] = ['shift', 'requests', 'stock', 'journal'];
 
 /** Меню профиля — одно у всех; «Персонал» — тем, кто заводит людей (MANAGES). */
 export function menuTabs(role: Role): Tab[] {
-  return (['diet', 'users', 'move', 'containers', 'suppliers', 'rating', 'guide'] as Tab[]).filter((t) => t !== 'users' || Boolean(MANAGES[role]?.length));
+  // «Мои достижения» скрыты, пока база не набрала смен и людей: статистика копится (staffStats), вернуть — добавить 'rating' перед 'guide'
+  return (['diet', 'users', 'move', 'containers', 'suppliers', 'guide'] as Tab[]).filter((t) => t !== 'users' || Boolean(MANAGES[role]?.length));
 }
 
 export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
@@ -154,7 +154,6 @@ export function TopBar({
               key={t}
               type="button"
               aria-current={t === tab ? 'page' : undefined}
-              data-tour={`nav-${t}`}
               onClick={() => onTab(t)}
               className={`h-9 rounded-xl px-3.5 text-[14px] font-bold ${t === tab ? `${KEY} text-teal-fg` : 'border border-transparent text-muted hover:text-ink'}`}
             >
@@ -173,7 +172,6 @@ export function TopBar({
             type="button"
             onClick={onMenu}
             aria-label="Профиль и меню"
-            data-tour="menu"
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface2 text-ink active:scale-95"
           >
             <Icon name="menu" size={22} />
@@ -241,7 +239,6 @@ export function BottomNav({ user, tabs, tab, onTab }: { user: CurrentUser; tabs:
             key={t}
             type="button"
             aria-current={on ? 'page' : undefined}
-            data-tour={`nav-${t}`}
             onClick={() => {
               if (t !== tab) haptics.tap();
               onTab(t);
@@ -398,17 +395,6 @@ export function MenuSheet({
             Установить на телефон
           </Button>
         )}
-
-        <Button
-          icon="question"
-          full
-          onClick={() => {
-            onClose();
-            startTour();
-          }}
-        >
-          Показать подсказки
-        </Button>
 
         <Button
           kind="danger"

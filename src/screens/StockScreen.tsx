@@ -119,7 +119,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       {road && <RoadBanner />}
 
       {low.length > 0 && (
-        <Plate glow="amber" halo className="flex flex-col gap-1 p-4" data-tour="stock-low">
+        <Plate glow="amber" halo className="flex flex-col gap-1 p-4">
           <span className="text-[12px] font-extrabold tracking-wide text-amber-fg">ЗАКАНЧИВАЕТСЯ</span>
           {low.map((v) => (
             <span key={v.item.id} className="text-[15px] font-bold">
@@ -129,7 +129,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         </Plate>
       )}
 
-      <div data-tour="purchases">
+      <div>
         <PurchasesBlock user={user} />
       </div>
 
@@ -168,7 +168,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       })}
 
       {canWrite && (
-        <div data-tour="stock-add">
+        <div>
           <Button icon="plus" full onClick={() => setAdding(true)}>
             Добавить позицию
           </Button>

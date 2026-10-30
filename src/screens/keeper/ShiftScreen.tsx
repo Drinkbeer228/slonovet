@@ -63,7 +63,7 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
           </span>
         </Plate>
       )}
-      <div data-tour="accept">
+      <div>
         <Button kind="accent" big full icon="shield" onClick={() => setAccepting(true)}>
           {toMe ? 'Принять' : 'Принять дежурство'}
         </Button>

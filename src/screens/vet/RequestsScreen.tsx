@@ -75,7 +75,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
           </Button>
         </div>
       </header>
-      <div data-tour="requests-tabs">
+      <div>
         <Segmented label="Какие задачи" value={view} onChange={setView} options={FILTERS} dots={dots} />
       </div>
       {empty && <Empty>{view === 'purchases' ? 'Ничего не просили купить' : 'Задач нет'}</Empty>}

@@ -44,7 +44,7 @@ export function DietScreen({ user }: { user: CurrentUser }) {
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
-          <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Рацион</h1>
+          <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Рацион слонов</h1>
           {canEdit && !editing && (
             <Button icon="edit" onClick={startEdit}>
               Изменить
@@ -54,7 +54,7 @@ export function DietScreen({ user }: { user: CurrentUser }) {
         {!canEdit && <ReadOnlyNote who={EDITORS.diet.who} />}
       </header>
 
-      <div data-tour="diet-el">
+      <div>
       <Segmented label="Слониха" value={el} onChange={setEl} options={ELEPHANTS.map((e) => ({ value: e, label: e }))} />
       </div>
 

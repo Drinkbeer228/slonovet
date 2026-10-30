@@ -123,6 +123,8 @@ export interface RequestMark extends Base {
   request_id: string;
   shift_id: string;
   done_by: string;
+  /** id отметившего — для статистики; у старых отметок нет */
+  done_by_id?: string | null;
   done_at: string;
   note: string;
   photo_path: string | null;
@@ -140,6 +142,8 @@ export interface Note extends Base {
   text: string;
   photo_path: string | null;
   author_name: string;
+  /** id автора — для статистики; у старых записей нет */
+  author_id?: string | null;
   created_at: string;
 }
 
@@ -226,16 +230,56 @@ export interface Supplier extends Base {
   created_by: string;
 }
 
-/** Контейнер с реквизитом: номер как на ящике («6», «6А», «Р-12»), фура и опись по строке на предмет. */
+export type ContainerKind = 'wheels' | 'case' | 'light_sound' | 'props' | 'luggage' | 'other';
+
+/**
+ * Контейнер: номер как на ящике («6», «6А», «Кофр звук 2»), тип, габариты в см, едет ли в этом туре,
+ * опись по строке на предмет. К фуре не привязан — погрузка отдельно (LoadPlan).
+ */
 export interface Container extends Base {
   number: string;
-  truck: string;
+  /** '' — у старых записей, до типов */
+  kind?: ContainerKind | '';
+  length_cm?: number | null;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  /** false — уехал в другой город / не едет: в погрузку не идёт, в описи остаётся */
+  in_tour?: boolean;
   contents: string;
   note: string;
-  /** схема погрузки («тетрис»): порядок и место в фуре — каркас, пока не заполняется */
-  load_order?: number | null;
-  slot_x?: number | null;
-  slot_y?: number | null;
+  /** до разделения на опись и погрузку: фура строкой. Не пишется, осталось у старых записей */
+  truck?: string;
+  created_by: string;
+}
+
+/** Фура: габариты кузова в см. */
+export interface Truck extends Base {
+  name: string;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
+  created_by: string;
+}
+
+/** Временный ящик в схеме погрузки, не из описи: «2 × 120 × 80 × 100». */
+export interface ExtraBox {
+  id: string;
+  label: string;
+  count: number;
+  l: number;
+  w: number;
+  h: number;
+}
+
+/** Сохранённая схема погрузки («Основная», «Без света»): порядок от передней стенки к дверям. */
+export interface LoadPlan extends Base {
+  name: string;
+  truck_id: string | null;
+  /** id контейнеров и временных ящиков по порядку погрузки */
+  queue: string[];
+  /** временно выключенные из этой схемы */
+  off: string[];
+  extras: ExtraBox[];
   created_by: string;
 }
 
@@ -275,6 +319,8 @@ export interface TableMap {
   tour_stops: TourStop;
   suppliers: Supplier;
   containers: Container;
+  trucks: Truck;
+  load_plans: LoadPlan;
 }
 
 export type TableName = keyof TableMap;
@@ -294,6 +340,8 @@ export const TABLES: TableName[] = [
   'tour_stops',
   'suppliers',
   'containers',
+  'trucks',
+  'load_plans',
 ];
 
 export interface CurrentUser {

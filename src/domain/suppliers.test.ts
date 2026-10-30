@@ -39,4 +39,9 @@ describe('у кого заказать', () => {
   it('город не отмечен — все', () => {
     expect(suppliersFor(list, null, null)).toHaveLength(4);
   });
+
+  it('ветеринар и мастер в «У кого» закупки не попадают', () => {
+    const more = [...list, sup('vet', 'Казань', 'Ветврач Иван', { supplies: ['Ветеринар'] })];
+    expect(suppliersFor(more, 'feed', 'Казань').map((s) => s.id)).not.toContain('vet');
+  });
 });

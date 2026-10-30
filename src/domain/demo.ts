@@ -4,7 +4,7 @@ import { ELEPHANTS, METRICS } from './elephants';
 import { SEED_DIETS, SEED_STOCK_ITEMS } from './seed';
 import { FEED_TIMES } from './shift';
 import { feedUsage } from './stock';
-import type { ElephantName, Level, MetricKey, Note, Profile, RequestMark, Shift, StockMove, VetRequest } from './types';
+import type { Container, ElephantName, Level, MetricKey, Note, Profile, RequestMark, Shift, StockMove, VetRequest } from './types';
 
 /** Демо-данные: 14 прошедших смен, заявки, склад. Только для режима без сервера. */
 export async function seedDemo() {
@@ -297,4 +297,32 @@ export async function seedDemo() {
   ]);
   await seedRows('notes', notes);
 
+  // «Контейнеры»: опись и погрузка — около десятка ящиков разных типов; один не едет, один без габаритов
+  const box = (id: string, number: string, kind: Container['kind'], l: number | null, w: number | null, h: number | null, contents: string, extra: Partial<Container> = {}): Container => ({
+    id: `demo-box-${id}`,
+    number,
+    kind,
+    length_cm: l,
+    width_cm: w,
+    height_cm: h,
+    in_tour: true,
+    contents,
+    note: '',
+    created_by: 'Соколов',
+    updated_at: now,
+    ...extra,
+  });
+  await seedRows('containers', [
+    box('1', '1', 'wheels', 200, 120, 180, 'Тумбы для слонов ×2\nСтупеньки'),
+    box('2', '2', 'wheels', 200, 120, 180, 'Тумба большая\nПодставка под ноги'),
+    box('3', '3', 'wheels', 120, 80, 150, 'Попоны праздничные ×3\nСбруя парадная'),
+    box('4', '4', 'wheels', 120, 80, 150, 'Попоны рабочие\nЦепи, карабины'),
+    box('5', '5', 'case', 120, 80, 100, 'Аптечка ветеринарная\nШприцы, бинты'),
+    box('6', '6', 'props', 120, 80, 110, 'Синяя шляпа в звёздочку\nКрасный плащ\nМячи большие ×4', { note: 'хрупкое' }),
+    box('7', 'Кофр звук 1', 'light_sound', 100, 60, 90, 'Пульт\nУдлинитель 20 м ×2'),
+    box('8', 'Кофр свет 2', 'light_sound', 100, 60, 90, 'Прожекторы ×4', { in_tour: false, note: 'остался на базе' }),
+    box('9', '9', 'luggage', 80, 60, 70, 'Личные вещи Соколова'),
+    box('10', '10', 'other', null, null, null, 'Вёдра, щётки, шланг 30 м'),
+  ]);
+  await seedRows('trucks', [{ id: 'demo-truck', name: 'Фура 1', length_cm: 1360, width_cm: 245, height_cm: 270, created_by: 'Соколов', updated_at: now }]);
 }
