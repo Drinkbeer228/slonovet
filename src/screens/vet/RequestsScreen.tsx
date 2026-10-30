@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { logEvent } from '../../lib/log';
 import { ELEPHANTS } from '../../domain/elephants';
-import { FREQ_LABEL, answerPresets, currentShift, overdue, requestProgress, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import { FREQ_LABEL, answerPresets, currentShift, onRestDay, overdue, requestProgress, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import { addMark, setPurchaseStatus } from '../../domain/actions';
 import { GROUPS, GROUP_TITLE, boardAttention, boardGroups, type BoardFilter, type BoardItem, type BoardType } from '../../domain/board';
 import { haptics } from '../../lib/haptics';
@@ -10,7 +10,7 @@ import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast, type Glow } from '../../ui/kit';
-import { canCloseRequest, canEdit } from '../../domain/access';
+import { canCloseRequest, canEdit, canReceiveHandover } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
 import { ArriveSheet, NewPurchaseSheet, OrderSheet, PurchaseDetail, PurchaseRow } from '../PurchasesView';
@@ -183,6 +183,9 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
   const fresh = unreadCount(comments, r.id, user.id, read[r.id]);
   // в открытом дежурстве ответить можно прямо с доски — без шторки
   const todo = shift && !closed && r.status === 'active' ? requestTodos([r], marks, shift, isoDate())[0] : undefined;
+  const profiles = useRows('profiles');
+  const assignee = r.assignee_id ? profiles.find((x) => x.id === r.assignee_id) : undefined;
+  const resting = Boolean(assignee && !closed && onRestDay(assignee.id, shifts));
   return (
     <BoardCard
       type={item.type}
@@ -214,6 +217,12 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
           {r.frequency !== 'once' ? ` · ${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}` : !p.last ? ' · ждёт отметки' : ''}
           {todo && !todo.done ? ' · в этой смене не отмечено' : ''}
         </span>
+        {assignee && (
+          <span className={`text-[13px] font-bold ${resting ? 'text-amber-fg' : 'text-ink2'}`}>
+            Поручено: {assignee.full_name}
+            {resting ? ' · на отсыпном' : ''}
+          </span>
+        )}
         {talk > 0 && (
           <span className={`text-[13px] font-bold ${fresh ? 'text-coral' : 'text-muted'}`}>
             Обсуждение · {talk}
@@ -408,6 +417,10 @@ export function NewRequestSheet({
   const [options, setOptions] = useState<string[]>([]);
   const [own, setOwn] = useState('');
   const [authorPhoto, setAuthorPhoto] = useState<File | null>(null);
+  const [assignee, setAssignee] = useState<string | null>(null);
+  const people = useRows('profiles').filter((p) => p.active && canReceiveHandover(p.role));
+  const shifts = useRows('shifts');
+  const resting = assignee ? people.find((p) => p.id === assignee && onRestDay(p.id, shifts)) : undefined;
 
   useEffect(() => {
     if (initial) {
@@ -423,6 +436,7 @@ export function NewRequestSheet({
       setUrgent(false);
       setOptions([]);
       setOwn('');
+      setAssignee(null);
     }
   }, [initial]);
 
@@ -459,6 +473,8 @@ export function NewRequestSheet({
               author_name: user.full_name,
               status: 'active',
               created_at: new Date().toISOString(),
+              // поле шлём, только если выбрали человека: старый сервер без колонки примет остальные задачи как раньше
+              ...(assignee ? { assignee_id: assignee } : {}),
             });
             toast('Задача поставлена');
             onClose();
@@ -490,6 +506,26 @@ export function NewRequestSheet({
             ))}
           </div>
         </div>
+        {people.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="px-1 text-[14px] font-bold text-muted">Поручить (необязательно)</span>
+            <div className="flex flex-wrap gap-2">
+              <Chip on={!assignee} onClick={() => setAssignee(null)}>
+                Кто на смене
+              </Chip>
+              {people.map((p) => (
+                <Chip key={p.id} on={assignee === p.id} onClick={() => setAssignee(p.id)}>
+                  {p.full_name}
+                </Chip>
+              ))}
+            </div>
+            {resting && (
+              <Plate glow="amber" className="px-3.5 py-2.5 text-[14px] font-bold text-amber-fg">
+                Внимание: {resting.full_name} на отсыпном после суточного дежурства
+              </Plate>
+            )}
+          </div>
+        )}
         {who === 'work' && onBuy && (
           <button type="button" onClick={onBuy} className="-mt-2 flex h-11 items-center self-start px-1 text-[14px] font-bold text-teal">
             Купить? → Закупки
