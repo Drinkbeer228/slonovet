@@ -78,7 +78,7 @@ export function IconButton({ icon, label, onClick, className = '' }: { icon: Ico
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border border-line text-ink active:scale-95 ${className}`}
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border text-ink active:scale-95 ${/(^|\s)border-/.test(className) ? '' : 'border-tick'} ${className}`}
     >
       <Icon name={icon} size={20} />
     </button>
@@ -110,6 +110,24 @@ export function Card({ children, className = '', ...rest }: { children: ReactNod
 /** Подпись под заголовком чужого раздела: смотреть можно, менять — хозяину. */
 export function ReadOnlyNote({ who }: { who: string }) {
   return <span className="px-1 text-[13px] font-semibold text-muted">Только просмотр — меняет {who}</span>;
+}
+
+/** Метки состояния задачи: СРОЧНО — заливкой, ПРОСРОЧЕНО — контуром, чтобы различались не только словом. */
+export function UrgentBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-coral px-2 py-1 text-[12px] font-extrabold leading-none tracking-wide text-teal-ink">
+      <Icon name="alert" size={12} stroke={3} />
+      СРОЧНО
+    </span>
+  );
+}
+
+export function LateBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-md border border-coral px-2 py-[3px] text-[12px] font-extrabold leading-none tracking-wide text-coral">
+      ПРОСРОЧЕНО
+    </span>
+  );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
@@ -417,7 +435,7 @@ export function DateInput({
 }
 
 export const inputCls =
-  'w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[16px] text-ink placeholder:text-faint outline-none focus:border-teal';
+  'w-full rounded-xl border border-tick bg-surface px-3.5 py-3 text-[16px] text-ink placeholder:text-faint outline-none focus:border-teal';
 
 /* ---------- Нижняя шторка / диалог ---------- */
 
