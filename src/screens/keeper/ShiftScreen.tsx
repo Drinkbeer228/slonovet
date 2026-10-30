@@ -96,7 +96,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
     <div className="flex flex-col gap-6">
       {/* компактный бар: кто дежурит, с какого часа и статус смены — в одну строку */}
       <header className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-2.5">
+        <Card tone="glass" className="flex items-center gap-3 px-3.5 py-2.5">
           <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal/15 text-[16px] font-extrabold text-teal">
             {shift.keeper_name.trim().charAt(0).toUpperCase()}
           </span>
@@ -115,7 +115,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
             {stale && <Icon name="alert" size={12} stroke={3} />}
             {stale ? 'Не сдано' : handed ? 'Сдано' : 'На смене'}
           </span>
-        </div>
+        </Card>
         {readOnly && !accept && (
           <span className="px-1 text-[13px] font-semibold text-muted">
             {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}

@@ -7,12 +7,14 @@ import { haptics } from '../lib/haptics';
 
 /* ---------- Кнопки ---------- */
 
-type BtnKind = 'primary' | 'light' | 'tonal' | 'ghost' | 'danger';
+type BtnKind = 'primary' | 'light' | 'accent' | 'ghost' | 'danger';
 
 const BTN: Record<BtnKind, string> = {
   primary: 'bg-teal text-teal-ink border-transparent',
   light: 'bg-ink text-bg border-transparent',
-  tonal: 'bg-teal/10 text-teal border-transparent active:bg-teal active:text-teal-ink',
+  // сочный бирюзовый ключ: верхний блик, внутренняя кромка и мягкое свечение цветом темы
+  accent:
+    'bg-teal bg-[linear-gradient(to_bottom,rgba(255,255,255,0.25),rgba(255,255,255,0)_60%)] text-teal-ink border-transparent shadow-[0_6px_22px_-4px_color-mix(in_srgb,var(--color-teal)_60%,transparent),inset_0_1px_0_rgba(255,255,255,0.35)] active:scale-[0.97]!',
   ghost: 'bg-transparent text-ink border-line',
   danger: 'bg-transparent text-coral border-coral/50',
 };
@@ -100,9 +102,39 @@ export function Section({ title, aside, children, id }: { title: ReactNode; asid
   );
 }
 
-export function Card({ children, className = '', ...rest }: { children: ReactNode; className?: string; 'data-tour'?: string }) {
+/**
+ * Уровни глубины: flat — как было; glass — полированная плита над фоном; sunken — утопленная панель (мониторинг).
+ * В светлой теме белая кромка не видна, поэтому там тонкая тёмная.
+ */
+export const TONE = {
+  flat: 'bg-surface',
+  glass:
+    'border border-white/[0.08] bg-surface/70 backdrop-blur-md shadow-[0_6px_18px_-6px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)] [:root[data-theme=light]_&]:border-black/10 [:root[data-theme=light]_&]:shadow-[0_4px_14px_-6px_rgba(15,27,34,0.2)]',
+  sunken:
+    'border border-white/[0.04] bg-black/25 shadow-[inset_0_2px_8px_rgba(0,0,0,0.35)] [:root[data-theme=light]_&]:border-black/5 [:root[data-theme=light]_&]:bg-surface2 [:root[data-theme=light]_&]:shadow-[inset_0_2px_6px_rgba(15,27,34,0.12)]',
+};
+
+/** Нажимаемая клавиша: верхний блик, мягкая тень, пружина при тапе. */
+export const KEY =
+  'bg-surface2 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.10),rgba(255,255,255,0)_60%)] border border-white/[0.1] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_2px_5px_rgba(0,0,0,0.3)] transition-transform active:scale-[0.97] [:root[data-theme=light]_&]:border-black/10';
+
+/** Световой чип для тегов. */
+export const CHIP =
+  'inline-flex items-center gap-1 rounded-full border border-white/[0.1] bg-surface2 px-2.5 py-1 text-[12px] font-bold text-ink shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] [:root[data-theme=light]_&]:border-black/10';
+
+export function Card({
+  children,
+  className = '',
+  tone = 'flat',
+  ...rest
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: keyof typeof TONE;
+  'data-tour'?: string;
+}) {
   return (
-    <div className={`rounded-2xl bg-surface ${className}`} {...rest}>
+    <div className={`rounded-2xl ${TONE[tone]} ${className}`} {...rest}>
       {children}
     </div>
   );
@@ -116,7 +148,7 @@ export function ReadOnlyNote({ who }: { who: string }) {
 /** Метки состояния задачи: СРОЧНО — заливкой, ПРОСРОЧЕНО — контуром, чтобы различались не только словом. */
 export function UrgentBadge() {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-coral px-2 py-1 text-[12px] font-extrabold leading-none tracking-wide text-teal-ink">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-coral px-2 py-1 text-[12px] font-extrabold leading-none tracking-wide text-teal-ink shadow-[0_0_12px_-2px_color-mix(in_srgb,var(--color-coral)_70%,transparent),inset_0_1px_0_rgba(255,255,255,0.3)]">
       <Icon name="alert" size={12} stroke={3} />
       СРОЧНО
     </span>

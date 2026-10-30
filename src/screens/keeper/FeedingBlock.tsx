@@ -45,7 +45,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
         </button>
       }
     >
-      <Card className="overflow-hidden">
+      <Card tone="glass" className="overflow-hidden">
         {FEED_TIMES.map((t) => {
           const f = shift.feeds[t];
           const done = Boolean(f?.done);

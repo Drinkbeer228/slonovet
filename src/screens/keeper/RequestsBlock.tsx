@@ -8,7 +8,7 @@ import { TASK_TYPE, taskType } from '../taskType';
 import { Icon } from '../../ui/Icon';
 import { remove, useRows } from '../../lib/store';
 import { shortDate, timeOf } from '../../lib/dates';
-import { Button, Card, Chip, FilePreview, IconButton, LateBadge, PhotoPick, PhotoThumb, Section, Sheet, UrgentBadge, inputCls, toast } from '../../ui/kit';
+import { Button, CHIP, Card, Chip, FilePreview, IconButton, LateBadge, PhotoPick, PhotoThumb, Section, Sheet, TONE, UrgentBadge, KEY, inputCls, toast } from '../../ui/kit';
 
 export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const requests = useRows('requests');
@@ -64,9 +64,11 @@ function RequestCard({
   const when = whenLabel(req);
   const multi = needed > 1;
   const who = whoLabel(req.elephant);
-  const tag = 'inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-[12px] font-bold text-ink2';
+  const tag = CHIP;
   return (
-    <div className="flex flex-col gap-2.5 rounded-2xl bg-surface p-3.5">
+    <div className={`relative flex flex-col gap-2.5 overflow-hidden rounded-2xl p-3.5 ${TONE.glass} ${!done && req.urgent ? 'shadow-[0_0_26px_-8px_color-mix(in_srgb,var(--color-coral)_65%,transparent)]!' : ''}`}>
+      {/* срочное: тлеющее свечение по левому краю */}
+      {!done && req.urgent && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-coral/25 via-coral/10 to-transparent" />}
       <div className="flex items-start justify-between gap-2">
         <h3 className={`m-0 flex min-w-0 items-center gap-2 text-[20px] font-extrabold leading-tight ${t.text}`}>
           <Icon name={t.icon} size={18} />
@@ -83,7 +85,7 @@ function RequestCard({
       <p className={`m-0 text-[15px] font-medium leading-snug ${done ? 'text-ink2' : ''}`}>{req.text}</p>
       {req.photo_path && <PhotoThumb path={req.photo_path} size={72} />}
       <div className="flex flex-wrap gap-1.5">
-        <span className={late ? `${tag} !bg-coral/10 !text-coral` : tag}>
+        <span className={late ? `${tag} !border-coral/40 !bg-coral/15 !text-coral` : tag}>
           {late && <Icon name="alert" size={12} stroke={3} />}
           {when || FREQ_LABEL[req.frequency]}
         </span>
@@ -116,23 +118,23 @@ function RequestCard({
           {multi && <span className="text-[13px] font-semibold text-muted">отмечено {marks.length} из {needed}</span>}
           <div className="flex gap-2">
             {/* один цельный переключатель вместо отдельных кнопок */}
-            <div role="group" aria-label="Ответ" className="grid flex-1 gap-0.5 rounded-xl bg-surface2 p-0.5" style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
+            <div role="group" aria-label="Ответ" className={`grid flex-1 gap-1 rounded-xl p-0.5 ${TONE.sunken}`} style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
               {req.options.map((o) => (
-                <button key={o} type="button" onClick={() => onQuick(o)} className="h-10 min-w-0 truncate rounded-[10px] px-1.5 text-[14px] font-bold text-ink active:bg-teal active:text-teal-ink">
+                <button key={o} type="button" onClick={() => onQuick(o)} className={`h-10 min-w-0 truncate rounded-[10px] px-1.5 text-[14px] font-bold text-ink ${KEY}`}>
                   {o}
                 </button>
               ))}
             </div>
-            {!req.needs_photo && <IconButton icon="camera" label="Отметить с фото или заметкой" onClick={onDetailed} />}
+            {!req.needs_photo && <IconButton icon="camera" label="Отметить с фото или заметкой" onClick={onDetailed} className={KEY} />}
           </div>
         </div>
       ) : (
         !done && (
           <div className="flex gap-2">
-            <Button kind="tonal" icon="check" full onClick={() => onQuick()}>
+            <Button kind="accent" icon="check" full onClick={() => onQuick()}>
               {multi ? `Отметить (${marks.length} из ${needed})` : req.needs_photo ? 'Выполнено — фото' : 'Выполнено'}
             </Button>
-            {!req.needs_photo && <IconButton icon="camera" label="Отметить с фото или заметкой" onClick={onDetailed} />}
+            {!req.needs_photo && <IconButton icon="camera" label="Отметить с фото или заметкой" onClick={onDetailed} className={KEY} />}
           </div>
         )
       )}

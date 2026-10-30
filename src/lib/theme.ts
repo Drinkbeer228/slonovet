@@ -24,7 +24,7 @@ function write(key: string, value: string) {
 
 let current: Theme = (() => {
   const t = read(KEY_THEME);
-  return t === 'light' || t === 'pixel' ? t : 'dark';
+  return t === 'light' ? t : 'dark'; // сохранённый «pixel» из прошлых версий — в тёмную
 })();
 const listeners = new Set<() => void>();
 

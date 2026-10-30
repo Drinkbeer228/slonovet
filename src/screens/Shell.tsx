@@ -133,12 +133,7 @@ export function TopBar({
     <header className="sticky top-0 z-30 border-b border-surface2 bg-bg/95 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
         <Logo size={28} />
-        <span className="hidden text-[16px] font-extrabold tracking-tight md:inline">СлоноВет</span>
-        {/* кто вошёл и с какой ролью — одинаково у всех; на телефоне фамилия */}
-        <span className="flex min-w-0 flex-col leading-tight md:hidden">
-          <span className="truncate text-[15px] font-extrabold">{user.full_name.split(' ')[0]}</span>
-          <span className="self-start rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
-        </span>
+        <span className="text-[17px] font-extrabold tracking-tight">СлоноВет</span>
         <nav className="ml-4 hidden flex-1 items-center gap-1 md:flex" aria-label="Разделы">
           {tabs.map((t) => (
             <button
@@ -165,9 +160,9 @@ export function TopBar({
             onClick={onMenu}
             aria-label="Профиль и меню"
             data-tour="menu"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-surface2 text-[15px] font-extrabold"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface2 text-ink active:scale-95"
           >
-            {user.full_name.slice(0, 1)}
+            <Icon name="menu" size={22} />
           </button>
         </div>
       </div>
@@ -479,7 +474,7 @@ function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
   );
 }
 
-/** Вид приложения: тёмная, светлая или «Пиксель». */
+/** Вид приложения: тёмная или светлая («Пиксель» убран из выбора). */
 function ThemeCard() {
   const theme = useTheme();
   return (
@@ -487,7 +482,7 @@ function ThemeCard() {
       <span className="px-1 text-[14px] font-bold text-muted">Вид</span>
       <Segmented
         label="Вид приложения"
-        options={(['dark', 'light', 'pixel'] as Theme[]).map((t) => ({ value: t, label: THEME_LABEL[t] }))}
+        options={(['dark', 'light'] as Theme[]).map((t) => ({ value: t, label: THEME_LABEL[t] }))}
         value={theme}
         onChange={setTheme}
       />

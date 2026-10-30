@@ -23,7 +23,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
 
   return (
     <Section title="Состояние" id="sec-state">
-      <Card className="flex flex-col gap-1 p-2">
+      <Card tone="sunken" className="flex flex-col gap-1 p-2">
         <div className="grid grid-cols-[88px_repeat(3,minmax(0,1fr))] gap-1 pb-1.5 pt-1">
           <span />
           {ELEPHANTS.map((e) => (

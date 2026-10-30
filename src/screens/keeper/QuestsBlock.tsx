@@ -165,7 +165,7 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
         </div>
       </Quest>
 
-      <Card className="divide-y divide-surface2 overflow-hidden">
+      <Card tone="glass" className="divide-y divide-white/[0.06] overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3">
           <span className="flex flex-1 flex-col gap-0.5">
             <span className="text-[15px] font-bold">Мешков взяли</span>
