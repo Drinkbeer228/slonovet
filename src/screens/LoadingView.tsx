@@ -3,9 +3,9 @@ import { logEvent } from '../lib/log';
 import { containerName } from '../domain/containers';
 import { EURO_TRUCK, autoOrder, pack, planBoxes, shapeKey, shapes, swap, type Box, type Placed } from '../domain/loading';
 import type { CurrentUser, ExtraBox, LoadPlan, Truck } from '../domain/types';
-import { newId, put, useRows } from '../lib/store';
+import { newId, put, remove, useRows } from '../lib/store';
 import { Icon } from '../ui/Icon';
-import { Button, Card, Chip, Empty, Field, KEY, Meter, Plate, Section, Sheet, inputCls, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, Empty, Field, KEY, Meter, Plate, Section, Sheet, inputCls, toast } from '../ui/kit';
 
 type Work = Pick<LoadPlan, 'truck_id' | 'queue' | 'off' | 'extras'>;
 const EMPTY: Work = { truck_id: null, queue: [], off: [], extras: [] };
@@ -50,13 +50,15 @@ export function LoadingView({ user, canWrite }: { user: CurrentUser; canWrite: b
   };
   const [draft, setDraft] = useState<Work>(EMPTY);
   const [picked, setPicked] = useState<string | null>(null);
-  const [truckSheet, setTruckSheet] = useState(false);
+  /** шторка фуры: 'new' — новая, иначе правим эту */
+  const [truckSheet, setTruckSheet] = useState<'new' | Truck | null>(null);
   const [extraSheet, setExtraSheet] = useState(false);
   const [saveSheet, setSaveSheet] = useState(false);
 
   const plan = plans.find((p) => p.id === planId) ?? null;
   const work: Work = plan ?? draft;
-  const truck: Pick<Truck, 'name' | 'length_cm' | 'width_cm' | 'height_cm'> = trucks.find((t) => t.id === work.truck_id) ?? trucks[0] ?? EURO_TRUCK;
+  const chosen = trucks.find((t) => t.id === work.truck_id) ?? trucks[0];
+  const truck: Pick<Truck, 'name' | 'length_cm' | 'width_cm' | 'height_cm'> = chosen ?? EURO_TRUCK;
   const { queue, off, noDims } = planBoxes(containers, work);
   const result = pack(truck, queue);
   const letters = shapes(queue);
@@ -86,12 +88,17 @@ export function LoadingView({ user, canWrite }: { user: CurrentUser; canWrite: b
             </Chip>
           )}
           {trucks.map((t) => (
-            <Chip key={t.id} on={t.id === (trucks.find((x) => x.id === work.truck_id) ?? trucks[0]).id} onClick={() => update({ truck_id: t.id })}>
+            <Chip key={t.id} on={t.id === chosen?.id} onClick={() => update({ truck_id: t.id })}>
               {t.name}
             </Chip>
           ))}
+          {canWrite && chosen && (
+            <Button icon="edit" onClick={() => setTruckSheet(chosen)}>
+              Изменить
+            </Button>
+          )}
           {canWrite && (
-            <Button icon="plus" onClick={() => setTruckSheet(true)}>
+            <Button icon="plus" onClick={() => setTruckSheet('new')}>
               Фура
             </Button>
           )}
@@ -210,7 +217,7 @@ export function LoadingView({ user, canWrite }: { user: CurrentUser; canWrite: b
         </p>
       )}
 
-      <TruckSheet open={truckSheet} user={user} onClose={() => setTruckSheet(false)} onSaved={(id) => update({ truck_id: id })} />
+      {truckSheet && <TruckSheet key={truckSheet === 'new' ? 'new' : truckSheet.id} edit={truckSheet === 'new' ? null : truckSheet} user={user} onClose={() => setTruckSheet(null)} onSaved={(id) => update({ truck_id: id })} />}
       <ExtraSheet open={extraSheet} onClose={() => setExtraSheet(false)} onAdd={(e) => update({ extras: [...work.extras, e] })} />
       <SaveSheet
         open={saveSheet}
@@ -270,15 +277,17 @@ function TruckPlan({ truck, placed, letterOf, picked, onTap }: { truck: Pick<Tru
   );
 }
 
-function TruckSheet({ open, user, onClose, onSaved }: { open: boolean; user: CurrentUser; onClose: () => void; onSaved: (id: string) => void }) {
-  const [t, setT] = useState({ name: '', l: String(EURO_TRUCK.length_cm), w: String(EURO_TRUCK.width_cm), h: String(EURO_TRUCK.height_cm) });
-  if (!open) return null;
+/** Новая фура или правка выбранной; у выбранной — «Удалить». Схемы с удалённой фурой берут первую оставшуюся. */
+function TruckSheet({ edit, user, onClose, onSaved }: { edit: Truck | null; user: CurrentUser; onClose: () => void; onSaved: (id: string) => void }) {
+  const base = edit ?? EURO_TRUCK;
+  const [t, setT] = useState({ name: edit?.name ?? '', l: String(base.length_cm), w: String(base.width_cm), h: String(base.height_cm) });
+  const [asking, setAsking] = useState(false);
   const ok = t.name.trim() && cm(t.l) && cm(t.w) && cm(t.h);
   return (
     <Sheet
       open
       onClose={onClose}
-      title="Новая фура"
+      title={edit ? edit.name : 'Новая фура'}
       footer={
         <Button
           kind="primary"
@@ -286,11 +295,16 @@ function TruckSheet({ open, user, onClose, onSaved }: { open: boolean; user: Cur
           full
           disabled={!ok}
           onClick={async () => {
-            const id = newId();
-            await put('trucks', { id, name: t.name.trim(), length_cm: cm(t.l), width_cm: cm(t.w), height_cm: cm(t.h), created_by: user.full_name });
-            onSaved(id);
-            setT({ name: '', l: String(EURO_TRUCK.length_cm), w: String(EURO_TRUCK.width_cm), h: String(EURO_TRUCK.height_cm) });
-            toast('Фура добавлена');
+            const fields = { name: t.name.trim(), length_cm: cm(t.l), width_cm: cm(t.w), height_cm: cm(t.h) };
+            if (edit) {
+              await put('trucks', { ...edit, ...fields });
+              toast('Фура сохранена');
+            } else {
+              const id = newId();
+              await put('trucks', { id, ...fields, created_by: user.full_name });
+              onSaved(id);
+              toast('Фура добавлена');
+            }
             onClose();
           }}
         >
@@ -310,7 +324,27 @@ function TruckSheet({ open, user, onClose, onSaved }: { open: boolean; user: Cur
             </Field>
           ))}
         </div>
+        {edit && (
+          <Button full onClick={() => setAsking(true)}>
+            Удалить фуру
+          </Button>
+        )}
       </div>
+      {edit && (
+        <Confirm
+          open={asking}
+          title={`Удалить «${edit.name}»?`}
+          text="Фура пропадёт у всех. Схемы погрузки останутся — пересчитаются на другую фуру."
+          okLabel="Удалить"
+          onOk={async () => {
+            await remove('trucks', edit.id);
+            logEvent('loading.truck.delete', { name: edit.name.slice(0, 60) });
+            toast('Фура удалена');
+            onClose();
+          }}
+          onClose={() => setAsking(false)}
+        />
+      )}
     </Sheet>
   );
 }
