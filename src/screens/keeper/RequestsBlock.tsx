@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { addMark } from '../../domain/actions';
 import { haptics } from '../../lib/haptics';
-import { FREQ_LABEL, overdue, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import { FREQ_LABEL, dutyTodos, overdue, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import type { CurrentUser, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
 import { TASK_TYPE, taskType } from '../taskType';
 import { Icon } from '../../ui/Icon';
 import { remove, useRows } from '../../lib/store';
-import { shortDate, timeOf, stampOf } from '../../lib/dates';
+import { shortDate, timeOf } from '../../lib/dates';
 import { Button, Card, Chip, FilePreview, IconButton, LateBadge, PhotoPick, PhotoThumb, Section, Sheet, UrgentBadge, inputCls, toast } from '../../ui/kit';
 
 export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
-  const todos = requestTodos(requests, marks, shift);
+  const todos = dutyTodos(requests, marks, shift);
   const left = todos.filter((t) => !t.done).length;
   const [marking, setMarking] = useState<{ todo: RequestTodo; answer: string } | null>(null);
   const [talk, setTalk] = useState<VetRequest | null>(null);
@@ -65,7 +65,7 @@ function RequestCard({
   const multi = needed > 1;
   const who = whoLabel(req.elephant);
   return (
-    <Card className={`flex flex-col gap-2.5 border-l-4 p-3.5 ${t.stripe} ${!done && req.urgent ? 'ring-2 ring-coral' : !done && late ? 'ring-1 ring-coral/60' : ''}`}>
+    <Card className={`flex flex-col gap-2 border-l-4 p-3 ${t.stripe} ${!done && req.urgent ? 'ring-2 ring-coral' : !done && late ? 'ring-1 ring-coral/60' : ''}`}>
       <div className="flex items-center justify-between gap-2">
         <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
           <Icon name={t.icon} size={15} />
@@ -77,15 +77,18 @@ function RequestCard({
         </span>
       </div>
       <p className={`m-0 text-[15px] font-medium leading-snug ${done ? 'text-ink2' : ''}`}>{req.text}</p>
-      <span className={`flex items-center gap-1.5 text-[13px] font-bold ${late ? 'text-coral' : 'text-ink2'}`}>
-        {late && <Icon name="alert" size={14} />}
-        {when || FREQ_LABEL[req.frequency]}
-        {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
-      </span>
-      {req.photo_path && <PhotoThumb path={req.photo_path} size={96} />}
-      <span className="-mt-1.5 text-[13px] font-semibold text-muted">
-        {stampOf(req.created_at)} · {req.author_name}
-      </span>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`flex items-center gap-1.5 text-[13px] font-bold ${late ? 'text-coral' : 'text-ink2'}`}>
+          {late && <Icon name="alert" size={14} />}
+          {when || FREQ_LABEL[req.frequency]}
+          {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
+        </span>
+        {/* обсуждение — значком в строке срока: отдельная строка кнопки съедала высоту карточки */}
+        <span className="-my-2.5">
+          <DiscussionButton req={req} user={user} onOpen={onTalk} compact />
+        </span>
+      </div>
+      {req.photo_path && <PhotoThumb path={req.photo_path} size={72} />}
       {marks.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {marks.map((m) => (
@@ -127,13 +130,11 @@ function RequestCard({
           </div>
         )
       )}
-      {req.needs_photo && !done && <span className="text-[13px] font-semibold text-muted">врач просит фото</span>}
-      <DiscussionButton req={req} user={user} onOpen={onTalk} />
     </Card>
   );
 }
 
-function MarkSheet({ todo, answer, shift, user, onClose }: { todo: RequestTodo | null; answer: string; shift: Shift; user: CurrentUser; onClose: () => void }) {
+export function MarkSheet({ todo, answer, shift, user, onClose }: { todo: RequestTodo | null; answer: string; shift: Shift; user: CurrentUser; onClose: () => void }) {
   const [note, setNote] = useState('');
   const [picked, setPicked] = useState('');
   useEffect(() => setPicked(answer), [answer, todo]);

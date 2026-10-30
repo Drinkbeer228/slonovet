@@ -1,7 +1,7 @@
 import { canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, updateShift } from '../../domain/actions';
-import { FEED_TIMES, acceptedBy, currentShift, lastHanded, newShift, requestTodos, shiftFlags } from '../../domain/shift';
+import { FEED_TIMES, acceptedBy, currentShift, lastHanded, newShift, dutyTodos, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
@@ -199,7 +199,7 @@ function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; 
   const marks = useRows('request_marks');
 
   const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done);
-  const reqLeft = requestTodos(requests, marks, shift).filter((t) => !t.done);
+  const reqLeft = dutyTodos(requests, marks, shift).filter((t) => !t.done);
   const flags = shiftFlags(shift);
   const warnings = [
     feedsLeft.length ? `Не отмечено кормление: ${feedsLeft.join(', ')}` : null,

@@ -15,6 +15,7 @@ import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
 import { ArriveSheet, NewPurchaseSheet, OrderSheet, PurchaseDetail, PurchaseRow } from '../PurchasesView';
 import { DiscussionThread } from '../Discussion';
+import { MarkSheet } from '../keeper/RequestsBlock';
 import { unreadCount, useReadMarks } from '../../lib/comments';
 
 const VIEW_KEY = 'slonovet_requests_view';
@@ -206,6 +207,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
   const marks = useRows('request_marks');
   const shift = currentShift(useRows('shifts'));
   const [confirm, setConfirm] = useState(false);
+  const [marking, setMarking] = useState(false);
   if (!req) return null;
   // отметить может любой (директор сам обработал Претти) — но только в открытое дежурство и если в нём ещё не отмечено
   const todo = shift && req.status === 'active' ? requestTodos([req], marks, shift)[0] : undefined;
@@ -248,7 +250,9 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
         {todo && !todo.done && (
           <div className="flex flex-col gap-2">
             {req.needs_photo ? (
-              <span className="text-[13px] font-semibold text-muted">Врач просит фото — отметьте на вкладке «Дежурство», там можно снять.</span>
+              <Button kind="primary" icon="camera" full onClick={() => setMarking(true)}>
+                Отметить с фото
+              </Button>
             ) : req.options?.length ? (
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
                 {req.options.map((o) => (
@@ -305,6 +309,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
           <DiscussionThread req={req} user={user} />
         </Section>
       </div>
+      {shift && todo && <MarkSheet todo={marking ? todo : null} answer="" shift={shift} user={user} onClose={() => setMarking(false)} />}
       <Confirm
         open={confirm}
         title="Закрыть задачу?"

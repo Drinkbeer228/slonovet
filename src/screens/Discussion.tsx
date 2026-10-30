@@ -3,7 +3,7 @@ import { addComment } from '../domain/actions';
 import { whoLabel } from '../domain/shift';
 import type { CurrentUser, VetRequest } from '../domain/types';
 import { markRead, unreadCount, useReadMarks } from '../lib/comments';
-import { localDay, relDate, timeOf } from '../lib/dates';
+import { localDay, relDate, stampOf, timeOf } from '../lib/dates';
 import { useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
 import { Icon } from '../ui/Icon';
@@ -81,7 +81,12 @@ export function DiscussionSheet({ req, user, onClose }: { req: VetRequest | null
     <Sheet open={req !== null} onClose={onClose} title={req ? `Обсуждение · ${whoLabel(req.elephant)}` : ''}>
       {req && (
         <div className="flex flex-col gap-4">
-          <p className="m-0 rounded-2xl border border-line px-3.5 py-2.5 text-[14px] font-medium leading-snug text-muted">{req.text}</p>
+          <div className="flex flex-col gap-1 rounded-2xl border border-line px-3.5 py-2.5">
+            <p className="m-0 text-[14px] font-medium leading-snug text-ink2">{req.text}</p>
+            <span className="text-[13px] font-semibold text-muted">
+              Поставил: {req.author_name}, {stampOf(req.created_at)}
+            </span>
+          </div>
           <DiscussionThread req={req} user={user} />
         </div>
       )}
@@ -90,11 +95,28 @@ export function DiscussionSheet({ req, user, onClose }: { req: VetRequest | null
 }
 
 /** Кнопка «Обсуждение · 3» с точкой, если есть новое от других. */
-export function DiscussionButton({ req, user, onOpen }: { req: VetRequest; user: CurrentUser; onOpen: () => void }) {
+export function DiscussionButton({ req, user, onOpen, compact }: { req: VetRequest; user: CurrentUser; onOpen: () => void; compact?: boolean }) {
   const all = useRows('request_comments');
   const read = useReadMarks(user.id);
   const total = all.filter((c) => c.request_id === req.id && !c.deleted).length;
   const fresh = unreadCount(all, req.id, user.id, read[req.id]);
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={total ? `Обсуждение: ${total}${fresh ? `, новых ${fresh}` : ''}` : 'Спросить'}
+        className={`relative flex h-10 w-10 items-center justify-center rounded-xl ${fresh ? 'bg-coral/15 text-coral' : 'text-muted'}`}
+      >
+        <Icon name="message" size={20} />
+        {total > 0 && (
+          <span className={`absolute right-0 top-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-extrabold leading-none ${fresh ? 'bg-coral text-teal-ink' : 'bg-surface2 text-ink2'}`}>
+            {fresh || total}
+          </span>
+        )}
+      </button>
+    );
+  }
   return (
     <button
       type="button"

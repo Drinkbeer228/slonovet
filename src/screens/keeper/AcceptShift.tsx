@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { LEVEL_LABEL, METRIC_LABEL, SAFETY_CHECKS } from '../../domain/elephants';
 import { acceptShift, takeOverShift } from '../../domain/actions';
-import { acceptedBy, lastHanded, requestTodos, shiftFlags } from '../../domain/shift';
+import { acceptedBy, dutyTodos, lastHanded, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
@@ -47,7 +47,7 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
       return (parts.includes(r) ? parts.filter((x) => x !== r) : [...parts, r]).join('. ');
     });
   const flags = shiftFlags(prev);
-  const openReqs = prev ? requestTodos(requests, marks, { ...prev, date: isoDate(), id: '__new__' }).filter((t) => !t.done) : [];
+  const openReqs = prev ? dutyTodos(requests, marks, { ...prev, date: isoDate(), id: '__new__' }).filter((t) => !t.done) : [];
 
   return (
     <div className="flex flex-col gap-6">

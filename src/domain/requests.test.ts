@@ -1,6 +1,6 @@
 // Задачи на день и час, просрочка и «новое в обсуждении».
 import { describe, expect, it } from 'vitest';
-import { overdue, requestTodos, whenLabel } from './shift';
+import { dutyTodos, overdue, requestTodos, whenLabel } from './shift';
 import { unreadCount, unreadRequests } from '../lib/comments';
 import type { RequestComment, RequestMark, Shift, VetRequest } from './types';
 
@@ -102,5 +102,13 @@ describe('варианты ответа по адресату', () => {
     expect(work).toContain('сделано');
     expect(work).not.toContain('в работе');
     expect(answerPresets('Одри').map((p) => p.label)).toContain('Съела');
+  });
+});
+
+describe('назначения на «Дежурстве»', () => {
+  it('только по слонам: «Работа» остаётся на доске «Задачи», но по-прежнему отмечается из неё', () => {
+    const list = [req('hoz'), req('pretty', { elephant: 'Претти' }), req('all', { elephant: 'all' })];
+    expect(dutyTodos(list, [], shift('2026-10-26')).map((t) => t.req.id).sort()).toEqual(['all', 'pretty']);
+    expect(requestTodos([list[0]], [], shift('2026-10-26'))).toHaveLength(1);
   });
 });

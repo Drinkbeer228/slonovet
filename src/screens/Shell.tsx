@@ -10,7 +10,7 @@ import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
-import { currentShift, requestTodos } from '../domain/shift';
+import { currentShift, dutyTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
 import { balances, stockPerDay, stockView } from '../domain/stock';
 import { startTour } from './Tour';
@@ -190,7 +190,7 @@ export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   const comments = useRows('request_comments');
   const read = useReadMarks(user.id);
   const shift = currentShift(shifts);
-  const left = shift ? requestTodos(requests, marks, shift).filter((t) => !t.done).length : 0;
+  const left = shift ? dutyTodos(requests, marks, shift).filter((t) => !t.done).length : 0;
   const low = useMemo(() => {
     const bal = balances(moves);
     const perDay = stockPerDay(items, diets, moves);
