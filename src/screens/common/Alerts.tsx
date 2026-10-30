@@ -23,7 +23,7 @@ function Line({ a, level }: { a: HealthItem; level: 1 | 2 }) {
 /** Кнопки звонка врачам, у которых в профиле есть телефон. */
 export function CallVet() {
   const vets = useRows('profiles').filter((p) => p.active && p.role === 'vet' && p.phone?.trim());
-  if (!vets.length) return <span className="text-[13px] font-semibold text-muted">Телефона врача в «Персонале» нет — директор может его вписать.</span>;
+  if (!vets.length) return <span className="text-[13px] font-semibold text-muted">Телефона врача нет — его вписывают в «Персонале».</span>;
   return (
     <div className="flex flex-col gap-2">
       {vets.map((v) => (

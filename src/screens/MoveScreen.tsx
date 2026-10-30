@@ -47,19 +47,19 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <StopCard user={user} />
       <header className="flex flex-col gap-0.5 px-1">
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Переезд</h1>
         <span className="text-[14px] font-semibold text-muted">
           Что подготовить киперам · собрано {done} из {allIds.length}
         </span>
       </header>
+      <StopCard user={user} />
 
       <Card className="overflow-hidden">
         <Check
           on={road.on}
           label="В дороге"
-          sub={canRoad ? 'каши и зерносмесь отменяются у всех, овощи вечером, сено и вода вволю' : 'включает директор, врач или администратор'}
+          sub="каши и зерносмесь отменяются у всех, овощи вечером, сено и вода вволю"
           onChange={(v) => canRoad && setRoad(v)}
         />
       </Card>

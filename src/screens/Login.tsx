@@ -121,7 +121,7 @@ export function Login() {
           </button>
           {forgot && (
             <p className="m-0 -mt-2 text-center text-[13px] font-semibold leading-snug text-muted">
-              Попросите директора или администратора: меню → «Персонал» → вы → новый пароль. Почта не нужна.
+              Попроси того, кто ведёт «Персонал», задать новый пароль: меню → «Персонал» → твоё имя. Почта не нужна.
             </p>
           )}
         </form>

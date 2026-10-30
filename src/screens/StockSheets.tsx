@@ -182,7 +182,7 @@ export function DeliverySheet({ open, user, shiftId, onClose }: { open: boolean;
           </div>
         </div>
         {!closer && purchases.some((p) => p.status === 'ordered') && (
-          <p className="m-0 px-1 text-[13px] font-semibold text-muted">Приход запишется сразу. Закупку закроет администратор или директор.</p>
+          <p className="m-0 px-1 text-[13px] font-semibold text-muted">Приход запишется сразу, закупку закроют отдельно.</p>
         )}
       </div>
     </Sheet>

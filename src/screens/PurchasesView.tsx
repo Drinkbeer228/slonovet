@@ -421,7 +421,7 @@ export function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purch
           {p.status_by && p.status !== 'new' ? ` (${p.status_by}, ${relDate(localDay(p.status_at ?? p.updated_at))})` : ''}
         </span>
         <SupplierLine id={p.supplier_id} />
-        {!buyer && <span className="text-[13px] font-semibold text-muted">«Заказано» и «Привезли» отмечает администратор или директор.</span>}
+        {!buyer && <span className="text-[13px] font-semibold text-muted">«Заказано» и «Привезли» отмечает тот, кто закупает.</span>}
       </div>
       <ArriveSheet
         purchase={arriving ? p : null}
