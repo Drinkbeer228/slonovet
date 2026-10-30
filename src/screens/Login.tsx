@@ -106,13 +106,13 @@ export function Login() {
               </button>
             </div>
           </Field>
-          {caps && <p className="-mt-2 m-0 px-1 text-[13px] font-semibold text-amber">Включён Caps Lock</p>}
+          {caps && <p className="-mt-2 m-0 px-1 text-[13px] font-semibold text-amber-fg">Включён Caps Lock</p>}
           {error && (
-            <p role="alert" className="m-0 text-[14px] font-bold text-coral">
+            <p role="alert" className="m-0 text-[14px] font-bold text-coral-fg">
               {error}
             </p>
           )}
-          <Button kind="primary" big full type="submit" disabled={busy || !login || !password}>
+          <Button kind="accent" big full type="submit" disabled={busy || !login || !password}>
             {busy ? 'Входим…' : 'Войти'}
           </Button>
           {!navigator.onLine && <p className="m-0 text-center text-[13px] font-semibold text-muted">Для первого входа нужен интернет</p>}

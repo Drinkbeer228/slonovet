@@ -5,7 +5,7 @@ import { getClient } from '../../lib/supabase';
 import { PreviewError, getPreviewRole } from '../../lib/preview';
 import { syncNow } from '../../lib/sync';
 import { newId, put, useRows } from '../../lib/store';
-import { Button, Card, Check, Chip, Field, ReadOnlyNote, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Field, KEY, Plate, ReadOnlyNote, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { EDITORS, MANAGES, SEES_LOGINS } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 
@@ -81,7 +81,7 @@ export function UsersScreen({ session, role }: { session: Session; role: Role })
         if (!list.length) return null;
         return (
           <Section key={r.value} title={r.label}>
-            <Card className="divide-y divide-surface2 overflow-hidden">
+            <Card className="divide-y divide-edge overflow-hidden">
               {list.map((p) => (
                 <button
                   key={p.id}
@@ -90,7 +90,7 @@ export function UsersScreen({ session, role }: { session: Session; role: Role })
                   onClick={() => setEditing(p)}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:opacity-60"
                 >
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface2 text-[14px] font-extrabold">{p.full_name.slice(0, 1)}</span>
+                  <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-[14px] font-extrabold ${KEY}`}>{p.full_name.slice(0, 1)}</span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className={`text-[15px] font-bold ${p.active ? '' : 'text-faint line-through'}`}>{p.full_name}</span>
                     {(seesLogins || !p.active || p.id === session.user.id) && (
@@ -180,14 +180,14 @@ function AddSheet({ open, demo, roles, onClose }: { open: boolean; demo: boolean
       {created ? (
         <div className="flex flex-col gap-3">
           <p className="m-0 text-[15px] text-ink2">Передайте эти данные для входа:</p>
-          <Card className="flex flex-col gap-1 p-4 text-[17px] font-bold">
+          <Plate glow="teal" className="flex flex-col gap-1 p-4 text-[17px] font-bold">
             <span>
-              Логин: <span className="text-teal">{created.login}</span>
+              Логин: <span className="text-teal-fg">{created.login}</span>
             </span>
             <span>
-              Пароль: <span className="text-teal">{created.password}</span>
+              Пароль: <span className="text-teal-fg">{created.password}</span>
             </span>
-          </Card>
+          </Plate>
           <p className="m-0 text-[13px] font-semibold text-muted">Пароль больше нигде не покажется — запишите.</p>
         </div>
       ) : (

@@ -42,7 +42,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
       </header>
 
       <Section title="На дорогу">
-        <Card className="divide-y divide-surface2 overflow-hidden">
+        <Card className="divide-y divide-edge overflow-hidden">
           <div className="flex items-center gap-3 px-4 py-3">
             <span className="flex-1 text-[15px] font-bold">Дней в дороге</span>
             <Stepper label="Дней в дороге" value={days} min={1} onChange={setDays} />
@@ -63,7 +63,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
         const own = custom.filter((c) => c.section === sec.key);
         return (
           <Section key={sec.key} title={sec.title}>
-            <Card className="divide-y divide-surface2 overflow-hidden">
+            <Card className="divide-y divide-edge overflow-hidden">
               {[...sec.items, ...own.map((c) => ({ id: c.id, text: c.text }))].map((it) => {
                 const r = byId.get(it.id);
                 const ns = needs.filter((n) => n.item === it.id);

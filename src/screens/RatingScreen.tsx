@@ -1,8 +1,21 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { BADGES, keeperStats } from '../domain/achievements';
 import type { CurrentUser } from '../domain/types';
 import { useRows } from '../lib/store';
-import { Card, Empty, Section } from '../ui/kit';
+import { Card, Empty, Meter, Plate, Section } from '../ui/kit';
+
+/** Полученный значок — бирюзовая плита с свечением; ещё не полученный — приглушённое матовое стекло. */
+function Wrap({ done, children }: { done: boolean; children: ReactNode }) {
+  return done ? (
+    <Plate glow="teal" halo className="flex flex-col gap-1.5 p-3">
+      {children}
+    </Plate>
+  ) : (
+    <Card tone="sunken" className="flex flex-col gap-1.5 p-3">
+      {children}
+    </Card>
+  );
+}
 
 /** Мои достижения: личные значки кипера, без рейтинга и сравнения с коллегами. */
 export function RatingScreen({ user }: { user: CurrentUser }) {
@@ -25,21 +38,19 @@ export function RatingScreen({ user }: { user: CurrentUser }) {
               const [v, need] = badge.progress(me);
               const done = got.includes(badge);
               return (
-                <Card key={badge.key} className={`flex flex-col gap-1.5 p-3 ${done ? 'ring-1 ring-teal/50' : ''}`}>
+                <Wrap key={badge.key} done={done}>
                   <span className={`text-[28px] leading-none ${done ? '' : 'opacity-30 grayscale'}`}>{badge.icon}</span>
                   <span className={`text-[14px] font-extrabold ${done ? '' : 'text-muted'}`}>{badge.title}</span>
                   <span className="text-[12px] font-semibold leading-snug text-muted">{badge.text}</span>
                   {!done && (
                     <span className="flex items-center gap-2">
-                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface2">
-                        <span className="block h-full rounded-full bg-teal" style={{ width: `${Math.min(100, (v / need) * 100)}%` }} />
-                      </span>
-                      <span className="text-[11px] font-bold text-faint">
+                      <Meter className="flex-1" value={need ? v / need : 0} label={`${badge.title}: ${Math.min(v, need)} из ${need}`} />
+                      <span className="text-[12px] font-bold text-muted">
                         {Math.min(v, need)}/{need}
                       </span>
                     </span>
                   )}
-                </Card>
+                </Wrap>
               );
             })}
           </div>

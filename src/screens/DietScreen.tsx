@@ -87,14 +87,14 @@ export function DietScreen({ user }: { user: CurrentUser }) {
                 <h2 className="m-0 text-[17px] font-extrabold">{m.title}</h2>
               </div>
               {m.prep && (
-                <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber/15 px-2.5 py-1 text-[13px] font-bold text-amber">
+                <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-amber/40 bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] px-2.5 py-1 text-[13px] font-bold text-amber-fg shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]">
                   <Icon name="clock" size={14} />
                   {m.prep}
                 </span>
               )}
               <div className="flex flex-col">
                 {m.items.map((it, ii) => (
-                  <div key={ii} className="flex items-center justify-between gap-3 border-t border-surface2 py-2">
+                  <div key={ii} className="flex items-center justify-between gap-3 border-t border-edge py-2">
                     <span className="text-[15px] font-medium text-ink2">{it.name}</span>
                     {editing && draft ? (
                       <span className="flex items-center gap-1.5">
@@ -134,7 +134,7 @@ export function DietScreen({ user }: { user: CurrentUser }) {
           ))}
           {editing && (
             <div className="sticky bottom-24 flex gap-2 md:bottom-4">
-              <Button full onClick={() => setEditing(false)} className="bg-bg">
+              <Button full onClick={() => setEditing(false)}>
                 Отмена
               </Button>
               <Button
