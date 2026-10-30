@@ -5,9 +5,9 @@ import { boardAttention } from '../domain/board';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast } from '../ui/kit';
+import { Button, Card, Check, Chip, Confirm, KEY, Plate, Sheet, TONE, toast } from '../ui/kit';
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
-import { setTheme, useTheme } from '../lib/theme';
+import { setLite, setTheme, useLite, useTheme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { exportUnsent, requeueQuarantine, useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
@@ -363,6 +363,7 @@ export function MenuSheet({
         {session.mode === 'cloud' && !preview && <PushCard role={session.user.role} onClose={onClose} />}
 
         <ThemeCard />
+        <LiteCard />
 
         {extra.length > 0 && (
           <Card className="divide-y divide-edge overflow-hidden">
@@ -499,6 +500,16 @@ function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
           Выключить на этом телефоне
         </Button>
       )}
+    </Card>
+  );
+}
+
+/** Лёгкий режим для старых телефонов: без размытия, теней и анимаций. Запоминается на этом телефоне. */
+function LiteCard() {
+  const lite = useLite();
+  return (
+    <Card className="overflow-hidden">
+      <Check on={lite} label="Лёгкий режим" sub="для старых телефонов: без размытия, теней и анимаций — быстрее листается" onChange={setLite} />
     </Card>
   );
 }
