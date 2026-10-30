@@ -4,7 +4,7 @@ import { DeliverySheet, RecountSheet } from './StockSheets';
 import { useMemo, useState } from 'react';
 import { countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { LOW_DAYS, LOW_DAYS_OPTIONS, ORDER_DAYS, STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, deliveries, lastCount, lowDays, orderHint, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
+import { LOW_DAYS, LOW_DAYS_OPTIONS, STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, deliveries, lastCount, lowDays, orderHint, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
 import { ledger } from '../domain/stops';
 import { newId, put, useRows, useEffectiveDiets } from '../lib/store';
@@ -153,7 +153,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
                         ? `заказано${p.delivery_date ? ` · привезут ${shortDate(p.delivery_date)}` : ''}${p.amount ? ` · ${p.amount}` : ''}`
                         : `попросили купить${p.amount ? ` · ${p.amount}` : ''}`
                       : hint
-                        ? `на ${ORDER_DAYS} дней взять ≈ ${hint.text}`
+                        ? `на неделю взять ≈ ${hint.text}`
                         : 'не заказано'}
                   </span>
                 </span>

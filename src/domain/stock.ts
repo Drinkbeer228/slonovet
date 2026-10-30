@@ -272,8 +272,8 @@ export function lowDays(item: StockItem): number {
   return item.low_days && item.low_days !== 3 ? item.low_days : LOW_DAYS[categoryOf(item)];
 }
 
-/** На сколько дней подсказывать заказ. */
-export const ORDER_DAYS = 14;
+/** На сколько дней подсказывать заказ: заказывают раз в неделю, чтобы овощи и корм не портились. */
+export const ORDER_DAYS = 7;
 
 export interface OrderHint {
   /** сколько заказать в единицах закупки: мешков (крупы), кг (овощи и развес), штук/тюков */

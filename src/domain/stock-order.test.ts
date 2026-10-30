@@ -21,14 +21,14 @@ describe('когда предупреждать', () => {
   });
 });
 
-describe('сколько заказать на 2 недели', () => {
+describe('сколько заказать на неделю', () => {
   it('мешки — целыми, с учётом остатка', () => {
-    // 4 кг в день × 14 = 56, есть 10 → 46 кг → 3 мешка по 20
-    expect(orderHint(stockView(item('oats', 'grain'), 10, 4))).toEqual({ n: 3, text: '3 мешка' });
+    // 4 кг в день × 7 = 28, есть 10 → 18 кг → 1 мешок по 20
+    expect(orderHint(stockView(item('oats', 'grain'), 10, 4))).toEqual({ n: 1, text: '1 мешок' });
   });
   it('тюки — штуками, овощи — кг до десятков', () => {
-    expect(orderHint(stockView(item('hay', 'feed', 'count'), 34, 10))?.text).toBe('106 тюков');
-    expect(orderHint(stockView(item('carrot', 'veg'), 120, 60))?.text).toBe('720 кг');
+    expect(orderHint(stockView(item('hay', 'feed', 'count'), 34, 10))?.text).toBe('36 тюков');
+    expect(orderHint(stockView(item('carrot', 'veg'), 120, 60))?.text).toBe('300 кг');
   });
   it('хватает или расход неизвестен — не подсказываем', () => {
     expect(orderHint(stockView(item('oats', 'grain'), 100, 1))).toBeNull();
