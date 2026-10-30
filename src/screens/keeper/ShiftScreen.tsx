@@ -141,14 +141,11 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       {stale && mine && (
         <Plate glow="amber" className="flex flex-col gap-2 p-3.5">
           <span className="text-[14px] font-bold text-amber-fg">Смена идёт больше суток</span>
-          <div className="flex gap-2">
-            <Button kind="accent" full onClick={() => rolloverShift(shift, user)}>
-              Новые сутки (я остаюсь)
-            </Button>
-            <Button full onClick={() => setHandoverOpen(true)}>
-              Сдать сменщику
-            </Button>
-          </div>
+          {/* сдать — одной кнопкой внизу экрана («Сдать дежурство»), здесь не дублируем */}
+          <Button kind="accent" full onClick={() => rolloverShift(shift, user)}>
+            Новые сутки (я остаюсь)
+          </Button>
+          <span className="text-[13px] font-semibold text-muted">Уходишь — «Сдать дежурство» внизу экрана.</span>
         </Plate>
       )}
 
