@@ -440,3 +440,62 @@ describe('смены без связи — находки аудита, испр
     expect(open[0].accepted_from).toBe('sA');
   });
 });
+
+describe('гастроли: сохранность очереди после долгого офлайна — этап 1A аудита 30.10', () => {
+  it('отклонённая правка не пропадает: лежит в карантине, уходит после «Отправить ещё раз» и попадает в файл', async () => {
+    const p = await phone();
+    server.rls = (table) => (table === 'notes' ? 'нет прав' : null); // как будто роль на сервере уже сменили
+    await p.store.put('notes', note('n-quar'));
+    await syncOnce(p);
+    expect(p.store.pendingCount()).toBe(0);
+    expect((await p.store.getQuarantine()).map((q) => q.entry.row.id)).toEqual(['n-quar']);
+    expect(await p.store.exportUnsent()).toContain('n-quar');
+    server.rls = () => null; // права вернули
+    expect(await p.store.requeueQuarantine()).toBe(1);
+    await syncOnce(p);
+    expect(server.get('notes', 'n-quar')).toBeDefined();
+    expect(await p.store.getQuarantine()).toEqual([]);
+  });
+
+  it('родитель уходит раньше ребёнка: позиция склада раньше своего движения, даже если движение внесли первым', async () => {
+    const p = await phone();
+    await p.store.put('stock_moves', move('m1'));
+    await p.store.put('stock_items', oats());
+    await syncOnce(p);
+    const order = server.log.filter((l) => l.kind === 'upsert').map((l) => l.table);
+    expect(order.indexOf('stock_items')).toBeLessThan(order.indexOf('stock_moves'));
+  });
+
+  it('нарушение внешнего ключа (родитель ещё в дороге) — не окончательный отказ: запись ждёт и уходит потом', async () => {
+    const p = await phone();
+    await p.store.put('notes', note('n1'));
+    server.fail = () => ({ status: 409, code: '23503', message: 'violates foreign key constraint' });
+    await syncOnce(p);
+    expect(p.store.pendingCount()).toBe(1);
+    expect(p.sync.getSyncStatus().rejected).toEqual([]);
+    expect(await p.store.getQuarantine()).toEqual([]);
+    server.fail = () => null;
+    await syncOnce(p);
+    expect(server.get('notes', 'n1')).toBeDefined();
+  });
+
+  it('сервер перегружен (503): остальная очередь не молотится, одна попытка за цикл', async () => {
+    const p = await phone();
+    await p.store.put('notes', note('n1'));
+    await p.store.put('notes', note('n2'));
+    await p.store.put('notes', note('n3'));
+    server.fail = () => ({ status: 503, message: 'Service Unavailable' });
+    await syncOnce(p);
+    expect(server.log.filter((l) => l.kind === 'upsert').length).toBe(1);
+    expect(p.store.pendingCount()).toBe(3);
+  });
+
+  it('фото не задерживают текст: сначала записи, потом фото', async () => {
+    const p = await phone();
+    await p.store.put('notes', note('n1'));
+    await p.idb.idbPut('blobs', { path: 's1/p1.jpg', blob: new Blob(['x']), uploaded: false });
+    await syncOnce(p);
+    const kinds = server.log.map((l) => l.kind).filter((k) => k === 'upsert' || k === 'storage');
+    expect(kinds.indexOf('upsert')).toBeLessThan(kinds.indexOf('storage'));
+  });
+});

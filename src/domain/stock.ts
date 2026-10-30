@@ -51,6 +51,19 @@ function before(a: StockMove, b: StockMove) {
   return ta < tb || (ta === tb && a.id < b.id);
 }
 
+/** Последний пересчёт позиции — точка отсчёта её остатка; null, если позицию не пересчитывали. */
+export function lastCountOf(moves: StockMove[], itemId: string): StockMove | null {
+  let last: StockMove | null = null;
+  for (const m of moves) if (m.item_id === itemId && m.counted != null && (!last || before(last, m))) last = m;
+  return last;
+}
+
+/** Движение лежит до последнего пересчёта своей позиции: остаток его уже не учитывает (пересчёт включает его в себя). */
+export function isBeforeCount(m: StockMove, moves: StockMove[]): boolean {
+  const c = lastCountOf(moves, m.item_id);
+  return Boolean(c && m.counted == null && before(m, c));
+}
+
 /**
  * Остатки. Последний пересчёт позиции (counted) — точка отсчёта: остаток = пересчитанное + движения после него.
  * Чужие списания, сделанные до пересчёта и пришедшие позже, итог не меняют. Без пересчёта — сумма всех движений.

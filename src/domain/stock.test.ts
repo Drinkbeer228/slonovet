@@ -157,3 +157,62 @@ describe('даты — находка аудита Д3, исправлена н�
       expect(relDate(localDay(created), '2026-10-26')).toBe('сегодня');
     }));
 });
+
+describe('Фураж — правка после пересчёта склада (этап 1C аудита 30.10)', () => {
+  const pause = () => new Promise((r) => setTimeout(r, 5));
+  const bal = (id: string) => balances(p.store.getRows('stock_moves')).get(id) ?? 0;
+
+  it('сено исправили уже после пересчёта: остаток уменьшается ровно на разницу, а не теряет правку', async () => {
+    await p.actions.setHay(s1(), 8, keeperA);
+    await pause();
+    await p.actions.countStock('hay', 20, keeperA, null); // посчитали уже после выдачи 8 тюков
+    await pause();
+    await p.actions.setHay(s1(), 9, keeperA); // «нет, выдали 9»
+    expect(bal('hay')).toBe(19);
+    await pause();
+    await p.actions.setHay(s1(), 10, keeperA); // и ещё раз — разницы не должны накапливаться дважды
+    expect(bal('hay')).toBe(18);
+  });
+
+  it('галочку кормления сняли после пересчёта: списанное возвращается на склад', async () => {
+    await p.actions.setFeedDone(s1(), '13:00', true, keeperA);
+    await pause();
+    await p.actions.countStock('formamax', 10, keeperA, null);
+    await pause();
+    await p.actions.setFeedDone(s1(), '13:00', false, keeperA);
+    expect(bal('formamax')).toBe(12); // 10 по пересчёту + 2 возвращённые
+    await pause();
+    await p.actions.setFeedDone(s1(), '13:00', true, keeperA); // поставили снова
+    expect(bal('formamax')).toBe(10);
+  });
+
+  it('снятие и повтор галочки не стирают «½ / отказ» и вес', async () => {
+    await p.actions.setFeedDone(s1(), '13:00', true, keeperA);
+    await p.actions.cycleEaten(s1(), '13:00', 'Марго'); // all → half
+    await p.actions.setFeedDone(s1(), '13:00', false, keeperA);
+    await p.actions.setFeedDone(s1(), '13:00', true, keeperA);
+    expect(s1().feeds['13:00']?.eaten?.['Марго']).toBe('half');
+  });
+});
+
+describe('Фураж — приём смены без сдачи и приходы (этап 1C аудита 30.10)', () => {
+  it('кормление отмечено в двух сменах одного дня (приём без сдачи офлайн) — списывается один раз', async () => {
+    const s2: Shift = { ...shift, id: 's2', keeper_id: 'user-b', keeper_name: 'Кипер Б', accepted_from: 's1' };
+    await p.store.seedRows('shifts', [s2]);
+    await p.actions.setFeedDone(s1(), '13:00', true, keeperA);
+    await p.actions.setFeedDone(p.store.getRow('shifts', 's2')!, '13:00', true, keeperA);
+    expect(activeFeed()).toEqual([['formamax', -2]]);
+    await p.actions.setFeedDone(p.store.getRow('shifts', 's2')!, '13:00', false, keeperA); // снял второй — вернулось всё
+    expect(activeFeed()).toEqual([]);
+  });
+
+  it('вторая часть поставки — отдельный приход, а то же количество дважды — один', async () => {
+    const oats = { ...item('oats', 'Овёс', 'grain'), sack_kg: 40 };
+    const purchase = { id: 'p2', item_id: 'oats', title: 'Овёс', amount: '5 мешков', note: '', urgent: false, status: 'ordered' as const, author_id: 'user-a', author_name: 'Кипер А', status_by: null, status_at: null, created_at: now, updated_at: now };
+    await p.actions.arrivePurchase(purchase, oats, 3, keeperA, null);
+    await p.actions.arrivePurchase(purchase, oats, 3, keeperA, null);
+    await p.actions.arrivePurchase(purchase, oats, 2, keeperA, null);
+    const total = p.store.getRows('stock_moves').filter((m) => m.item_id === 'oats').reduce((s, m) => s + Number(m.delta), 0);
+    expect(total).toBe(200); // 3 мешка (120 кг) + 2 мешка (80 кг), повтор не задвоил
+  });
+});

@@ -1,4 +1,4 @@
-import { canTakeShift, canWorkShift } from '../../domain/access';
+import { canReceiveHandover, canTakeShift, canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, rolloverShift, updateShift } from '../../domain/actions';
 import { FEED_TIMES, acceptedBy, currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
@@ -229,7 +229,7 @@ function HandoverNote({ shift }: { shift: Shift }) {
 
 function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: Shift; user: CurrentUser; onClose: () => void }) {
   const requests = useRows('requests');
-  const people = useRows('profiles').filter((p) => p.active && p.role === 'keeper' && p.id !== user.id);
+  const people = useRows('profiles').filter((p) => p.active && canReceiveHandover(p.role) && p.id !== user.id);
   const [checked, setChecked] = useState(false);
   const [toId, setToId] = useState<string | null>(null);
   useEffect(() => {

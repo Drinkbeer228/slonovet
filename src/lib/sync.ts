@@ -117,14 +117,22 @@ function addRejected(item: Rejected) {
   setStatus({ rejected: list });
 }
 
-const onOnline = () => syncNow();
+const onOnline = () => {
+  backoffUntil = 0; // связь вернулась — ждать нечего
+  syncNow();
+};
+/** Автоматические попытки (таймер, возвращение в приложение) не бьют по недоступному серверу. */
+const autoSync = () => {
+  if (Date.now() < backoffUntil) return;
+  syncNow();
+};
 const onOffline = () => setStatus({ state: 'offline' });
 
 /** Вернулись в приложение — подтянуть новое, но не чаще раза в FOCUS_GAP_MS. */
 export function syncOnFocus() {
   if (document.visibilityState !== 'visible') return;
   if (Date.now() - lastStart < FOCUS_GAP_MS) return;
-  syncNow();
+  autoSync();
 }
 
 /** Попросить браузер не стирать наши данные сам (Safari чистит сайты, которые давно не открывали). */
@@ -145,7 +153,7 @@ export function startSync() {
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     document.addEventListener('visibilitychange', syncOnFocus);
-    interval = setInterval(() => syncNow(), 60_000);
+    interval = setInterval(autoSync, 60_000);
     askPersistentStorage();
   }
   syncNow();
@@ -166,7 +174,7 @@ export function stopSync(demo: boolean) {
 export function scheduleSync(delay = 1500) {
   if (!enabled) return;
   if (timer) clearTimeout(timer);
-  timer = setTimeout(() => syncNow(), delay);
+  timer = setTimeout(autoSync, delay);
 }
 
 function describe(e: unknown): string {
@@ -187,8 +195,35 @@ interface ServerError {
 function isPermanent(error: ServerError, httpStatus: number | undefined): boolean {
   if (!httpStatus || httpStatus >= 500 || httpStatus === 401 || httpStatus === 408 || httpStatus === 429) return false;
   if (error.code?.startsWith('PGRST2')) return false;
+  // нарушение внешнего ключа: родитель (например, задача) ещё в дороге — отметка дождётся его
+  if (error.code === '23503') return false;
   return httpStatus >= 400;
 }
+
+/** Родители раньше детей: отметка не уйдёт раньше своей задачи, движение — раньше своей позиции. */
+const RANK: Record<TableName, number> = {
+  profiles: 0,
+  stock_items: 1,
+  diets: 1,
+  requests: 1,
+  shifts: 2,
+  notes: 3,
+  move_items: 3,
+  stock_moves: 4,
+  purchases: 4,
+  request_marks: 5,
+  request_comments: 5,
+};
+
+/** Сервер недоступен или перегружен: 5xx, 429, нет связи. Дальше очередь не молотим — ждём. */
+const isServerDown = (httpStatus: number | undefined) => !httpStatus || httpStatus >= 500 || httpStatus === 429;
+const BACKOFF_MIN_MS = 60_000;
+const BACKOFF_MAX_MS = 15 * 60_000;
+/** До какого момента автоматические попытки (таймер, возвращение в приложение) не бьют по серверу. */
+let backoffUntil = 0;
+let failStreak = 0;
+/** Сколько секунд на фото за один цикл: связь «есть, но мёртвая» не должна держать текст смены. */
+const PHOTO_BUDGET_MS = 45_000;
 
 const WHAT: Record<TableName, string> = {
   profiles: 'Человек',
@@ -288,13 +323,16 @@ async function cycle(client: SupabaseClient) {
   await checkServer(`${getServerConfig()?.url}#${SYNC_EPOCH}`);
   let failed: string | null = null;
 
-  const photos = await uploadPendingPhotos();
-  if (photos.failed) failed = `Фото не отправлено (${photos.failed}): ${photos.error}`;
   await flushEvents();
 
   // очередь — общая для вкладок; перечитываем, чтобы не отправить то, что уже ушло из другой вкладки
   await reloadOutbox();
-  for (const entry of getOutbox()) {
+  let down = false;
+  const queue = getOutbox()
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => RANK[a.e.table] - RANK[b.e.table] || a.i - b.i) // внутри таблицы — по порядку внесения
+    .map((x) => x.e);
+  for (const entry of queue) {
     const { deleted, ...row } = entry.row as TableMap[TableName] & { deleted?: boolean };
     const full = { ...row, deleted: Boolean(deleted) };
     const patched = Boolean(entry.patches || entry.insert);
@@ -305,12 +343,29 @@ async function cycle(client: SupabaseClient) {
     if (res.error) {
       if (isPermanent(res.error, res.status) && (await reject(client, entry, res.error, res.status))) continue;
       failed = res.error.message;
-      // сеть пропала — дальше не пытаемся
-      if (!navigator.onLine) break;
+      // сервер лёг, перегружен или сети нет — остальное только добавит нагрузки
+      if (!navigator.onLine || isServerDown(res.status)) {
+        down = true;
+        break;
+      }
       continue;
     }
     if (patched && res.data) await acceptServerRow(entry.table, res.data as TableMap[TableName], entry.ts);
     await dropOutbox(entry.key, entry.ts);
+  }
+
+  if (down) {
+    failStreak++;
+    backoffUntil = Date.now() + Math.min(BACKOFF_MIN_MS * 2 ** (failStreak - 1), BACKOFF_MAX_MS);
+  } else {
+    failStreak = 0;
+    backoffUntil = 0;
+  }
+
+  // фото — после текста и в пределах времени: тяжёлые файлы не задерживают смену, а недоступный сервер их не ждёт
+  if (!down) {
+    const photos = await uploadPendingPhotos(Date.now() + PHOTO_BUDGET_MS);
+    if (photos.failed) failed = `Фото не отправлено (${photos.failed}): ${photos.error}`;
   }
 
   for (const t of TABLES) {
