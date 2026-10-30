@@ -8,6 +8,7 @@ import { getRows, useRows } from '../lib/store';
 import { plural } from '../lib/dates';
 import { Button, Card, Check, Chip, KEY, PAD, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
 import { firstNumber } from './PurchasesView';
+import { Icon } from '../ui/Icon';
 
 /**
  * В чём человек считает позицию: крупы — мешками, овощи и развес — кг, сено и мешки для мусора — штуками.
@@ -27,7 +28,8 @@ const show = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 const sortItems = (items: StockItem[]) =>
   [...items].sort((a, b) => STOCK_CATEGORIES.findIndex((c) => c.id === categoryOf(a)) - STOCK_CATEGORIES.findIndex((c) => c.id === categoryOf(b)) || a.sort - b.sort);
 
-const isSacks = (it: StockItem) => unitOf(it).label === 'мешков';
+/** Крупы и каши мешками (не овощи, не штучные «мешки для мусора»). */
+const isSacks = (it: StockItem) => it.kind === 'sack' && Boolean(it.sack_kg) && categoryOf(it) !== 'veg';
 
 /** «Батарейка» открытого мешка — как заряд телефона, четвертями. */
 export function Battery({ frac, low = false, small = false }: { frac: number; low?: boolean; small?: boolean }) {
@@ -74,34 +76,75 @@ const sacksText = (v: number) => {
   return full && f ? `${full} + ${f}` : f || String(full);
 };
 
-/** Мешки при пересчёте: полные — кнопками, открытый — одной кнопкой по кругу: — → ¼ → ½ → ¾. */
-function SackRow({ it, value, onChange, hint }: { it: StockItem; value: string; onChange: (v: string) => void; hint?: string }) {
+/** Правка мешков: полные — «−/+», открытый — тап по батарейке на четверть больше (пусто → ¼ → ½ → ¾ → пусто). */
+function SackControls({ it, value, onChange }: { it: StockItem; value: string; onChange: (v: string) => void }) {
   const { full, frac } = split(num(value));
   const set = (f: number, fr: number) => onChange(show(f + fr));
   const i = FRAC.indexOf(frac);
   return (
-    <div className="flex flex-col gap-2 px-4 py-3">
-      {/* сверху — как в остатках: название и «зарядка» мешков */}
-      <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
+      <Stepper label={`${it.name}: полных мешков`} value={full} onChange={(f) => set(f, frac)} />
+      <span className="flex-1 text-right text-[13px] font-semibold text-muted">открытый</span>
+      <button
+        type="button"
+        onClick={() => set(full, FRAC[(i + 1) % FRAC.length])}
+        aria-label={`${it.name}: открытый мешок — ${frac ? FRAC_LABEL[i] : 'нет'}. Нажми, чтобы изменить`}
+        className={`flex h-11 w-[84px] shrink-0 items-center justify-center rounded-xl ${KEY}`}
+      >
+        <Battery frac={frac} />
+      </button>
+    </div>
+  );
+}
+
+/** Сколько — словами: «3 + ½ мешка», «126 тюков», «40 кг». */
+function amountWords(it: StockItem, value: string) {
+  const v = num(value);
+  if (isSacks(it)) {
+    const { full, frac } = split(v);
+    return `${sacksText(v)} ${frac ? 'мешка' : plural(full, 'мешок', 'мешка', 'мешков')}`;
+  }
+  return it.kind === 'count' ? `${show(v)} ${plural(Math.round(v), ...countWords(it.id, it.unit))}` : `${show(v)} кг`;
+}
+
+/**
+ * Строка пересчёта: свёрнута — название и сколько сейчас (мешки «зарядкой»); тап — правка только этой позиции.
+ * Расходятся обычно 2–3 позиции из всех — остальные так и остаются одной строкой.
+ */
+function RecountRow({ it, value, was, open, onToggle, onChange }: { it: StockItem; value: string; was: string | null; open: boolean; onToggle: () => void; onChange: (v: string) => void }) {
+  const { full, frac } = split(num(value));
+  return (
+    <div className={was != null ? 'bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)]' : ''}>
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left">
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-[15px] font-bold">{it.name}</span>
-          <span className="text-[12px] font-semibold text-muted">{hint ?? `${sacksText(num(value))} ${frac ? 'мешка' : plural(full, 'мешок', 'мешка', 'мешков')}`}</span>
+          <span className={`text-[12px] font-semibold ${was != null ? 'text-teal-fg' : 'text-muted'}`}>
+            {amountWords(it, value)}
+            {was != null ? ` · было ${was}` : ''}
+          </span>
         </span>
-        <SackGauge full={full} frac={frac} />
-      </div>
-      {/* снизу — поправить: полные «−/+», открытый — тап по батарейке на четверть больше (пусто → ¼ → ½ → ¾ → пусто) */}
-      <div className="flex items-center gap-2">
-        <Stepper label={`${it.name}: полных мешков`} value={full} onChange={(f) => set(f, frac)} />
-        <span className="flex-1 text-right text-[13px] font-semibold text-muted">открытый</span>
-        <button
-          type="button"
-          onClick={() => set(full, FRAC[(i + 1) % FRAC.length])}
-          aria-label={`${it.name}: открытый мешок — ${frac ? FRAC_LABEL[i] : 'нет'}. Нажми, чтобы изменить`}
-          className={`flex h-11 w-[84px] shrink-0 items-center justify-center rounded-xl ${KEY}`}
-        >
-          <Battery frac={frac} />
-        </button>
-      </div>
+        {isSacks(it) ? <SackGauge full={full} frac={frac} small /> : null}
+        <Icon name={open ? 'check' : 'edit'} size={16} className="shrink-0 text-muted" />
+      </button>
+      {open && (
+        <div className="px-4 pb-3">
+          {isSacks(it) ? (
+            <SackControls it={it} value={value} onChange={onChange} />
+          ) : (
+            <div className="flex items-center gap-3">
+              <input
+                className={`${inputCls} h-11 flex-1 text-right`}
+                inputMode="decimal"
+                autoFocus
+                value={value}
+                onChange={(e) => onChange(e.target.value.replace(/[^\d.,]/g, ''))}
+                aria-label={`${it.name}, ${unitOf(it).label}`}
+              />
+              <span className="w-14 shrink-0 text-[13px] font-semibold text-muted">{unitOf(it).label}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -246,9 +289,11 @@ export function RecountSheet({ open, user, shiftId, onClose }: { open: boolean; 
   const [val, setVal] = useState<Record<string, string>>({});
   const [start, setStart] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setEditing(null);
     const bal = balances(getRows('stock_moves'));
     const now = Object.fromEntries(
       getRows('stock_items').map((it) => {
@@ -288,14 +333,20 @@ export function RecountSheet({ open, user, shiftId, onClose }: { open: boolean; 
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="m-0 px-1 text-[13px] font-semibold text-muted">Стоит то, что сейчас по приложению. Поправь, где на складе иначе. Мешки: полные — «−/+», открытый — тап по батарейке, каждый раз на четверть больше.</p>
+        <p className="m-0 px-1 text-[13px] font-semibold text-muted">Здесь — сколько сейчас по приложению. Тапни позицию, если на складе иначе; остальные не трогай.</p>
         <Card className="divide-y divide-edge overflow-hidden">
           {sorted.map((it) => {
-            const was = (val[it.id] ?? '') !== (start[it.id] ?? '');
-            return isSacks(it) ? (
-              <SackRow key={it.id} it={it} value={val[it.id] ?? ''} onChange={(v) => setVal({ ...val, [it.id]: v })} hint={was ? `было ${sacksText(num(start[it.id] ?? '0'))}` : undefined} />
-            ) : (
-              <AmountRow key={it.id} it={it} value={val[it.id] ?? ''} onChange={(v) => setVal({ ...val, [it.id]: v })} hint={was ? `было ${start[it.id]}` : undefined} />
+            const changedHere = (val[it.id] ?? '') !== (start[it.id] ?? '');
+            return (
+              <RecountRow
+                key={it.id}
+                it={it}
+                value={val[it.id] ?? ''}
+                was={changedHere ? (isSacks(it) ? sacksText(num(start[it.id] ?? '0')) : (start[it.id] ?? '')) : null}
+                open={editing === it.id}
+                onToggle={() => setEditing(editing === it.id ? null : it.id)}
+                onChange={(v) => setVal({ ...val, [it.id]: v })}
+              />
             );
           })}
         </Card>
