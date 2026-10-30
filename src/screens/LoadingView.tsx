@@ -87,16 +87,18 @@ export function LoadingView({ user, canWrite }: { user: CurrentUser; canWrite: b
               {EURO_TRUCK.name}
             </Chip>
           )}
-          {trucks.map((t) => (
-            <Chip key={t.id} on={t.id === chosen?.id} onClick={() => update({ truck_id: t.id })}>
-              {t.name}
-            </Chip>
-          ))}
-          {canWrite && chosen && (
-            <Button icon="edit" onClick={() => setTruckSheet(chosen)}>
-              Изменить
-            </Button>
-          )}
+          {/* тап по выбранной фуре — правка размеров или удаление, по другой — выбрать её */}
+          {trucks.map((t) => {
+            const on = t.id === chosen?.id;
+            return (
+              <Chip key={t.id} on={on} onClick={() => (on ? canWrite && setTruckSheet(t) : update({ truck_id: t.id }))}>
+                <span className="inline-flex items-center gap-1.5">
+                  {t.name}
+                  {on && canWrite && <Icon name="edit" size={14} className="text-muted" />}
+                </span>
+              </Chip>
+            );
+          })}
           {canWrite && (
             <Button icon="plus" onClick={() => setTruckSheet('new')}>
               Фура
