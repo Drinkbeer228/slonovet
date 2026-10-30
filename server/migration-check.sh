@@ -59,30 +59,30 @@ begin
   raise notice 'ok: колонки, триггер и политика на месте';
 
   -- 2. принятие без сдачи: смена Б закрывает открытую смену А как takeover
-  perform public.apply_shift_patch('T-A', jsonb_build_object('id', 'T-A', 'date', '2030-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2030-01-01T08:00:00Z'), '[]');
-  perform public.apply_shift_patch('T-B', jsonb_build_object('id', 'T-B', 'date', '2030-01-01', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2030-01-01T20:00:00Z', 'accepted_from', 'T-A'), '[]');
+  perform public.apply_shift_patch('T-A', jsonb_build_object('id', 'T-A', 'date', '2020-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2020-01-01T08:00:00Z'), '[]');
+  perform public.apply_shift_patch('T-B', jsonb_build_object('id', 'T-B', 'date', '2020-01-01', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2020-01-01T20:00:00Z', 'accepted_from', 'T-A'), '[]');
   select status, close_reason, closed_by into s from public.shifts where id = 'T-A';
   if s.status <> 'handed' or s.close_reason <> 'takeover' or s.closed_by <> kb then raise exception 'FAIL takeover: % % %', s.status, s.close_reason, s.closed_by; end if;
   raise notice 'ok: принятие без сдачи закрыло прежнюю смену (takeover)';
 
   -- 3. новые сутки у того же человека: rollover
-  perform public.apply_shift_patch('T-C', jsonb_build_object('id', 'T-C', 'date', '2030-01-02', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2030-01-02T08:00:00Z', 'accepted_from', 'T-B'), '[]');
+  perform public.apply_shift_patch('T-C', jsonb_build_object('id', 'T-C', 'date', '2020-01-02', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2020-01-02T08:00:00Z', 'accepted_from', 'T-B'), '[]');
   select close_reason into s from public.shifts where id = 'T-B';
   if s.close_reason <> 'rollover' then raise exception 'FAIL rollover: %', s.close_reason; end if;
   raise notice 'ok: новые сутки закрыли прежнюю как rollover';
 
   -- 4. опоздавшая старая смена приходит уже закрытой и никому не отказывают
-  perform public.apply_shift_patch('T-D', jsonb_build_object('id', 'T-D', 'date', '2030-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2030-01-01T12:00:00Z'), '[]');
+  perform public.apply_shift_patch('T-D', jsonb_build_object('id', 'T-D', 'date', '2020-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2020-01-01T12:00:00Z'), '[]');
   select status, close_reason into s from public.shifts where id = 'T-D';
   if s.status <> 'handed' or s.close_reason <> 'superseded' then raise exception 'FAIL superseded: % %', s.status, s.close_reason; end if;
   select count(*) into n from public.shifts where status = 'open' and not deleted;
   if n <> 1 then raise exception 'FAIL: открытых смен после проверок %, а должна быть одна', n; end if;
   raise notice 'ok: опоздавшая смена закрыта superseded, открытая смена одна';
 
-  -- 5. патч поля handover_to доходит (старый вызов без новых полей тоже работал выше)
-  perform public.apply_shift_patch('T-C', null, '[{"path":["handover_to"],"value":"00000000-0000-0000-0000-000000000001"}]');
-  select handover_to::text into s from public.shifts where id = 'T-C';
-  if s.handover_to is distinct from '00000000-0000-0000-0000-000000000001' then raise exception 'FAIL: handover_to не записался'; end if;
+  -- 5. патч поля handover_to доходит (сдать можно только киперу или директору — берём настоящего)
+  perform public.apply_shift_patch('T-C', null, jsonb_build_array(jsonb_build_object('path', jsonb_build_array('handover_to'), 'value', kb)));
+  select handover_to::text as h into s from public.shifts where id = 'T-C';
+  if s.h is distinct from kb::text then raise exception 'FAIL: handover_to не записался'; end if;
   raise notice 'ok: патч новых полей работает';
 
   -- 6. права: директор пишет только свою смену; администратор (manager) — не дежурит вообще
@@ -94,7 +94,7 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', s.uid, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     begin
-      perform public.apply_shift_patch('T-R-' || s.who, jsonb_build_object('id', 'T-R-' || s.who, 'date', '2030-01-05', 'keeper_id', s.uid, 'keeper_name', 'X', 'status', 'open', 'accepted_at', '2030-01-05T08:00:00Z'), '[]');
+      perform public.apply_shift_patch('T-R-' || s.who, jsonb_build_object('id', 'T-R-' || s.who, 'date', '2020-01-05', 'keeper_id', s.uid, 'keeper_name', 'X', 'status', 'open', 'accepted_at', '2020-01-05T08:00:00Z'), '[]');
       execute 'reset role';
       if not s.ok then raise exception 'FAIL: % записал свою смену, а дежурить не вправе', s.who; end if;
       raise notice 'ok: % записал свою смену', s.who;
@@ -105,7 +105,7 @@ begin
     end;
     execute 'set local role authenticated';
     begin
-      perform public.apply_shift_patch('T-X-' || s.who, jsonb_build_object('id', 'T-X-' || s.who, 'date', '2030-01-06', 'keeper_id', ka, 'keeper_name', 'чужая', 'status', 'open', 'accepted_at', '2030-01-06T08:00:00Z'), '[]');
+      perform public.apply_shift_patch('T-X-' || s.who, jsonb_build_object('id', 'T-X-' || s.who, 'date', '2020-01-06', 'keeper_id', ka, 'keeper_name', 'чужая', 'status', 'open', 'accepted_at', '2020-01-06T08:00:00Z'), '[]');
       execute 'reset role';
       raise exception 'FAIL: % записал смену за другого', s.who;
     exception when insufficient_privilege then
@@ -118,13 +118,13 @@ begin
   select id into s from public.profiles where role in ('vet', 'manager') and active limit 1;
   if s.id is not null then
     begin
-      perform public.apply_shift_patch('T-G1', jsonb_build_object('id', 'T-G1', 'date', '2030-01-07', 'keeper_id', s.id, 'keeper_name', 'врач', 'status', 'open', 'accepted_at', '2030-01-07T08:00:00Z'), '[]');
+      perform public.apply_shift_patch('T-G1', jsonb_build_object('id', 'T-G1', 'date', '2020-01-07', 'keeper_id', s.id, 'keeper_name', 'врач', 'status', 'open', 'accepted_at', '2020-01-07T08:00:00Z'), '[]');
       raise exception 'FAIL: дежурным записали врача или администратора';
     exception when insufficient_privilege then
       raise notice 'ok: дежурным нельзя записать врача или администратора';
     end;
   end if;
-  perform public.apply_shift_patch('T-G2', jsonb_build_object('id', 'T-G2', 'date', '2030-01-08', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2999-01-01T00:00:00Z'), '[]');
+  perform public.apply_shift_patch('T-G2', jsonb_build_object('id', 'T-G2', 'date', '2020-01-08', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2999-01-01T00:00:00Z'), '[]');
   select accepted_at into s from public.shifts where id = 'T-G2';
   if s.accepted_at > now() + interval '1 hour' then raise exception 'FAIL: время приёма из будущего не подрезано'; end if;
   raise notice 'ok: время приёма из будущего подрезано';
