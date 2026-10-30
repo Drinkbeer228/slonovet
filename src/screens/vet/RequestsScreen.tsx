@@ -108,7 +108,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
                   i.kind === 'request' ? (
                     <BoardRequest key={i.req.id} item={i} user={user} onOpen={setOpen} />
                   ) : (
-                    <BoardCard key={i.p.id} type="purchases" label={TASK_TYPE.purchases.label} urgent={i.p.urgent && (i.p.status === 'new' || i.p.status === 'ordered')}>
+                    <BoardCard key={i.p.id} type="purchases" label={TASK_TYPE.purchases.label} quiet={closed} urgent={i.p.urgent && (i.p.status === 'new' || i.p.status === 'ordered')}>
                       <PurchaseRow p={i.p} buyer={buyer} onOpen={setOpenBuy} onOrder={setOrdering} onArrive={arrive} />
                     </BoardCard>
                   ),
@@ -153,6 +153,7 @@ function BoardCard({
   right,
   urgent,
   late,
+  quiet,
   children,
 }: {
   type: BoardType;
@@ -160,12 +161,14 @@ function BoardCard({
   right?: ReactNode;
   urgent?: boolean;
   late?: boolean;
+  /** закрытая: плита без свечения — не спорит с тем, что ещё надо сделать */
+  quiet?: boolean;
   children: ReactNode;
 }) {
   const t = TASK_TYPE[type];
   const glow: Glow = urgent || late ? 'coral' : t.glow;
   return (
-    <Plate glow={glow} halo={urgent} className="flex flex-col gap-2 px-4 py-3">
+    <Plate glow={glow} halo={urgent && !quiet} flat={quiet} className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
           <Icon name={t.icon} size={15} />
@@ -199,6 +202,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
   return (
     <BoardCard
       type={item.type}
+      quiet={closed}
       urgent={!closed && r.urgent}
       late={late}
       label={item.type === 'work' ? TASK_TYPE.work.label : whoLabel(r.elephant)}
@@ -628,7 +632,7 @@ export function NewRequestSheet({
                   .filter(Boolean),
               );
             }}
-            placeholder="Свои варианты через запятую: забрал, нет на месте"
+            placeholder="Свои: забрал, нет на месте"
           />
           {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кнопки ответа: {options.join(' · ')}</span>}
         </div>

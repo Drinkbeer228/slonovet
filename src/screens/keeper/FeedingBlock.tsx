@@ -107,7 +107,8 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
           <Stepper label="Сено" value={shift.hay_bales} onChange={(v) => setHay(shift, v, user)} />
         </div>
       </Card>
-      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда ставишь галочку. Овощи — по рациону в кг, поправь, если дали иначе.</p>}
+      {/* про овощи сказано в самой строке («поправь, если дали иначе») — здесь только общее правило */}
+      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда ставишь галочку.</p>}
       <RecipeSheet time={recipe} onTime={setRecipe} diets={diets} />
     </Section>
   );
