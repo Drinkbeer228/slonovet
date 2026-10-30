@@ -1,6 +1,6 @@
 import { EDITORS, canEdit } from '../domain/access';
 import { NewPurchaseSheet, PurchasesBlock } from './PurchasesView';
-import { DeliverySheet, RecountSheet } from './StockSheets';
+import { DeliverySheet, RecountSheet, SackGauge } from './StockSheets';
 import { useMemo, useState } from 'react';
 import { countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
@@ -56,33 +56,8 @@ function daysText(v: StockView, noQty: boolean) {
   return `≈ ${d} ${plural(d, 'день', 'дня', 'дней')}`;
 }
 
-/** «Батарейка» открытого мешка */
-function Battery({ frac, low }: { frac: number; low: boolean }) {
-  const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
-  return (
-    <div className="flex items-center gap-1" role="img" aria-label={`Открытый мешок заполнен на ${pct}%`}>
-      <div className={`relative h-6 w-16 overflow-hidden rounded-md ${TONE.sunken}`}>
-        <div className={`absolute inset-y-0 left-0 ${low ? PAD.amber : PAD.teal}`} style={{ width: `${pct}%` }} />
-        {[25, 50, 75].map((t) => (
-          <span key={t} className="absolute inset-y-0 w-px bg-bg/60" style={{ left: `${t}%` }} />
-        ))}
-      </div>
-      <span className="h-2.5 w-1 rounded-r-sm bg-track" />
-    </div>
-  );
-}
-
 function Sacks({ v }: { v: StockView }) {
-  const shown = Math.min(v.full, 5);
-  return (
-    <div className="flex items-center gap-1.5">
-      {Array.from({ length: shown }).map((_, i) => (
-        <span key={i} className={`h-6 w-4 rounded-[4px] ${v.low ? PAD.amber : PAD.teal}`} aria-hidden="true" />
-      ))}
-      {v.full > shown && <span className="text-[12px] font-bold text-muted">+{v.full - shown}</span>}
-      {(v.openFrac > 0 || v.full === 0) && <Battery frac={v.openFrac} low={v.low} />}
-    </div>
-  );
+  return <SackGauge full={v.full} frac={v.openFrac} low={v.low} />;
 }
 
 export function StockScreen({ user }: { user: CurrentUser }) {

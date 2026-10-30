@@ -6,7 +6,7 @@ import type { CurrentUser, Purchase, StockItem } from '../domain/types';
 import { logEvent } from '../lib/log';
 import { getRows, useRows } from '../lib/store';
 import { plural } from '../lib/dates';
-import { Button, Card, Check, Chip, KEY, Sheet, Stepper, inputCls, toast } from '../ui/kit';
+import { Button, Card, Check, Chip, KEY, PAD, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
 import { firstNumber } from './PurchasesView';
 
 /**
@@ -29,6 +29,36 @@ const sortItems = (items: StockItem[]) =>
 
 const isSacks = (it: StockItem) => unitOf(it).label === 'мешков';
 
+/** «Батарейка» открытого мешка — как заряд телефона, четвертями. */
+export function Battery({ frac, low = false, small = false }: { frac: number; low?: boolean; small?: boolean }) {
+  const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
+  return (
+    <span className="flex items-center gap-1" role="img" aria-label={`Открытый мешок заполнен на ${pct}%`}>
+      <span className={`relative overflow-hidden rounded-md ${small ? 'h-4 w-10' : 'h-6 w-16'} ${TONE.sunken}`}>
+        <span className={`absolute inset-y-0 left-0 ${low ? PAD.amber : PAD.teal}`} style={{ width: `${pct}%` }} />
+        {[25, 50, 75].map((t) => (
+          <span key={t} className="absolute inset-y-0 w-px bg-bg/60" style={{ left: `${t}%` }} />
+        ))}
+      </span>
+      <span className={`${small ? 'h-2 w-0.5' : 'h-2.5 w-1'} rounded-r-sm bg-track`} />
+    </span>
+  );
+}
+
+/** Мешки как на складе: полные — столбиками (до 5, дальше «+N»), открытый — батарейкой. */
+export function SackGauge({ full, frac, low = false, small = false }: { full: number; frac: number; low?: boolean; small?: boolean }) {
+  const shown = Math.min(full, 5);
+  return (
+    <span className={`flex items-center ${small ? 'gap-1' : 'gap-1.5'}`}>
+      {Array.from({ length: shown }).map((_, i) => (
+        <span key={i} className={`${small ? 'h-4 w-3 rounded-[3px]' : 'h-6 w-4 rounded-[4px]'} ${low ? PAD.amber : PAD.teal}`} aria-hidden="true" />
+      ))}
+      {full > shown && <span className="text-[12px] font-bold text-muted">+{full - shown}</span>}
+      {(frac > 0 || full === 0) && <Battery frac={frac} low={low} small={small} />}
+    </span>
+  );
+}
+
 /** Открытый мешок — четвертями: так на складе и смотрят («полный и ещё ¾»). */
 const FRAC = [0, 0.25, 0.5, 0.75];
 const FRAC_LABEL = ['—', '¼', '½', '¾'];
@@ -50,20 +80,28 @@ function SackRow({ it, value, onChange, hint }: { it: StockItem; value: string; 
   const set = (f: number, fr: number) => onChange(show(f + fr));
   const i = FRAC.indexOf(frac);
   return (
-    <div className="flex min-h-11 items-center gap-2 px-4 py-2">
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-bold">{it.name}</span>
-        <span className="text-[12px] font-semibold text-muted">{hint ?? `${sacksText(num(value))} ${frac ? 'мешка' : plural(full, 'мешок', 'мешка', 'мешков')}`}</span>
-      </span>
-      <Stepper label={`${it.name}: полных мешков`} value={full} onChange={(f) => set(f, frac)} />
-      <button
-        type="button"
-        onClick={() => set(full, FRAC[(i + 1) % FRAC.length])}
-        aria-label={`${it.name}: открытый мешок — ${frac ? FRAC_LABEL[i] : 'нет'}. Нажми, чтобы изменить`}
-        className={`h-11 w-12 shrink-0 rounded-xl text-[16px] font-extrabold ${frac ? 'text-teal-fg' : 'text-muted'} ${KEY}`}
-      >
-        {frac ? `+${FRAC_LABEL[i]}` : '—'}
-      </button>
+    <div className="flex flex-col gap-2 px-4 py-3">
+      {/* сверху — как в остатках: название и «зарядка» мешков */}
+      <div className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-bold">{it.name}</span>
+          <span className="text-[12px] font-semibold text-muted">{hint ?? `${sacksText(num(value))} ${frac ? 'мешка' : plural(full, 'мешок', 'мешка', 'мешков')}`}</span>
+        </span>
+        <SackGauge full={full} frac={frac} />
+      </div>
+      {/* снизу — поправить: полные «−/+», открытый — тап по батарейке на четверть больше (пусто → ¼ → ½ → ¾ → пусто) */}
+      <div className="flex items-center gap-2">
+        <Stepper label={`${it.name}: полных мешков`} value={full} onChange={(f) => set(f, frac)} />
+        <span className="flex-1 text-right text-[13px] font-semibold text-muted">открытый</span>
+        <button
+          type="button"
+          onClick={() => set(full, FRAC[(i + 1) % FRAC.length])}
+          aria-label={`${it.name}: открытый мешок — ${frac ? FRAC_LABEL[i] : 'нет'}. Нажми, чтобы изменить`}
+          className={`flex h-11 w-[84px] shrink-0 items-center justify-center rounded-xl ${KEY}`}
+        >
+          <Battery frac={frac} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -250,7 +288,7 @@ export function RecountSheet({ open, user, shiftId, onClose }: { open: boolean; 
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="m-0 px-1 text-[13px] font-semibold text-muted">Стоит то, что сейчас по приложению. Поправь, где на складе иначе. Мешки: полные — «−/+», открытый — кнопка справа (— ¼ ½ ¾).</p>
+        <p className="m-0 px-1 text-[13px] font-semibold text-muted">Стоит то, что сейчас по приложению. Поправь, где на складе иначе. Мешки: полные — «−/+», открытый — тап по батарейке, каждый раз на четверть больше.</p>
         <Card className="divide-y divide-edge overflow-hidden">
           {sorted.map((it) => {
             const was = (val[it.id] ?? '') !== (start[it.id] ?? '');
