@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
 import { idbAll, idbClear, idbDelete, idbGet, idbPut, idbPutMany, idbPutPair, EXTRA_STORES } from './idb';
 import { applyPatches, diff, mergePatches, type Patch } from './patch';
+import { effectiveDiets, roadMode } from '../domain/road';
 
 /**
  * Все данные держим в памяти + IndexedDB. Каждое изменение пишется локально сразу,
@@ -95,6 +96,19 @@ export function getRow<K extends TableName>(table: K, id: string): TableMap[K] |
 
 export function useRows<K extends TableName>(table: K): TableMap[K][] {
   return useSyncExternalStore(subscribe, () => getRows(table));
+}
+
+/** Рацион с учётом «В дороге» (каши отменены) — для экранов. */
+export function useEffectiveDiets() {
+  const diets = useRows('diets');
+  const items = useRows('stock_items');
+  const road = roadMode(useRows('move_items')).on;
+  return { diets: effectiveDiets(diets, items, road), base: diets, road };
+}
+
+/** То же без React — для действий (списание кормления, «заканчивается»). */
+export function getEffectiveDiets() {
+  return effectiveDiets(getRows('diets'), getRows('stock_items'), roadMode(getRows('move_items')).on);
 }
 
 export function useVersion() {

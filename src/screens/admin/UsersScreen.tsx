@@ -241,6 +241,7 @@ function EditSheet({
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('keeper');
   const [active, setActive] = useState(true);
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -252,6 +253,7 @@ function EditSheet({
     setName(profile.full_name);
     setRole(profile.role);
     setActive(profile.active);
+    setPhone(profile.phone ?? '');
     setPassword('');
     setError(null);
     setConfirmDelete(false);
@@ -275,10 +277,11 @@ function EditSheet({
     setError(null);
     try {
       if (demo) {
-        await put('profiles', { ...profile, full_name: fullName, role, active });
+        await put('profiles', { ...profile, full_name: fullName, role, active, phone: phone.trim() || null });
       } else {
-        if (renamed || role !== profile.role || active !== profile.active) {
-          await callAdmin({ action: 'update', id: profile.id, full_name: fullName, role, active: String(active) });
+        const phoneChanged = phone.trim() !== (profile.phone ?? '');
+        if (renamed || role !== profile.role || active !== profile.active || phoneChanged) {
+          await callAdmin({ action: 'update', id: profile.id, full_name: fullName, role, active: String(active), ...(phoneChanged ? { phone: phone.trim() } : {}) });
         }
         if (password) await callAdmin({ action: 'password', id: profile.id, password });
         await syncNow();
@@ -338,6 +341,11 @@ function EditSheet({
             ))}
           </div>
         </div>
+        {role === 'vet' && (
+          <Field label="Телефон" hint="для кнопки «Позвонить врачу» при тревоге">
+            <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="off" placeholder="+7 900 000-00-00" />
+          </Field>
+        )}
         {!demo && (
           <Field label="Новый пароль" hint="оставьте пустым, чтобы не менять">
             <div className="flex gap-2">

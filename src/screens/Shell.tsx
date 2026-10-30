@@ -9,7 +9,7 @@ import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast } from '../
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { setTheme, useTheme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
-import { exportUnsent, requeueQuarantine, useRows } from '../lib/store';
+import { exportUnsent, requeueQuarantine, useRows, useEffectiveDiets } from '../lib/store';
 import { haptics } from '../lib/haptics';
 import { currentShift, dutyTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
@@ -19,7 +19,7 @@ import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
 import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
 
-export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move';
+export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move' | 'suppliers' | 'containers';
 
 export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   shift: { label: 'Дежурство', icon: 'shift' },
@@ -31,6 +31,8 @@ export const TAB_META: Record<Tab, { label: string; icon: IconName }> = {
   guide: { label: 'Справка', icon: 'question' },
   rating: { label: 'Мои достижения', icon: 'trophy' },
   move: { label: 'Переезд', icon: 'truck' },
+  suppliers: { label: 'Поставщики', icon: 'phone' },
+  containers: { label: 'Контейнеры', icon: 'box' },
 };
 
 /**
@@ -42,7 +44,7 @@ export const TABS: Tab[] = ['shift', 'requests', 'stock', 'journal'];
 
 /** Меню профиля — одно у всех; «Персонал» — тем, кто заводит людей (MANAGES). */
 export function menuTabs(role: Role): Tab[] {
-  return (['diet', 'users', 'move', 'rating', 'guide'] as Tab[]).filter((t) => t !== 'users' || Boolean(MANAGES[role]?.length));
+  return (['diet', 'users', 'move', 'containers', 'suppliers', 'rating', 'guide'] as Tab[]).filter((t) => t !== 'users' || Boolean(MANAGES[role]?.length));
 }
 
 export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
@@ -193,7 +195,7 @@ export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   const shifts = useRows('shifts');
   const items = useRows('stock_items');
   const moves = useRows('stock_moves');
-  const diets = useRows('diets');
+  const { diets } = useEffectiveDiets();
   const comments = useRows('request_comments');
   const purchases = useRows('purchases');
   const read = useReadMarks(user.id);

@@ -4,10 +4,11 @@ import { categoryOf, feedUsage, weighedItem } from '../../domain/stock';
 import { FEED_TIMES } from '../../domain/shift';
 import type { CurrentUser, Diet, Eaten, Shift } from '../../domain/types';
 import { useState } from 'react';
-import { useRows } from '../../lib/store';
+import { useRows, useEffectiveDiets } from '../../lib/store';
 import { Card, DecimalInput, LEVEL_CELL, Section, Segmented, Sheet, Stepper, Tick } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { qtyText } from '../DietScreen';
+import { mealCancelled } from '../../domain/road';
 
 const EATEN_LABEL: Record<Eaten, string> = { all: 'всё', half: '½', none: 'отказ' };
 const EATEN_CLS: Record<Eaten, string> = {
@@ -32,7 +33,8 @@ export function mealTitle(diets: Diet[], time: string) {
 }
 
 export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
-  const diets = useRows('diets');
+  // в дороге каши отменены: такое кормление помечено, списаний по кашам нет
+  const { diets, base } = useEffectiveDiets();
   const doneCount = FEED_TIMES.filter((t) => shift.feeds[t]?.done).length;
   const [recipe, setRecipe] = useState<string | null>(null);
   return (
@@ -50,6 +52,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
           const f = shift.feeds[t];
           const done = Boolean(f?.done);
           const { title, prep } = mealTitle(diets, t);
+          const cancelled = mealCancelled(base, diets, t);
           return (
             <div key={t} className="border-b border-edge">
               <button
@@ -61,8 +64,8 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
               >
                 <span className={`w-12 text-[15px] font-extrabold ${done ? 'text-faint' : ''}`}>{t}</span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className={`text-[15px] font-bold ${done ? 'text-faint' : ''}`}>{title}</span>
-                  <span className="text-[12px] font-semibold text-muted">{done ? 'выдано' : prep}</span>
+                  <span className={`text-[15px] font-bold ${done || cancelled ? 'text-faint' : ''}`}>{title}</span>
+                  <span className={`text-[12px] font-semibold ${cancelled && !done ? 'text-amber-fg' : 'text-muted'}`}>{done ? 'выдано' : cancelled ? 'в дороге — отменено' : prep}</span>
                 </span>
                 <Tick on={done} />
               </button>

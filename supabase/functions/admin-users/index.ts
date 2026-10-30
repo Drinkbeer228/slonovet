@@ -84,6 +84,8 @@ Deno.serve(async (req) => {
     if (body.full_name) patch.full_name = body.full_name;
     if (ROLES.includes(body.role)) patch.role = body.role;
     if (body.active === 'true' || body.active === 'false') patch.active = body.active === 'true';
+    // телефон для «Позвонить врачу»: пустая строка — убрать
+    if (typeof body.phone === 'string') patch.phone = body.phone.trim().slice(0, 32) || null;
     if (body.id === caller.user.id && (patch.active === false || (patch.role && patch.role !== me.role))) {
       return reply({ error: 'Нельзя отключить или понизить самого себя' }, 400);
     }

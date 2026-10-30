@@ -209,6 +209,9 @@ const RANK: Record<TableName, number> = {
   shifts: 2,
   notes: 3,
   move_items: 3,
+  tour_stops: 1,
+  suppliers: 1,
+  containers: 1,
   stock_moves: 4,
   purchases: 4,
   request_marks: 5,
@@ -236,6 +239,9 @@ const WHAT: Record<TableName, string> = {
   stock_moves: 'Движение фуража',
   diets: 'Рацион',
   move_items: 'Пункт переезда',
+  tour_stops: 'Город гастролей',
+  suppliers: 'Поставщик',
+  containers: 'Контейнер',
   purchases: 'Закупка',
 };
 

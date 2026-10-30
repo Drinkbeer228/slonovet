@@ -10,7 +10,7 @@ import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast, type Glow } from '../../ui/kit';
-import { canCloseRequest, canEdit, canReceiveHandover } from '../../domain/access';
+import { canCloseRequest, canEdit } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
 import { ArriveSheet, NewPurchaseSheet, OrderSheet, PurchaseDetail, PurchaseRow } from '../PurchasesView';
@@ -418,7 +418,8 @@ export function NewRequestSheet({
   const [own, setOwn] = useState('');
   const [authorPhoto, setAuthorPhoto] = useState<File | null>(null);
   const [assignee, setAssignee] = useState<string | null>(null);
-  const people = useRows('profiles').filter((p) => p.active && canReceiveHandover(p.role));
+  // поручают киперам; директор ставит задачи и следит, исполнителем не числится
+  const people = useRows('profiles').filter((p) => p.active && p.role === 'keeper');
   const shifts = useRows('shifts');
   const resting = assignee ? people.find((p) => p.id === assignee && onRestDay(p.id, shifts)) : undefined;
 

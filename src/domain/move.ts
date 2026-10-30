@@ -1,6 +1,6 @@
 import { ELEPHANTS } from './elephants';
-import { countPerDay, dailyUsage, fmtNum } from './stock';
-import type { Diet, StockItem, StockMove } from './types';
+import { countPerDay } from './stock';
+import type { StockMove } from './types';
 
 /**
  * Переезд (гастроли): что подготовить киперам. Шаблон — здесь, в коде;
@@ -26,8 +26,6 @@ export const MOVE_SECTIONS: MoveSection[] = [
       { id: 'feed-veg', text: 'Овощи нарезаны по коробкам — коробка на голову на ужин' },
       { id: 'feed-salt', text: 'Соль и мел' },
       { id: 'feed-hay', text: 'Сено погружено' },
-      { id: 'feed-grain', text: 'Зерносмесь расфасована по дням' },
-      { id: 'feed-porridge', text: 'Каши (ФормаМакс, ОптиФорм, Mono Grass)' },
       { id: 'feed-branches', text: 'Ветки' },
       { id: 'feed-treats', text: 'Подкормка для репетиций' },
     ],
@@ -99,28 +97,20 @@ export interface MoveNeed {
   item?: string;
 }
 
-/** Что нужно на N дней дороги — по рациону и реальному расходу со склада. */
-export function moveNeeds(days: number, diets: Diet[], items: StockItem[], moves: StockMove[]): MoveNeed[] {
+/**
+ * Что брать с собой: дни в дороге + запас на первые дни на новом месте (пока не наладятся поставки).
+ * Каши и зерносмесь в дороге не дают — в этот список они не входят. Сено на запас — только если на новой точке его нет.
+ */
+export function moveNeeds(days: number, moves: StockMove[], opts: { reserve?: number; hayThere?: boolean } = {}): MoveNeed[] {
+  const reserve = opts.reserve ?? 0;
+  const all = days + reserve;
   const heads = ELEPHANTS.length;
-  const usage = dailyUsage(diets, items);
   const hay = countPerDay(moves, 'hay') || 9;
   const bags = countPerDay(moves, 'bags') || 2;
-  const kg = (ids: string[]) => ids.reduce((s, id) => s + (usage.get(id) ?? 0), 0) * days;
   const out: MoveNeed[] = [
-    { label: 'Коробок овощей', value: `${days * heads}`, item: 'feed-veg' },
-    { label: 'Сена, тюков', value: `≈ ${Math.ceil(hay * days)}`, item: 'feed-hay' },
-    { label: 'Зерносмеси', value: `≈ ${fmtNum(kg(['hercules', 'bran', 'oats', 'corn', 'seeds']), 0)} кг`, item: 'feed-grain' },
+    { label: 'Коробок овощей', value: `${all * heads}`, item: 'feed-veg' },
+    { label: 'Сена, тюков', value: `≈ ${Math.round(hay * (days + (opts.hayThere ? 0 : reserve)))}`, item: 'feed-hay' },
   ];
-  for (const it of items.filter((i) => ['formamax', 'optiform', 'monograss'].includes(i.id))) {
-    const need = (usage.get(it.id) ?? 0) * days;
-    if (need > 0) {
-      out.push({
-        label: it.name,
-        value: `${fmtNum(need, 1)} кг${it.sack_kg ? ` · ${Math.ceil(need / it.sack_kg)} меш.` : ''}`,
-        item: 'feed-porridge',
-      });
-    }
-  }
-  out.push({ label: 'Мешков 240 л', value: `≈ ${Math.ceil(bags * days)}`, item: 'clean-bags' });
+  out.push({ label: 'Мешков 240 л', value: `≈ ${Math.ceil(bags * all)}`, item: 'clean-bags' });
   return out;
 }

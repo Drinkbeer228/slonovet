@@ -3,12 +3,14 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, rolloverShift, updateShift } from '../../domain/actions';
 import { FEED_TIMES, acceptedBy, currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
-import { useRows } from '../../lib/store';
+import { useRows, useEffectiveDiets } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Plate, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
+import { RoadBanner } from '../common/RoadBanner';
+import { mealCancelled } from '../../domain/road';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
 import { FeedingBlock } from './FeedingBlock';
@@ -137,18 +139,16 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
           </span>
         )}
       </header>
+      <RoadBanner />
 
       {stale && mine && (
         <Plate glow="amber" className="flex flex-col gap-2 p-3.5">
           <span className="text-[14px] font-bold text-amber-fg">Смена идёт больше суток</span>
-          <div className="flex gap-2">
-            <Button kind="accent" full onClick={() => rolloverShift(shift, user)}>
-              Новые сутки (я остаюсь)
-            </Button>
-            <Button full onClick={() => setHandoverOpen(true)}>
-              Сдать сменщику
-            </Button>
-          </div>
+          {/* сдать — одной кнопкой внизу экрана («Сдать дежурство»), здесь не дублируем */}
+          <Button kind="accent" full onClick={() => rolloverShift(shift, user)}>
+            Новые сутки (я остаюсь)
+          </Button>
+          <span className="text-[13px] font-semibold text-muted">Уходишь — «Сдать дежурство» внизу экрана.</span>
         </Plate>
       )}
 
@@ -240,7 +240,8 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   }, [open]);
   const marks = useRows('request_marks');
 
-  const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done);
+  const { diets: roadDiets, base: baseDiets } = useEffectiveDiets();
+  const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done && !mealCancelled(baseDiets, roadDiets, t));
   const reqLeft = dutyTodos(requests, marks, shift, isoDate()).filter((t) => !t.done);
   const flags = shiftFlags(shift);
   const warnings = [

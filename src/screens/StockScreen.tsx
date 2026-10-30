@@ -4,11 +4,13 @@ import { useMemo, useState } from 'react';
 import { addStockMove, countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
-import type { CurrentUser, StockCategory, StockItem } from '../domain/types';
-import { newId, put, useRows } from '../lib/store';
-import { localDay, plural, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
+import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
+import { ledger } from '../domain/stops';
+import { newId, put, useRows, useEffectiveDiets } from '../lib/store';
+import { localDay, plural, relDate, shortDate, timeOf } from '../lib/dates';
+import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
+import { RoadBanner } from './common/RoadBanner';
 
 const MOVE_LABEL: Partial<Record<string, string>> = { in: 'приход', fix: 'поправка', waste: 'брак', extra: 'вне рациона' };
 
@@ -85,7 +87,7 @@ function Sacks({ v }: { v: StockView }) {
 export function StockScreen({ user }: { user: CurrentUser }) {
   const items = useRows('stock_items');
   const moves = useRows('stock_moves');
-  const diets = useRows('diets');
+  const { diets, road } = useEffectiveDiets(); // в дороге каши отменены — прогноз без них
   const shifts = useRows('shifts');
   const shiftId = currentShift(shifts)?.id ?? null;
   const [edit, setEdit] = useState<StockView | null>(null);
@@ -98,11 +100,6 @@ export function StockScreen({ user }: { user: CurrentUser }) {
   }, [items, moves, diets]);
   const noQty = useMemo(() => itemsWithoutQty(diets), [diets]);
   const low = [...views.values()].filter((v) => v.low).sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
-  const history = [...moves]
-    .filter((m) => m.reason === 'in' || m.reason === 'fix' || m.reason === 'waste' || m.reason === 'extra')
-    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-    .slice(0, 15);
-  const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
   const canWrite = canEdit('stock', user.role);
   const [adding, setAdding] = useState(false);
 
@@ -119,6 +116,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         </div>
         {!canWrite && <ReadOnlyNote who={EDITORS.stock.who} />}
       </header>
+      {road && <RoadBanner />}
 
       {low.length > 0 && (
         <Plate glow="amber" halo className="flex flex-col gap-1 p-4" data-tour="stock-low">
@@ -182,31 +180,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         {canWrite && ' Нажми на позицию, чтобы поправить остаток, переименовать или удалить.'}
       </p>
 
-      {history.length > 0 && (
-        <Section id="stock-history" title="Приход, выдачи и брак">
-          <Card className="divide-y divide-edge overflow-hidden">
-            {history.map((m) => {
-              const it = items.find((i) => i.id === m.item_id);
-              const unit = it?.kind === 'count' ? countWords(it.id, it.unit)[2] : 'кг';
-              return (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-[14px] font-bold">{nameOf(m.item_id)}</span>
-                    <span className="text-[12px] font-semibold text-muted">
-                      {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unit}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
-                      {m.note ? `: ${m.note}` : ''} · {relDate(localDay(m.created_at))} {timeOf(m.created_at)} · {m.author_name}
-                    </span>
-                  </span>
-                  <span className={`text-[15px] font-extrabold ${Number(m.delta) > 0 ? 'text-teal' : 'text-ink2'}`}>
-                    {Number(m.delta) > 0 ? '+' : '−'}
-                    {fmtNum(Math.abs(Number(m.delta)))} {unit}
-                  </span>
-                </div>
-              );
-            })}
-          </Card>
-        </Section>
-      )}
+      <Ledger moves={moves} items={items} />
 
       <AdjustSheet view={edit} user={user} shiftId={shiftId} onClose={() => setEdit(null)} />
       <AddItemSheet open={adding} items={items} user={user} shiftId={shiftId} onClose={() => setAdding(false)} />
@@ -600,5 +574,77 @@ function AddItemSheet({
         </Field>
       </div>
     </Sheet>
+  );
+}
+
+/** Одна строка ленты: что, сколько, когда, кто. */
+function LedgerRow({ m, items }: { m: StockMove; items: StockItem[] }) {
+  const it = items.find((i) => i.id === m.item_id);
+  const unit = it?.kind === 'count' ? countWords(it.id, it.unit)[2] : 'кг';
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[14px] font-bold">{it?.name ?? m.item_id}</span>
+        <span className="text-[12px] font-semibold text-muted">
+          {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unit}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
+          {m.note ? `: ${m.note}` : ''} · {relDate(localDay(m.created_at))} {timeOf(m.created_at)} · {m.author_name}
+        </span>
+      </span>
+      <span className={`text-[15px] font-extrabold ${Number(m.delta) > 0 ? 'text-teal' : 'text-ink2'}`}>
+        {Number(m.delta) > 0 ? '+' : '−'}
+        {fmtNum(Math.abs(Number(m.delta)))} {unit}
+      </span>
+    </div>
+  );
+}
+
+/** Сколько строк показывать сразу — остальное по «Показать ещё». */
+const LEDGER_PAGE = 20;
+
+/**
+ * «Привозили»: приходы и пересчёты за 30 дней; старше — свёрнуто по месяцам. От города в «Переезде» не зависит.
+ * Не бухгалтерия: только чтобы помнить, что и когда привозили, и вовремя заказать.
+ */
+function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
+  const [more, setMore] = useState(false);
+  const [archive, setArchive] = useState(false);
+  const { start, current, archive: past } = ledger(moves);
+  if (!current.length && !past.length) return null;
+  const shown = more ? current : current.slice(0, LEDGER_PAGE);
+  return (
+    <Section id="stock-history" title="Привозили" aside={`за 30 дней, с ${shortDate(start)}`}>
+      {current.length ? (
+        <Card className="divide-y divide-edge overflow-hidden">
+          {shown.map((m) => (
+            <LedgerRow key={m.id} m={m} items={items} />
+          ))}
+        </Card>
+      ) : (
+        <Empty>За последние 30 дней ничего не привозили</Empty>
+      )}
+      {current.length > LEDGER_PAGE && (
+        <Button full onClick={() => setMore(!more)}>
+          {more ? 'Свернуть' : `Показать ещё ${current.length - LEDGER_PAGE}`}
+        </Button>
+      )}
+      {past.length > 0 && (
+        <>
+          <Button full onClick={() => setArchive(!archive)}>
+            {archive ? 'Скрыть' : `Раньше · ${past.reduce((n, g) => n + g.moves.length, 0)}`}
+          </Button>
+          {archive &&
+            past.map((g) => (
+              <div key={g.label} className="flex flex-col gap-1.5">
+                <span className="px-1 text-[13px] font-extrabold text-muted">{g.label}</span>
+                <Card className="divide-y divide-edge overflow-hidden">
+                  {g.moves.map((m) => (
+                    <LedgerRow key={m.id} m={m} items={items} />
+                  ))}
+                </Card>
+              </div>
+            ))}
+        </>
+      )}
+    </Section>
   );
 }

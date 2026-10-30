@@ -14,7 +14,7 @@ describe('единый каркас', () => {
   it('меню одно у всех, «Персонал» — только у тех, кто заводит людей', () => {
     for (const r of ROLES) {
       const m = menuTabs(r);
-      expect(m.filter((t) => t !== 'users')).toEqual(['diet', 'move', 'rating', 'guide']);
+      expect(m.filter((t) => t !== 'users')).toEqual(['diet', 'move', 'containers', 'suppliers', 'rating', 'guide']);
       expect(m.includes('users')).toBe(Boolean(MANAGES[r]?.length));
     }
   });

@@ -14,49 +14,61 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
   // открытая ячейка: признаки, уровень и запись — в шторке, чтобы таблица 7×3 не разъезжалась
   const [open, setOpen] = useState<{ el: ElephantName; m: MetricKey } | null>(null);
 
-  // норма → сразу «внимание» и шторка с признаками; не норма — шторка (там же «плохо» и вернуть «норму»)
+  // по умолчанию всё — норма (как в бумажном журнале): тап по норме → сразу «внимание» и шторка с признаками
   const tap = (el: ElephantName, m: MetricKey) => {
     const cur = shift.state?.[el]?.[m]?.level ?? 0;
     if (cur === 0) setCell(shift, el, m, 1);
     setOpen({ el, m });
   };
+  const COLS = 'grid grid-cols-[76px_repeat(3,minmax(0,1fr))] gap-x-2';
 
   return (
     <Section title="Состояние" id="sec-state">
-      <Card tone="sunken" className="flex flex-col gap-1 p-2">
-        <div className="grid grid-cols-[88px_repeat(3,minmax(0,1fr))] gap-1 pb-1.5 pt-1">
+      <Card tone="sunken" className="relative p-2">
+        {/* колонки слоних — отдельными полосами, чтобы с первого взгляда было видно: три слонихи, одни и те же показатели */}
+        <div aria-hidden="true" className={`pointer-events-none absolute inset-2 ${COLS}`}>
           <span />
           {ELEPHANTS.map((e) => (
-            <span key={e} className="text-center text-[13px] font-extrabold">
-              {e}
-            </span>
+            <span key={e} className="rounded-xl border border-edge bg-surface2/60" />
           ))}
         </div>
-        {METRICS.map((m) => (
-          <div key={m.key} className="grid grid-cols-[88px_repeat(3,minmax(0,1fr))] items-center gap-1">
-            <span className="pl-1.5 text-[14px] font-semibold text-ink2">{m.label}</span>
-            {ELEPHANTS.map((el) => {
-              const cell = shift.state?.[el]?.[m.key];
-              const level = cell?.level ?? 0;
-              const label = LEVEL_LABEL[level];
-              const n = cell?.symptoms?.length ?? 0;
-              return (
-                <button
-                  key={el}
-                  type="button"
-                  disabled={readOnly}
-                  aria-label={`${el}, ${m.label}: ${label}${n ? `, признаков: ${n}` : ''}`}
-                  onClick={() => tap(el, m.key)}
-                  className={`relative h-11 rounded-[10px] border text-[13px] transition-transform active:scale-[0.97] ${LEVEL_CELL[level]}`}
-                >
-                  {label}
-                  {/* сколько признаков отмечено — уголком, чтобы не теснить слово */}
-                  {n > 0 && <span className="absolute right-1 top-0.5 text-[10px] font-extrabold leading-none">{n}</span>}
-                </button>
-              );
-            })}
+        <div className="relative flex flex-col gap-1">
+          <div className={`${COLS} pb-1 pt-1.5`}>
+            <span />
+            {ELEPHANTS.map((e) => (
+              <span key={e} className="text-center text-[15px] font-extrabold">
+                {e}
+              </span>
+            ))}
           </div>
-        ))}
+          {METRICS.map((m) => (
+            <div key={m.key} className={`${COLS} items-center`}>
+              <span className="pl-1.5 text-[14px] font-semibold text-ink2">{m.label}</span>
+              {ELEPHANTS.map((el) => {
+                const cell = shift.state?.[el]?.[m.key];
+                const level = cell?.level ?? 0;
+                const label = LEVEL_LABEL[level];
+                const n = cell?.symptoms?.length ?? 0;
+                return (
+                  <div key={el} className="px-1">
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      aria-label={`${el}, ${m.label}: ${label}${n ? `, признаков: ${n}` : ''}`}
+                      onClick={() => tap(el, m.key)}
+                      className={`relative h-11 w-full rounded-[10px] border text-[13px] transition-transform active:scale-[0.97] ${LEVEL_CELL[level]}`}
+                    >
+                      {label}
+                      {/* сколько признаков отмечено — уголком, чтобы не теснить слово */}
+                      {n > 0 && <span className="absolute right-1 top-0.5 text-[10px] font-extrabold leading-none">{n}</span>}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          <span className="h-1" />
+        </div>
       </Card>
 
       {/* отклонения — короткой строкой под таблицей: «Претти · общее — внимание: вялая, качается ✎» */}

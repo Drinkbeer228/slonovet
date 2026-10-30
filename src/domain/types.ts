@@ -21,6 +21,8 @@ export interface Profile extends Base {
   full_name: string;
   role: Role;
   active: boolean;
+  /** телефон для звонка с экрана (у врача — кнопка «Позвонить врачу») */
+  phone?: string | null;
 }
 
 export interface CellState {
@@ -126,11 +128,13 @@ export interface RequestMark extends Base {
   photo_path: string | null;
 }
 
-export type NoteKind = 'observation' | 'procedure' | 'medication';
+/** incident — «ЧП»: не про слона (вода, свет, инвентарь, манеж, стресс) */
+export type NoteKind = 'observation' | 'procedure' | 'medication' | 'incident';
 
 export interface Note extends Base {
   shift_id: string;
-  elephant: ElephantName;
+  /** 'none' — запись «ЧП», не про конкретную слониху */
+  elephant: ElephantName | 'none';
   kind: NoteKind;
   metric: MetricKey | null;
   text: string;
@@ -201,6 +205,40 @@ export interface MoveItem extends Base {
   created_by: string;
 }
 
+/** Город гастролей: с какого дня труппа там (и до какого). Текущий — последний по дате приезда. */
+export interface TourStop extends Base {
+  city: string;
+  arrive_on: string;
+  depart_on: string | null;
+  note: string;
+  created_by: string;
+}
+
+/** Поставщик в городе гастролей: что возит, как связаться и как он себя показал (1 плохо · 2 так себе · 3 хорошо). */
+export interface Supplier extends Base {
+  city: string;
+  name: string;
+  supplies: string[];
+  phone: string;
+  address: string;
+  quality: 1 | 2 | 3 | null;
+  note: string;
+  created_by: string;
+}
+
+/** Контейнер с реквизитом: номер как на ящике («6», «6А», «Р-12»), фура и опись по строке на предмет. */
+export interface Container extends Base {
+  number: string;
+  truck: string;
+  contents: string;
+  note: string;
+  /** схема погрузки («тетрис»): порядок и место в фуре — каркас, пока не заполняется */
+  load_order?: number | null;
+  slot_x?: number | null;
+  slot_y?: number | null;
+  created_by: string;
+}
+
 export type PurchaseStatus = 'new' | 'ordered' | 'done' | 'cancelled';
 
 /** Закупка: кто-то просит купить; администратор/директор отмечает «заказано» и «привезли». */
@@ -232,6 +270,9 @@ export interface TableMap {
   diets: Diet;
   move_items: MoveItem;
   purchases: Purchase;
+  tour_stops: TourStop;
+  suppliers: Supplier;
+  containers: Container;
 }
 
 export type TableName = keyof TableMap;
@@ -248,6 +289,9 @@ export const TABLES: TableName[] = [
   'diets',
   'move_items',
   'purchases',
+  'tour_stops',
+  'suppliers',
+  'containers',
 ];
 
 export interface CurrentUser {
