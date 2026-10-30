@@ -3,31 +3,31 @@ import { cancelHandOver } from '../../domain/actions';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { syncNow } from '../../lib/sync';
 import { localDay, relDate, timeOf } from '../../lib/dates';
+import { useRows } from '../../lib/store';
 import { Button, Confirm, Plate, Section, Sheet } from '../../ui/kit';
 import { AcceptShift } from './AcceptShift';
 import { Icon } from '../../ui/Icon';
-import { WhyLink } from '../common/Why';
 
-/** Экран сдающего: код для следующего дежурного, пока смену не приняли. */
+/** Экран сдающего: смена сдана, ждём, пока сменщик нажмёт «Принять». Кода нет. */
 export function HandedShift({ shift, onAcceptOwn }: { shift: Shift; onAcceptOwn: () => void }) {
   const [cancel, setCancel] = useState(false);
-  const code = shift.handover_code ?? '';
+  const profiles = useRows('profiles');
+  const to = profiles.find((p) => p.id === shift.handover_to);
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <header className="flex flex-col gap-0.5 px-1">
         <span className="text-[13px] font-semibold text-muted">
           сдана {relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в {timeOf(shift.handed_at)}
         </span>
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Ждём дежурного</h1>
+        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Смена сдана</h1>
       </header>
 
-      <Plate glow="teal" halo className="flex flex-col items-center gap-3 p-6">
-        <span className="text-[14px] font-bold text-muted">Продиктуй код тому, кто принимает</span>
-        <span aria-label={`Код ${code.split('').join(' ')}`} className="font-mono text-[56px] font-extrabold tracking-[0.25em] text-teal">
-          {code}
+      <Plate glow="teal" halo className="flex flex-col items-center gap-2 p-6 text-center">
+        <Icon name="check" size={28} stroke={2.6} className="text-teal-fg" />
+        <span className="text-[17px] font-extrabold">{to ? `Принимает ${to.full_name}` : 'Ждём сменщика'}</span>
+        <span className="text-[13px] font-semibold text-muted">
+          У сменщика на телефоне появится «Тебе сдали смену» и кнопка «Принять». Интернет нужен только, чтобы он это увидел; не увидел, заступит сам.
         </span>
-        <span className="text-center text-[13px] font-semibold text-muted">Он пройдёт проверку, впишет замечания и введёт код. Тогда дежурство будет передана.</span>
-        <WhyLink id="handover-code" label="зачем код?" />
       </Plate>
 
       <div className="flex flex-col gap-2">
@@ -45,7 +45,7 @@ export function HandedShift({ shift, onAcceptOwn }: { shift: Shift; onAcceptOwn:
       <Confirm
         open={cancel}
         title="Вернуть дежурство?"
-        text="Код перестанет действовать, дежурство снова откроется у тебя."
+        text="Дежурство снова откроется у тебя."
         okLabel="Вернуть"
         onOk={() => cancelHandOver(shift)}
         onClose={() => setCancel(false)}
@@ -83,13 +83,13 @@ export function NotHandedHint({ shift, user }: { shift: Shift; user: CurrentUser
   return (
     <Plate glow="amber" className="flex flex-col gap-2 p-4">
       <p className="m-0 text-[15px] font-bold">Дежурит {shift.keeper_name}</p>
-      <p className="m-0 text-[14px] text-ink2">Чтобы принять её, попроси его нажать «Сдать дежурство» внизу и продиктовать код.</p>
+      <p className="m-0 text-[14px] text-ink2">Если он ушёл и не сдал смену, можно заступить сразу.</p>
       <div className="flex flex-wrap gap-x-5">
         <button type="button" onClick={() => syncNow().catch(() => undefined)} className="py-2 text-[13px] font-bold text-teal">
           Он уже сдал? Обновить
         </button>
         <button type="button" onClick={() => setTakeover(true)} className="py-2 text-[13px] font-bold text-teal">
-          У него нет связи — принять без кода
+          Заступить (смена не сдана)
         </button>
       </div>
       <Sheet open={takeover} onClose={() => setTakeover(false)} title="Принять без кода">

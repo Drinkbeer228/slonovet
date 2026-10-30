@@ -85,8 +85,6 @@ export async function seedDemo() {
       accepted_at: ts(date, '08:00'),
       handed_at: ts(addDays(date, 1), '08:00'),
       checked_at: ts(addDays(date, 1), '08:00'),
-      // вчерашняя смена ждёт передачи: в примере сдающий диктует 2580
-      handover_code: i === 1 ? '2580' : null,
       accepted_from: i < 14 ? addDays(date, -1) : null,
       accept_remarks: i === 4 ? 'Мокрая подстилка у Одри. Вещи у ограждения' : '',
       updated_at: now,

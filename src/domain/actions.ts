@@ -4,7 +4,7 @@ import { savePhoto } from '../lib/photos';
 import { logEvent } from '../lib/log';
 import { reportLowStock } from '../lib/push';
 import { isoDate } from '../lib/dates';
-import { newHandoverCode, newShift } from './shift';
+import { newShift } from './shift';
 import { balances, feedUsage, toStockUnits, weighedItem } from './stock';
 import type { CurrentUser, ElephantName, Level, MetricKey, Note, NoteKind, Purchase, PurchaseStatus, Shift, StockItem, StockMove } from './types';
 
@@ -29,35 +29,49 @@ export async function acceptShift(user: CurrentUser, safety: Record<string, bool
 }
 
 /**
- * Принять без кода: у сдающего нет связи, и его «Сдать» до этого телефона не дошло. Его смену отмечаем сданной,
- * а когда его телефон выйдет на связь, его заметка и отметки сольются с этим (смены шлются патчами).
+ * Принять смену, которую не сдали (ушёл, нет связи, не успел): заступаем сразу. Чужую смену не трогаем:
+ * когда наша дойдёт до сервера, он сам закроет прежнюю открытую («принята без сдачи»), а поздние записи прежнего
+ * владельца сольются патчами. Работа со слонами не ждёт ни сети, ни кого-либо ещё.
  */
 export async function takeOverShift(prev: Shift, user: CurrentUser, safety: Record<string, boolean>, remarks: string) {
   logEvent('shift.takeover', { from: prev.id });
-  await updateShift(prev, (s) => {
-    if (s.status !== 'open') return;
-    s.status = 'handed';
-    s.handed_at = new Date().toISOString();
-  });
-  const note = ['Принято без кода: у сдающего не было связи', remarks].filter(Boolean).join('. ');
+  const note = ['Принята без сдачи', remarks].filter(Boolean).join('. ');
   await acceptShift(user, safety, { id: prev.id, remarks: note });
 }
 
-/** Сдать дежурство: появляется код, который сдающий диктует сменщику. */
-export async function handOver(shift: Shift, note: string) {
-  logEvent('shift.handover', { shift: shift.id, note: note.slice(0, 200) });
+/** Закрыть свою смену: что не трогали — норма (кипер подтвердил осмотр), время и причина закрытия. */
+function closeOwn(s: Shift, reason: NonNullable<Shift['close_reason']>, by: string | null) {
+  s.status = 'handed';
+  s.handed_at = new Date().toISOString();
+  s.close_reason = reason;
+  s.closed_by = by ?? s.keeper_id;
+}
+
+/**
+ * Сдать дежурство конкретному сменщику (toId) или «кому-нибудь» (null). Кода нет: сменщик на своём телефоне
+ * видит «Тебе сдали смену» и жмёт «Принять»; не увидел — принимает сам, смена сойдётся на сервере.
+ */
+export async function handOver(shift: Shift, note: string, toId: string | null = null) {
+  logEvent('shift.handover', { shift: shift.id, to: toId, note: note.slice(0, 200) });
   await updateShift(shift, (s) => {
     // что не трогали — норма: в журнале остаётся явная отметка
     for (const el of ELEPHANTS) {
       s.state[el] = s.state[el] ?? {};
       for (const m of METRICS) if (!s.state[el]![m.key]) s.state[el]![m.key] = { level: 0 };
     }
-    s.status = 'handed';
-    s.handed_at = new Date().toISOString();
+    closeOwn(s, 'handover', s.keeper_id);
     s.note = note;
-    s.handover_code = newHandoverCode();
+    s.handover_to = toId;
+    s.handover_code = null;
     s.checked_at = s.handed_at; // сдаём только с галочкой «осмотрел всех» — она и делает нетронутое нормой
   });
+}
+
+/** Новые сутки (остаюсь на смене): своя закрывается, на того же человека открывается новая — за одно нажатие. */
+export async function rolloverShift(shift: Shift, user: CurrentUser) {
+  logEvent('shift.rollover', { shift: shift.id });
+  await updateShift(shift, (s) => closeOwn(s, 'rollover', user.id));
+  await acceptShift(user, shift.safety ?? {}, { id: shift.id, remarks: '' });
 }
 
 /** Передумал сдавать, пока смену никто не принял. */
@@ -66,6 +80,9 @@ export async function cancelHandOver(shift: Shift) {
     s.status = 'open';
     s.handed_at = null;
     s.handover_code = null;
+    s.handover_to = null;
+    s.closed_by = null;
+    s.close_reason = null;
   });
 }
 
