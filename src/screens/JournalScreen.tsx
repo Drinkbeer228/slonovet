@@ -8,6 +8,9 @@ import { CalendarSheet, Card, Empty, IconButton, KEY, PAD, Section } from '../ui
 import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
+import { ElephantHistorySheet } from './common/ElephantHistory';
+import { missedTasks } from '../domain/monitoring';
+import type { ElephantName } from '../domain/types';
 import { mealTitle } from './keeper/FeedingBlock';
 import { washText } from './keeper/QuestsBlock';
 
@@ -180,6 +183,7 @@ function DateJump({ value, onPick, className, children }: { value: string; onPic
 
 /** Смена таблицей, как в бумажном журнале. */
 function ShiftCard({ shift: s }: { shift: Shift }) {
+  const [history, setHistory] = useState<ElephantName | null>(null);
   return (
     <Card className="flex flex-col gap-2 p-3">
         <div className="flex items-baseline gap-2 px-1">
@@ -197,7 +201,9 @@ function ShiftCard({ shift: s }: { shift: Shift }) {
           ))}
           {ELEPHANTS.map((el) => (
             <Fragment key={el}>
-              <span className="border-t border-edge py-1 text-left text-[13px] font-bold text-ink2">{el}</span>
+              <button type="button" onClick={() => setHistory(el)} aria-label={`${el}: 14 дней`} className="min-h-9 border-t border-edge py-1 text-left text-[13px] font-bold text-ink2 underline decoration-edge-hi decoration-2 underline-offset-4">
+                {el}
+              </button>
               {METRICS.map((m) => {
                 // нетронутая клетка — норма, только если кипер подтвердил «осмотрел всех» при сдаче
                 const level = s.state?.[el]?.[m.key]?.level ?? (s.checked_at ? 0 : null);
@@ -211,12 +217,18 @@ function ShiftCard({ shift: s }: { shift: Shift }) {
             </Fragment>
           ))}
         </div>
+        <span className="px-1 text-[11px] font-semibold text-muted">Тап по имени — как было последние 14 дней</span>
+        <ElephantHistorySheet el={history} onClose={() => setHistory(null)} />
       </Card>
   );
 }
 
-/** Подробности дежурства под таблицей: передача, отклонения, кормление, «за дежурство», назначения, записи. */
+/**
+ * Подробности дежурства под таблицей — по важности: «Что важно» (не норма, невыполненное, замечания, передача),
+ * записи, выполненные назначения; рутина (кормление, туалет, сено, мешки) — одной строкой, подробно по тапу.
+ */
 function ShiftDetails({ shift }: { shift: Shift }) {
+  const [openRoutine, setOpenRoutine] = useState(false);
   const notes = useRows('notes');
   const next = acceptedBy(useRows('shifts'), shift);
   const marks = useRows('request_marks');
@@ -247,84 +259,70 @@ function ShiftDetails({ shift }: { shift: Shift }) {
   const branches = b?.amount ? BRANCH_AMOUNT[b.amount] : b?.kg ? `${b.kg} кг` : '';
   const branchesText = branches ? `${branches}${b?.kinds?.length ? ` · ${b.kinds.join(', ')}` : ''}` : '—';
 
+  const missed = missedTasks(requests, marks, shift);
+  // рутина одной строкой: что не так с кормлением — по имени, остальное числом
+  const feedIssues = FEED_TIMES.flatMap((t) => {
+    const f = shift.feeds[t];
+    if (!f?.done) return shift.status === 'handed' ? [`${t} не отмечено`] : [];
+    return ELEPHANTS.filter((e) => (f.eaten?.[e] ?? 'all') !== 'all').map((e) => `${e} ${EATEN[f.eaten![e]!]} в ${t}`);
+  });
+  const total = (pick: (e: ElephantName) => number) => ELEPHANTS.reduce((n, e) => n + pick(e), 0);
+  const routine = [
+    feedIssues.length ? `кормление: ${feedIssues.join(', ')}` : FEED_TIMES.some((t) => shift.feeds[t]?.done) ? 'кормление всё' : null,
+    `туалет ${total((e) => q.urine?.[e]?.ok ?? 0)} баков`,
+    `кал ${total((e) => Number(q.feces?.[e] ?? 0))}`,
+    `сено ${shift.hay_bales} тюк.`,
+    q.cleaning?.bags ? `мешки ${q.cleaning.bags}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const quiet = shift.status === 'handed' && !flags.length && !missed.length && !next?.accept_remarks;
+
   return (
     <div className="flex flex-col gap-5">
-        {shift.note && (
-          <Card className="p-4">
-            <span className="mb-1 block text-[12px] font-extrabold tracking-wide text-muted">ЗАМЕТКА ДЕЖУРСТВУ</span>
-            <p className="m-0 text-[15px] leading-relaxed">{shift.note}</p>
-          </Card>
-        )}
-
-        {next && (
-          <Card className="p-4">
-            <span className="mb-1 block text-[12px] font-extrabold tracking-wide text-muted">
-              ПРИНЯЛ {next.keeper_name.toUpperCase()} · {timeOf(next.accepted_at)}
-            </span>
-            {next.accept_remarks ? (
-              <p className="m-0 text-[15px] font-semibold leading-relaxed text-amber">Замечания: {next.accept_remarks}</p>
-            ) : (
-              <p className="m-0 text-[15px] font-semibold text-teal">Без замечаний</p>
-            )}
-          </Card>
-        )}
-
-        {flags.length > 0 && (
-          <Section title="Не норма">
-            <Card className="flex flex-col gap-1.5 p-4">
+        {(flags.length > 0 || missed.length > 0 || next?.accept_remarks || shift.note) && (
+          <Section title="Что важно">
+            <Card className="flex flex-col divide-y divide-edge overflow-hidden">
               {flags.map((f) => (
-                <span key={`${f.elephant}-${f.metric}`} className={`text-[14px] font-bold ${f.level === 2 ? 'text-coral' : 'text-amber'}`}>
+                <span key={`${f.elephant}-${f.metric}`} className={`px-4 py-2.5 text-[14px] font-bold ${f.level === 2 ? 'text-coral-fg' : 'text-amber-fg'}`}>
                   {f.elephant} · {METRIC_LABEL[f.metric].toLowerCase()} — {LEVEL_LABEL[f.level]}
                   {f.symptoms.length > 0 && <span className="font-semibold">: {f.symptoms.join(', ')}</span>}
                 </span>
               ))}
+              {missed.map(({ req, why }) => (
+                <span key={req.id} className="px-4 py-2.5 text-[14px] font-semibold">
+                  <span className="font-bold text-coral-fg">Не выполнено</span> · {req.elephant === 'work' ? 'Работа' : req.elephant === 'all' ? 'Всем' : req.elephant}: {req.text}
+                  <span className="text-muted"> — {why}</span>
+                </span>
+              ))}
+              {next?.accept_remarks && (
+                <span className="px-4 py-2.5 text-[14px] font-semibold">
+                  <span className="font-bold text-amber-fg">Замечания при приёме</span> ({next.keeper_name}): {next.accept_remarks}
+                </span>
+              )}
+              {shift.note && (
+                <span className="px-4 py-2.5 text-[14px] leading-relaxed">
+                  <span className="font-bold text-muted">Передал следующему:</span> {shift.note}
+                </span>
+              )}
             </Card>
           </Section>
         )}
+        {quiet && <p className="m-0 px-1 text-[14px] font-bold text-teal-fg">Всё спокойно: всё в норме, назначения выполнены, принято без замечаний.</p>}
 
-        <Section title="Кормление">
-          <Card className="divide-y divide-edge overflow-hidden">
-            {FEED_TIMES.map((t) => {
-              const f = shift.feeds[t];
-              const eaten = f?.done ? ELEPHANTS.filter((e) => (f.eaten?.[e] ?? 'all') !== 'all') : [];
-              return (
-                <div key={t} className="flex items-center gap-3 px-4 py-2.5 text-[14px]">
-                  <span className="w-12 font-extrabold">{t}</span>
-                  <span className="flex-1 font-semibold text-ink2">{mealTitle(diets, t).title}</span>
-                  <span className={`font-bold ${f?.done ? (eaten.length ? 'text-amber' : 'text-teal') : 'text-coral'}`}>
-                    {f?.done
-                      ? eaten.length
-                        ? eaten.map((e) => `${e} ${EATEN[f.eaten![e]!]}`).join(', ')
-                        : 'всё'
-                      : 'не отмечено'}
-                  </span>
-                </div>
-              );
-            })}
-            <div className="flex items-center gap-3 px-4 py-2.5 text-[14px]">
-              <span className="flex-1 font-semibold text-ink2">Сено</span>
-              <span className="font-bold">{shift.hay_bales} тюк.</span>
-            </div>
-          </Card>
-        </Section>
-
-        <Section title="За дежурство">
-          <Card className="flex flex-col gap-2.5 p-4 text-[14px]">
-            <Row label="Моча, баков" value={urine} />
-            <Row label="Ветки" value={branchesText} />
-            <Row label="Кал, раз" value={ELEPHANTS.map((e) => `${e} ${Number(q.feces?.[e] ?? 0)}`).join(' · ')} />
-            <Row label="Мытьё" value={washText(q) || (care ? 'мыли' : '—')} />
-            <Row label="Мешки" value={cleaning || '—'} />
-          </Card>
-        </Section>
+        {sNotes.length > 0 && (
+          <Section title="Записи">
+            <NotesList notes={sNotes} />
+          </Section>
+        )}
 
         {sMarks.length > 0 && (
-          <Section title="Назначения и задачи">
+          <Section title="Выполнено по назначениям" aside={String(sMarks.length)}>
             <Card className="divide-y divide-edge overflow-hidden">
               {sMarks.map((m) => (
                 <div key={m.id} className="flex flex-col gap-0.5 px-4 py-2.5">
                   <span className="text-[14px] font-semibold">{requests.find((r) => r.id === m.request_id)?.text ?? 'Заявка'}</span>
-                  <span className="text-[12px] font-semibold text-teal">
+                  <span className="text-[12px] font-semibold text-teal-fg">
                     ✓ {timeOf(m.done_at)} · {m.done_by}
                     {m.note ? ` — ${m.note}` : ''}
                   </span>
@@ -334,15 +332,50 @@ function ShiftDetails({ shift }: { shift: Shift }) {
           </Section>
         )}
 
-        {sNotes.length > 0 && (
-          <Section title="Записи">
-            <NotesList notes={sNotes} />
-          </Section>
-        )}
+        <div className="flex flex-col gap-3">
+          <button type="button" onClick={() => setOpenRoutine(!openRoutine)} aria-expanded={openRoutine} className={`flex min-h-11 items-center gap-3 rounded-2xl px-4 py-3 text-left ${KEY}`}>
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="text-[12px] font-extrabold tracking-wide text-muted">РУТИНА</span>
+              <span className="text-[14px] font-semibold">{routine}</span>
+            </span>
+            <Icon name="down" size={18} className={`shrink-0 text-muted transition ${openRoutine ? 'rotate-180' : ''}`} />
+          </button>
+          {openRoutine && (
+            <>
+              <Card className="divide-y divide-edge overflow-hidden">
+                {FEED_TIMES.map((t) => {
+                  const f = shift.feeds[t];
+                  const eaten = f?.done ? ELEPHANTS.filter((e) => (f.eaten?.[e] ?? 'all') !== 'all') : [];
+                  return (
+                    <div key={t} className="flex items-center gap-3 px-4 py-2.5 text-[14px]">
+                      <span className="w-12 font-extrabold">{t}</span>
+                      <span className="flex-1 font-semibold text-ink2">{mealTitle(diets, t).title}</span>
+                      <span className={`font-bold ${f?.done ? (eaten.length ? 'text-amber-fg' : 'text-teal-fg') : shift.status === 'handed' ? 'text-coral-fg' : 'text-muted'}`}>
+                        {f?.done ? (eaten.length ? eaten.map((e) => `${e} ${EATEN[f.eaten![e]!]}`).join(', ') : 'всё') : shift.status === 'handed' ? 'не отмечено' : 'ещё нет'}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center gap-3 px-4 py-2.5 text-[14px]">
+                  <span className="flex-1 font-semibold text-ink2">Сено</span>
+                  <span className="font-bold">{shift.hay_bales} тюк.</span>
+                </div>
+              </Card>
+              <Card className="flex flex-col gap-2.5 p-4 text-[14px]">
+                <Row label="Моча, баков" value={urine} />
+                <Row label="Кал, раз" value={ELEPHANTS.map((e) => `${e} ${Number(q.feces?.[e] ?? 0)}`).join(' · ')} />
+                <Row label="Ветки" value={branchesText} />
+                <Row label="Мытьё" value={washText(q) || (care ? 'мыли' : '—')} />
+                <Row label="Мешки" value={cleaning || '—'} />
+              </Card>
+            </>
+          )}
+        </div>
 
         <p className="m-0 px-1 text-[12px] font-semibold text-muted">
           Принял {timeOf(shift.accepted_at)}
           {shift.handed_at ? ` · сдал ${relDate(localDay(shift.handed_at))} ${timeOf(shift.handed_at)}` : ' · идёт'}
+          {next ? ` · принял ${next.keeper_name} в ${timeOf(next.accepted_at)}${next.accept_remarks ? '' : ', без замечаний'}` : ''}
         </p>
     </div>
   );

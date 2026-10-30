@@ -98,6 +98,15 @@ export async function setCell(shift: Shift, el: ElephantName, m: MetricKey, leve
   });
 }
 
+/** «Всё так же, как в прошлую смену»: уровень и признаки разом. */
+export async function repeatCell(shift: Shift, el: ElephantName, m: MetricKey, level: Level, symptoms: string[]) {
+  logEvent('state.repeat', { el, metric: m, level });
+  await updateShift(shift, (s) => {
+    s.state[el] = s.state[el] ?? {};
+    s.state[el]![m] = { level, symptoms: [...symptoms] };
+  });
+}
+
 export async function toggleSymptom(shift: Shift, el: ElephantName, m: MetricKey, symptom: string) {
   await updateShift(shift, (s) => {
     const c = s.state[el]?.[m];
