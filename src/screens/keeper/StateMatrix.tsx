@@ -82,7 +82,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
                 type="button"
                 disabled={readOnly}
                 onClick={() => setOpen({ el: f.elephant, m: f.metric })}
-                className="flex items-center gap-2.5 px-3 py-2.5 text-left disabled:opacity-100"
+                className="flex min-h-11 items-center gap-2.5 px-3 py-2.5 text-left disabled:opacity-100"
               >
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${LEVEL_DOT[f.level]}`} />
                 <span className="min-w-0 flex-1 text-[14px] leading-snug">

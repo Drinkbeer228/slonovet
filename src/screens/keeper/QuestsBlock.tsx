@@ -45,14 +45,14 @@ function Quest({
 function Counter({ value, onPlus, onMinus, label, tone }: { value: number; onPlus: () => void; onMinus: () => void; label: string; tone: 'teal' | 'amber' }) {
   return (
     <div className={`flex items-center gap-0.5 rounded-2xl p-0.5 ${TONE.sunken}`}>
-      <button type="button" aria-label={`${label}: убрать`} onClick={onMinus} disabled={value === 0} className={`h-10 w-10 rounded-[14px] text-[20px] font-bold text-ink2 disabled:opacity-30 ${KEY}`}>
+      <button type="button" aria-label={`${label}: убрать`} onClick={onMinus} disabled={value === 0} className={`h-11 w-11 rounded-[14px] text-[20px] font-bold text-ink2 disabled:opacity-30 ${KEY}`}>
         −
       </button>
       <button
         type="button"
         aria-label={`${label}: добавить`}
         onClick={onPlus}
-        className={`inline-flex h-10 min-w-[60px] items-center justify-center gap-1 rounded-[14px] border px-2 text-[15px] font-extrabold transition-transform active:scale-[0.97] ${
+        className={`inline-flex h-11 min-w-[60px] items-center justify-center gap-1 rounded-[14px] border px-2 text-[15px] font-extrabold transition-transform active:scale-[0.97] ${
           tone === 'teal'
             ? 'border-teal/50 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg shadow-(--shadow-key-on)'
             : 'border-amber/50 bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg shadow-[inset_0_1px_0_var(--color-hl),0_0_16px_-4px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]'

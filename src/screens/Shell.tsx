@@ -122,7 +122,7 @@ export function SyncChip({ onClick }: { onClick: () => void }) {
     cls = 'text-coral-fg';
   }
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold ${KEY} ${cls}`}>
+    <button type="button" onClick={onClick} className={`inline-flex h-11 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold ${KEY} ${cls}`}>
       <Icon name={icon} size={15} stroke={2.2} />
       {text}
     </button>

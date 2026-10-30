@@ -330,15 +330,16 @@ export async function countStock(item_id: string, counted: number, user: Current
   });
 }
 
-/** Статус закупки: «заказано» (с датой доставки), «привезли», «отменено». */
-export async function setPurchaseStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser, delivery?: string | null) {
-  logEvent('purchase.status', { title: p.title.slice(0, 100), status, delivery: delivery ?? null });
+/** Статус закупки: «заказано» (с датой доставки и поставщиком), «привезли», «отменено». */
+export async function setPurchaseStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser, delivery?: string | null, supplierId?: string | null) {
+  logEvent('purchase.status', { title: p.title.slice(0, 100), status, delivery: delivery ?? null, supplier: supplierId ?? null });
   await put('purchases', {
     ...p,
     status,
     status_by: user.full_name,
     status_at: new Date().toISOString(),
     delivery_date: delivery === undefined ? (p.delivery_date ?? null) : delivery,
+    supplier_id: supplierId === undefined ? (p.supplier_id ?? null) : supplierId,
   });
 }
 

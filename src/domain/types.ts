@@ -255,6 +255,8 @@ export interface Purchase extends Base {
   status_at: string | null;
   /** когда обещали привезти — необязательно */
   delivery_date?: string | null;
+  /** у кого заказали — необязательно */
+  supplier_id?: string | null;
   created_at: string;
 }
 

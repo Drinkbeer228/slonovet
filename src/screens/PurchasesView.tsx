@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { canEdit } from '../domain/access';
-import type { CurrentUser, Purchase, PurchaseStatus } from '../domain/types';
+import type { CurrentUser, Purchase, PurchaseStatus, Supplier } from '../domain/types';
 import { logEvent } from '../lib/log';
 import { newId, put, useRows } from '../lib/store';
 import { isoDate, localDay, relDate, shortDate, timeOf } from '../lib/dates';
 import { arrivePurchase, setPurchaseStatus } from '../domain/actions';
 import { currentShift } from '../domain/shift';
+import { currentStop } from '../domain/stops';
+import { QUALITY, suppliersFor } from '../domain/suppliers';
 import { categoryOf, countWords, fmtNum, packWords, toStockUnits } from '../domain/stock';
 import { Button, Card, Check, Chip, DateInput, Field, KEY, Section, Sheet, UrgentBadge, inputCls, toast } from '../ui/kit';
 
@@ -25,8 +27,8 @@ function statusText(p: Purchase) {
   return STATUS[p.status].label;
 }
 
-async function setStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser, delivery?: string | null) {
-  await setPurchaseStatus(p, status, user, delivery);
+async function setStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser, delivery?: string | null, supplierId?: string | null) {
+  await setPurchaseStatus(p, status, user, delivery, supplierId);
   toast(`Отмечено: ${STATUS[status].label}`);
 }
 
@@ -138,6 +140,7 @@ export function PurchaseRow({
       </button>
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-full border border-edge-hi bg-surface2 px-2.5 py-1 text-[13px] font-bold shadow-[inset_0_1px_0_var(--color-hl)] ${STATUS[p.status].cls}`}>{statusText(p)}</span>
+        <SupplierName id={p.supplier_id} />
         {buyer && p.status === 'new' && (
           <button type="button" onClick={() => onOrder(p)} className="h-11 rounded-full border border-teal/50 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] px-4 text-[14px] font-bold text-teal-fg shadow-(--shadow-key-on) transition-transform active:scale-[0.97]">
             Заказано
@@ -153,13 +156,52 @@ export function PurchaseRow({
   );
 }
 
-/** «Заказано»: можно сразу указать, когда обещали привезти. */
+/** В карточке закупки: у кого заказали и кнопка звонка. */
+function SupplierLine({ id }: { id: string | null | undefined }) {
+  const s = useSupplier(id);
+  if (!s) return null;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="min-w-0 flex-1 text-[15px] font-semibold">
+        У кого: {s.name}
+        {s.city ? <span className="text-muted"> · {s.city}</span> : null}
+      </span>
+      {s.phone && (
+        <a href={`tel:${s.phone.replace(/[^\d+]/g, '')}`} className={`inline-flex h-11 items-center rounded-xl px-4 text-[14px] font-bold text-teal-fg ${KEY}`}>
+          Позвонить
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** Поставщик закупки: имя (удалённого не показываем). */
+function useSupplier(id: string | null | undefined): Supplier | undefined {
+  const list = useRows('suppliers');
+  return id ? list.find((s) => s.id === id && !s.deleted) : undefined;
+}
+
+function SupplierName({ id }: { id: string | null | undefined }) {
+  const s = useSupplier(id);
+  return s ? <span className="text-[13px] font-semibold text-muted">у {s.name}</span> : null;
+}
+
+/** «Заказано»: можно сразу указать, у кого и когда обещали привезти. */
 export function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase | null; user: CurrentUser; onClose: () => void }) {
   const [date, setDate] = useState('');
+  const [supplierId, setSupplierId] = useState<string | null>(null);
+  const suppliers = useRows('suppliers');
+  const items = useRows('stock_items');
+  const here = currentStop(useRows('tour_stops'))?.city ?? null;
   useEffect(() => {
-    if (p) setDate(p.delivery_date ?? '');
+    if (p) {
+      setDate(p.delivery_date ?? '');
+      setSupplierId(p.supplier_id ?? null);
+    }
   }, [p]);
   if (!p) return null;
+  const item = items.find((i) => i.id === p.item_id);
+  const offer = suppliersFor(suppliers, item ? categoryOf(item) : null, here);
   return (
     <Sheet
       open
@@ -171,7 +213,7 @@ export function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase 
           big
           full
           onClick={async () => {
-            await setStatus(p, 'ordered', user, date || null);
+            await setStatus(p, 'ordered', user, date || null, supplierId);
             onClose();
           }}
         >
@@ -179,9 +221,24 @@ export function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase 
         </Button>
       }
     >
-      <Field label="Когда привезут" hint="можно не указывать">
-        <DateInput value={date} onChange={setDate} min={isoDate()} label="Когда привезут" clearable />
-      </Field>
+      <div className="flex flex-col gap-5">
+        {offer.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="px-1 text-[14px] font-bold text-muted">У кого{here ? ` · ${here}` : ''} — можно не указывать</span>
+            <div className="flex flex-wrap gap-2">
+              {offer.map((s) => (
+                <Chip key={s.id} on={supplierId === s.id} onClick={() => setSupplierId(supplierId === s.id ? null : s.id)}>
+                  {s.name}
+                  {s.quality && <span className={`ml-1.5 text-[12px] ${QUALITY[s.quality].cls}`}>{QUALITY[s.quality].label}</span>}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+        <Field label="Когда привезут" hint="можно не указывать">
+          <DateInput value={date} onChange={setDate} min={isoDate()} label="Когда привезут" clearable />
+        </Field>
+      </div>
     </Sheet>
   );
 }
@@ -342,6 +399,7 @@ export function PurchaseDetail({ purchase: p, user, onClose }: { purchase: Purch
           Сейчас: {statusText(p)}
           {p.status_by && p.status !== 'new' ? ` (${p.status_by}, ${relDate(localDay(p.status_at ?? p.updated_at))})` : ''}
         </span>
+        <SupplierLine id={p.supplier_id} />
         {!buyer && <span className="text-[13px] font-semibold text-muted">«Заказано» и «Привезли» отмечает администратор или директор.</span>}
       </div>
       <ArriveSheet

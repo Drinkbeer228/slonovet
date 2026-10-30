@@ -108,7 +108,7 @@ export function DiscussionButton({ req, user, onOpen, compact }: { req: VetReque
         type="button"
         onClick={onOpen}
         aria-label={total ? `Обсуждение: ${total}${fresh ? `, новых ${fresh}` : ''}` : 'Спросить'}
-        className={`relative flex h-10 w-10 items-center justify-center rounded-xl ${fresh ? 'bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg' : 'text-muted'}`}
+        className={`relative flex h-11 w-11 items-center justify-center rounded-xl ${fresh ? 'bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg' : 'text-muted'}`}
       >
         <Icon name="message" size={20} />
         {total > 0 && (
