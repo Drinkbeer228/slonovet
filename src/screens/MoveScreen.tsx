@@ -92,10 +92,13 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
 
       {MOVE_SECTIONS.map((sec) => {
         const own = custom.filter((c) => c.section === sec.key);
+        const list = [...sec.items, ...own.map((c) => ({ id: c.id, text: c.text }))];
+        // сколько собрано в разделе — видно, где ещё не готово, не пролистывая весь список
+        const got = list.filter((it) => byId.get(it.id)?.done_by).length;
         return (
-          <Section key={sec.key} title={sec.title}>
+          <Section key={sec.key} title={sec.title} aside={<span className={got === list.length ? 'text-teal-fg' : ''}>{got === list.length ? 'всё собрано' : `${got} из ${list.length}`}</span>}>
             <Card className="divide-y divide-edge overflow-hidden">
-              {[...sec.items, ...own.map((c) => ({ id: c.id, text: c.text }))].map((it) => {
+              {list.map((it) => {
                 const r = byId.get(it.id);
                 const ns = needs.filter((n) => n.item === it.id);
                 const need = ns.length > 1 ? { value: ns.map((n) => `${n.label.split(' ')[0]} ${n.value.split(' ·')[0]}`).join(', ') } : ns[0];
@@ -143,7 +146,7 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
             ))}
           </div>
           <div className="flex gap-2">
-            <input className={inputCls} value={text} onChange={(e) => setText(e.target.value)} placeholder="Например: удлинитель для ветродуйки" />
+            <input className={inputCls} value={text} onChange={(e) => setText(e.target.value)} placeholder="Например: удлинитель" />
             <Button
               kind="primary"
               disabled={!text.trim()}
