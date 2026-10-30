@@ -1,5 +1,5 @@
 import type { Diet, MealItem, StockCategory, StockItem, StockMove } from './types';
-import { addDays, isoDate, localDay } from '../lib/dates';
+import { addDays, isoDate, localDay, plural } from '../lib/dates';
 
 /** Перевод позиции рецепта в единицы склада (кг или штуки). null — если перевести нельзя. */
 export function itemToStockUnits(mi: MealItem, item: StockItem | undefined): number | null {
@@ -244,7 +244,7 @@ export function stockView(item: StockItem, balance: number, perDay: number | nul
     openFrac = (b - full * item.sack_kg) / item.sack_kg;
     if (openFrac < 0.01) openFrac = 0;
   }
-  return { item, balance, perDay, daysLeft, full, openFrac, low: daysLeft != null && daysLeft < item.low_days };
+  return { item, balance, perDay, daysLeft, full, openFrac, low: daysLeft != null && daysLeft < lowDays(item) };
 }
 
 export function fmtNum(n: number, digits = 1) {
@@ -261,3 +261,60 @@ export const GRAIN_RATIO: Record<string, number> = {
   corn: 1.6,
   seeds: 0.93,
 };
+
+/**
+ * За сколько дней предупреждать «Заканчивается». Сено и корма на гастролях ищут и везут дольше, чем овощи.
+ * 3 — старое значение «по умолчанию» у всех позиций: его считаем «не задано» и берём по группе (в выборе 3 нет).
+ */
+export const LOW_DAYS: Record<StockCategory, number> = { feed: 7, porridge: 7, grain: 7, veg: 3, supplements: 7, household: 5, other: 3 };
+export const LOW_DAYS_OPTIONS = [2, 4, 5, 7, 10, 14];
+export function lowDays(item: StockItem): number {
+  return item.low_days && item.low_days !== 3 ? item.low_days : LOW_DAYS[categoryOf(item)];
+}
+
+/** На сколько дней подсказывать заказ. */
+export const ORDER_DAYS = 14;
+
+export interface OrderHint {
+  /** сколько заказать в единицах закупки: мешков (крупы), кг (овощи и развес), штук/тюков */
+  n: number;
+  /** «7 мешков», «280 кг», «60 тюков» — для поля «Сколько» в закупке */
+  text: string;
+}
+
+/** Сколько заказать, чтобы хватило на days дней по рациону с учётом того, что есть. null — расход неизвестен или хватает. */
+export function orderHint(v: StockView, days = ORDER_DAYS): OrderHint | null {
+  if (!v.perDay || v.perDay <= 0) return null;
+  const need = v.perDay * days - Math.max(0, v.balance);
+  if (need <= 0) return null;
+  const it = v.item;
+  if (it.kind === 'count') {
+    const n = Math.ceil(need);
+    return { n, text: `${n} ${plural(n, ...countWords(it.id, it.unit))}` };
+  }
+  if (it.kind === 'sack' && it.sack_kg && categoryOf(it) !== 'veg') {
+    const n = Math.ceil(need / it.sack_kg);
+    return { n, text: `${n} ${plural(n, ...packWords(it))}` };
+  }
+  // овощи и развес — в кг, круглым счётом до 10
+  const n = Math.ceil(need / 10) * 10;
+  return { n, text: `${n} кг` };
+}
+
+/** Последний пересчёт склада (по любой позиции): когда и кто. */
+export function lastCount(moves: StockMove[]): StockMove | undefined {
+  return moves.filter((m) => !m.deleted && m.counted != null).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+}
+
+/** Поставки: приходы одного человека в пределах 2 часов — одна машина. Новые сверху. */
+export function deliveries(moves: StockMove[]): { at: string; author: string; moves: StockMove[] }[] {
+  const list = moves.filter((m) => !m.deleted).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  const out: { at: string; author: string; moves: StockMove[] }[] = [];
+  for (const m of list) {
+    const last = out[out.length - 1];
+    const tail = last?.moves[last.moves.length - 1];
+    if (last && last.author === m.author_name && tail && Date.parse(tail.created_at) - Date.parse(m.created_at) <= 2 * 3_600_000) last.moves.push(m);
+    else out.push({ at: m.created_at, author: m.author_name, moves: [m] });
+  }
+  return out;
+}
