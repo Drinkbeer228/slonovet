@@ -15,7 +15,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // регистрируем сами (src/main.tsx): новая версия подхватывается сразу, без второго перезапуска
       injectRegister: false,
-      includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['icon-64.png', 'apple-touch-icon.png', 'logo.webp'],
       workbox: {
         // запросы к Supabase не кэшируем — данные и так хранятся в IndexedDB.
         // Сама страница — сначала из сети: онлайн всегда свежая версия, сразу при открытии.

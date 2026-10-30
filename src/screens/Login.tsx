@@ -3,7 +3,6 @@ import { loginCloud, loginDemo } from '../lib/auth';
 import { getServerConfig, isServerFromEnv, saveServerConfig } from '../lib/config';
 import { resetClient } from '../lib/supabase';
 import { Button, Card, Field, inputCls } from '../ui/kit';
-import { Logo } from './Shell';
 import { Icon } from '../ui/Icon';
 
 const LAST_LOGIN = 'slonovet_last_login';
@@ -59,8 +58,9 @@ export function Login() {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-8 px-4 py-10">
       <div className="flex flex-col items-center gap-3">
-        <Logo size={56} />
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">СлоноВет</h1>
+        {/* логотип с надписью; заголовок — для читалок экрана */}
+        <img src={`${import.meta.env.BASE_URL}logo.webp`} alt="" width={220} height={220} className="h-[220px] w-[220px] rounded-[48px] shadow-(--shadow-plate)" />
+        <h1 className="sr-only">СлоноВет</h1>
       </div>
 
       {cfg && (

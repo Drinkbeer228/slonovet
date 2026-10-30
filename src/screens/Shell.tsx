@@ -50,7 +50,7 @@ export function menuTabs(role: Role): Tab[] {
 export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
 
 export function Logo({ size = 32 }: { size?: number }) {
-  return <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={size} height={size} className="rounded-[22%]" />;
+  return <img src={`${import.meta.env.BASE_URL}icon-64.png`} alt="" width={size} height={size} className="rounded-[22%]" />;
 }
 
 /** Плашка «Посмотреть как»: чья роль на экране и как вернуться к себе. */

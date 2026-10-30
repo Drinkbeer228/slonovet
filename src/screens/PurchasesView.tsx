@@ -363,7 +363,6 @@ export function NewPurchaseSheet({
         <Card className="overflow-hidden">
           <Check on={urgent} label="Срочно" sub="заканчивается совсем" onChange={setUrgent} />
         </Card>
-        <p className="m-0 px-1 text-[13px] font-semibold text-muted">Закажет администратор или директор.</p>
       </div>
     </Sheet>
   );
