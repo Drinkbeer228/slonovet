@@ -72,7 +72,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
             На телефоне кнопка висит справа над нижней панелью — под большим пальцем; на широком экране — в шапке */}
         <div className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 md:static">
           <Button kind="accent" big icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : view === 'work' ? setCreating('work') : view === 'elephants' ? setCreating('Претти') : setPicking(true))}>
-            {view === 'purchases' ? 'Купить' : 'Новая'}
+            {view === 'purchases' ? 'Закупка' : 'Новая'}
           </Button>
         </div>
       </header>
@@ -400,11 +400,11 @@ const WHEN: { value: When; label: string }[] = [
   { value: 'course', label: 'Курс' },
 ];
 
-/** «+ Новая» на «Все»: сначала что за задача — слонам, работа или купить. */
+/** «+ Новая» на «Все»: сначала что за задача — слонам, работа или закупка. */
 const TASK_KINDS: { type: BoardType; title: string; sub: string }[] = [
   { type: 'elephants', title: 'Слонам', sub: 'Лечение, процедуры, наблюдение, кормление. Делает дежурный кипер' },
   { type: 'work', title: 'Работа', sub: 'Хозяйство и поручения: можно назначить человека' },
-  { type: 'purchases', title: 'Купить', sub: 'Закупка: закажет администратор или директор' },
+  { type: 'purchases', title: 'Закупка', sub: 'Корм, лекарства, инвентарь — что нужно купить' },
 ];
 
 function TaskTypeSheet({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (t: BoardType) => void }) {
