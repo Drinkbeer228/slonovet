@@ -31,11 +31,28 @@ psql_t() { docker exec -i -e PGPASSWORD="$PW" -e PGOPTIONS='-c client_min_messag
 echo "== до миграции"
 psql_t -Atc "select 'смен: ' || count(*) || ', открытых: ' || count(*) filter (where status = 'open' and not deleted) from public.shifts"
 psql_t -Atc "select 'применено миграций: ' || count(*) || ', последняя: ' || max(file) from slonovet.migrations"
+# ночная копия может отставать: миграции, применённые на рабочей после 03:30, в ней ещё нет
+# номера без ведущих нулей: «029» в sh читается как восьмеричное
+NUM=$(basename "$MIG" | grep -o '^[0-9]*' | sed 's/^0*//' || true)
+LAST=$(psql_t -Atc "select coalesce(max(file), '') from slonovet.migrations" | grep -o '^[0-9]*' | sed 's/^0*//' || true)
+if [ -n "$NUM" ] && [ -n "$LAST" ] && [ $((LAST + 1)) -lt "$NUM" ]; then
+  echo "ВНИМАНИЕ: в копии последняя миграция №$LAST, проверяется №$NUM — промежуточных в копии нет."
+  echo "  Проверяйте пачкой: склейте миграции с №$((LAST + 1)) по №$NUM в один файл (имя — с номера первой) и проверьте его."
+fi
 
 echo "== накат (как migrate.sh: одна транзакция) и повторный накат"
 NAME_F=$(basename "$MIG")
-{ cat "$MIG"; printf "\ninsert into slonovet.migrations (file, sha256) values ('%s', 'check') on conflict do nothing;\n" "$NAME_F"; } | psql_t -1 -q -f - && echo "накат 1: ок"
-docker exec -e PGPASSWORD="$PW" "$NAME" psql -h localhost -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -1 -q -f /tmp/mig.sql && echo "накат 2 (повторный): ок"
+# «cmd && echo» под set -e не останавливает скрипт при ошибке — поэтому явно: упало — FAIL и выход
+if { cat "$MIG"; printf "\ninsert into slonovet.migrations (file, sha256) values ('%s', 'check') on conflict do nothing;\n" "$NAME_F"; } | psql_t -1 -q -f -; then
+  echo "накат 1: ок"
+else
+  echo "FAIL: миграция не накатилась на копию — на рабочую НЕ применять"; exit 1
+fi
+if docker exec -e PGPASSWORD="$PW" "$NAME" psql -h localhost -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -1 -q -f /tmp/mig.sql; then
+  echo "накат 2 (повторный): ок"
+else
+  echo "FAIL: повторный накат упал — миграция не повторяемая"; exit 1
+fi
 
 echo "== проверки"
 psql_t -q <<'SQL'
