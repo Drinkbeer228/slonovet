@@ -67,10 +67,13 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
     <div className="flex flex-col gap-6">
       <header className="flex items-center justify-between gap-3 px-1">
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Задачи</h1>
-        {/* на «Закупках» — сразу форма закупки; иначе задача (на «Работе» — уже с адресатом «Работа») */}
-        <Button kind="accent" icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : setCreating(view === 'work' ? 'work' : 'Претти'))}>
-          {view === 'purchases' ? 'Купить' : 'Новая'}
-        </Button>
+        {/* на «Закупках» — сразу форма закупки; иначе задача (на «Работе» — уже с адресатом «Работа»).
+            На телефоне кнопка висит справа над нижней панелью — под большим пальцем; на широком экране — в шапке */}
+        <div className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 md:static">
+          <Button kind="accent" big icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : setCreating(view === 'work' ? 'work' : 'Претти'))}>
+            {view === 'purchases' ? 'Купить' : 'Новая'}
+          </Button>
+        </div>
       </header>
       <div data-tour="requests-tabs">
         <Segmented label="Какие задачи" value={view} onChange={setView} options={FILTERS} dots={dots} />
@@ -114,6 +117,8 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
           </Section>
         );
       })}
+      {/* место под плавающую кнопку, чтобы она не закрывала последнюю карточку */}
+      <div className="h-16 md:hidden" aria-hidden="true" />
       <NewRequestSheet
         initial={creating}
         user={user}
