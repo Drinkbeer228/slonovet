@@ -33,7 +33,7 @@ async function setStatus(p: Purchase, status: PurchaseStatus, user: CurrentUser,
 }
 
 /** Первое число из «сколько»: «10 тюков» → 10. */
-function firstNumber(text: string): string {
+export function firstNumber(text: string): string {
   const m = text.replace(',', '.').match(/\d+(\.\d+)?/);
   return m ? m[0].replace('.', ',') : '';
 }
@@ -243,7 +243,18 @@ export function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase 
   );
 }
 
-export function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user: CurrentUser; onClose: () => void }) {
+export function NewPurchaseSheet({
+  open,
+  user,
+  onClose,
+  preset,
+}: {
+  open: boolean;
+  user: CurrentUser;
+  onClose: () => void;
+  /** из «Заканчивается»: позиция и сколько взять уже подставлены */
+  preset?: { itemId: string; amount: string } | null;
+}) {
   const items = useRows('stock_items');
   const [itemId, setItemId] = useState<string | null>(null);
   const [other, setOther] = useState('');
@@ -253,13 +264,13 @@ export function NewPurchaseSheet({ open, user, onClose }: { open: boolean; user:
 
   useEffect(() => {
     if (open) {
-      setItemId(null);
+      setItemId(preset?.itemId ?? null);
       setOther('');
-      setAmount('');
+      setAmount(preset?.amount ?? '');
       setNote('');
       setUrgent(false);
     }
-  }, [open]);
+  }, [open, preset]);
 
   const item = items.find((i) => i.id === itemId);
   const title = itemId === 'other' ? other.trim() : (item?.name ?? '');

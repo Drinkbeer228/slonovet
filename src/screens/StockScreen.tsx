@@ -1,9 +1,10 @@
 import { EDITORS, canEdit } from '../domain/access';
-import { PurchasesBlock } from './PurchasesView';
+import { NewPurchaseSheet, PurchasesBlock } from './PurchasesView';
+import { DeliverySheet, RecountSheet } from './StockSheets';
 import { useMemo, useState } from 'react';
-import { addStockMove, countStock } from '../domain/actions';
+import { countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
-import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
+import { LOW_DAYS, LOW_DAYS_OPTIONS, ORDER_DAYS, STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, deliveries, lastCount, lowDays, orderHint, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
 import { ledger } from '../domain/stops';
 import { newId, put, useRows, useEffectiveDiets } from '../lib/store';
@@ -92,6 +93,11 @@ export function StockScreen({ user }: { user: CurrentUser }) {
   const shiftId = currentShift(shifts)?.id ?? null;
   const [edit, setEdit] = useState<StockView | null>(null);
   const [incoming, setIncoming] = useState(false);
+  const [recount, setRecount] = useState(false);
+  const [buy, setBuy] = useState<{ itemId: string; amount: string } | null>(null);
+  const purchases = useRows('purchases').filter((p) => !p.deleted && (p.status === 'new' || p.status === 'ordered'));
+  const counted = lastCount(moves);
+  const countAge = counted ? Math.floor((Date.now() - Date.parse(counted.created_at)) / 86_400_000) : null;
 
   const views = useMemo(() => {
     const bal = balances(moves);
@@ -108,24 +114,57 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
           <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Фураж</h1>
-          {canWrite && (
+        </div>
+        {canWrite && (
+          <div className="grid grid-cols-2 gap-2">
             <Button kind="light" icon="truck" onClick={() => setIncoming(true)}>
               Привезли
             </Button>
-          )}
-        </div>
+            <Button icon="refresh" onClick={() => setRecount(true)}>
+              Пересчёт
+            </Button>
+          </div>
+        )}
+        {/* на гастролях расхождения копятся: напоминаем, если давно не пересчитывали */}
+        <span className={`px-1 text-[13px] font-semibold ${countAge == null || countAge > 7 ? 'text-amber-fg' : 'text-muted'}`}>
+          {counted ? `Пересчёт склада: ${relDate(localDay(counted.created_at))}, ${counted.author_name}` : 'Склад ещё ни разу не пересчитывали'}
+          {countAge != null && countAge > 7 ? ' — пора пройти заново' : ''}
+        </span>
         {!canWrite && <ReadOnlyNote who={EDITORS.stock.who} />}
       </header>
       {road && <RoadBanner />}
 
       {low.length > 0 && (
-        <Plate glow="amber" halo className="flex flex-col gap-1 p-4">
-          <span className="text-[12px] font-extrabold tracking-wide text-amber-fg">ЗАКАНЧИВАЕТСЯ</span>
-          {low.map((v) => (
-            <span key={v.item.id} className="text-[15px] font-bold">
-              {v.item.name} — {v.balance <= 0 ? amountText(v) : daysText(v, false)}
-            </span>
-          ))}
+        <Plate glow="amber" halo className="flex flex-col p-4">
+          <span className="pb-1 text-[12px] font-extrabold tracking-wide text-amber-fg">ЗАКАНЧИВАЕТСЯ</span>
+          {/* у каждой — заказано ли и сколько взять на 2 недели; не заказано — «Купить» одним нажатием */}
+          {low.map((v) => {
+            const p = purchases.find((x) => x.item_id === v.item.id);
+            const hint = orderHint(v);
+            return (
+              <div key={v.item.id} className="flex items-center gap-3 border-t border-edge py-2 first:border-t-0">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[15px] font-bold">
+                    {v.item.name} — {v.balance <= 0 ? amountText(v) : daysText(v, false)}
+                  </span>
+                  <span className={`text-[13px] font-semibold ${p ? 'text-teal-fg' : 'text-muted'}`}>
+                    {p
+                      ? p.status === 'ordered'
+                        ? `заказано${p.delivery_date ? ` · привезут ${shortDate(p.delivery_date)}` : ''}${p.amount ? ` · ${p.amount}` : ''}`
+                        : `попросили купить${p.amount ? ` · ${p.amount}` : ''}`
+                      : hint
+                        ? `на ${ORDER_DAYS} дней взять ≈ ${hint.text}`
+                        : 'не заказано'}
+                  </span>
+                </span>
+                {!p && (
+                  <button type="button" onClick={() => setBuy({ itemId: v.item.id, amount: hint?.text ?? '' })} className={`h-11 shrink-0 rounded-xl px-3.5 text-[14px] font-bold text-ink ${KEY}`}>
+                    Купить
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </Plate>
       )}
 
@@ -175,16 +214,17 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         </div>
       )}
 
-      <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
-        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по рациону в 19:00, мешки — по счётчику «Мешков взяли». Фрукты и овощи на манеже и шоу — «Вне рациона» в дежурстве, остальные расхождения — поправка остатка.
-        {canWrite && ' Нажми на позицию, чтобы поправить остаток, переименовать или удалить.'}
+      <p className="m-0 px-1 text-[13px] font-semibold text-muted">
+        {canWrite ? 'Нажми на позицию — поправить остаток, срок «заканчивается», название. ' : ''}Как списывается сам — в «Справке».
       </p>
 
       <Ledger moves={moves} items={items} />
 
       <AdjustSheet view={edit} user={user} shiftId={shiftId} onClose={() => setEdit(null)} />
       <AddItemSheet open={adding} items={items} user={user} shiftId={shiftId} onClose={() => setAdding(false)} />
-      <IncomingSheet open={incoming} items={items} user={user} shiftId={shiftId} onClose={() => setIncoming(false)} />
+      <DeliverySheet open={incoming} user={user} shiftId={shiftId} onClose={() => setIncoming(false)} />
+      <RecountSheet open={recount} user={user} shiftId={shiftId} onClose={() => setRecount(false)} />
+      <NewPurchaseSheet open={buy !== null} preset={buy} user={user} onClose={() => setBuy(null)} />
     </div>
   );
 }
@@ -198,6 +238,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
   const [frac, setFrac] = useState(0);
   const [value, setValue] = useState('');
   const [sackKg, setSackKg] = useState('');
+  const [warn, setWarn] = useState(7);
   const [openedFor, setOpenedFor] = useState<string | null>(null);
   // остаток трогали — значит, пересчитали; иначе (переименовали) пересчёт не записываем
   const [counted, setCounted] = useState(false);
@@ -209,6 +250,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
     setFrac(FRACTIONS.reduce((a, b) => (Math.abs(b.v - view.openFrac) < Math.abs(a.v - view.openFrac) ? b : a)).v);
     setValue(String(Math.round(view.balance * 10) / 10));
     setSackKg(String(it.sack_kg ?? ''));
+    setWarn(lowDays(it));
     setName(it.name);
   }
   const close = () => {
@@ -242,7 +284,9 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             // название и настройки — одной записью, чтобы одно не затёрло другое
             const next: StockItem = { ...it, name: name.trim() || it.name };
             if (it.kind === 'sack' && num(sackKg)) next.sack_kg = num(sackKg);
-            if (next.name !== it.name || next.sack_kg !== it.sack_kg || next.kg_per_garets !== it.kg_per_garets) await put('stock_items', next);
+            // 3 в базе — «по группе»; выбрали срок группы — так и храним
+            if (warn !== lowDays(it)) next.low_days = warn === LOW_DAYS[categoryOf(it)] ? 3 : warn;
+            if (next.name !== it.name || next.sack_kg !== it.sack_kg || next.kg_per_garets !== it.kg_per_garets || next.low_days !== it.low_days) await put('stock_items', next);
             toast('Сохранено');
             close();
           }}
@@ -325,6 +369,17 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             </Field>
           </div>
         )}
+        <div className="flex flex-col gap-2 border-t border-edge pt-4">
+          <span className="px-1 text-[14px] font-bold text-muted">«Заканчивается» — когда останется на</span>
+          <div className="flex flex-wrap gap-2">
+            {/* 3 дня — только там, где это срок группы (овощи): иначе 3 читалось бы как «по группе» */}
+            {[...new Set([...LOW_DAYS_OPTIONS, LOW_DAYS[categoryOf(it)]])].sort((a, b) => a - b).map((d) => (
+              <Chip key={d} on={warn === d} onClick={() => setWarn(d)}>
+                {d} {plural(d, 'день', 'дня', 'дней')}
+              </Chip>
+            ))}
+          </div>
+        </div>
         <div className="flex flex-col gap-3 border-t border-edge pt-4">
           <Field label="Название">
             <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
@@ -351,93 +406,6 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
         }}
         onClose={() => setConfirmDelete(false)}
       />
-    </Sheet>
-  );
-}
-
-function IncomingSheet({
-  open,
-  items,
-  user,
-  shiftId,
-  onClose,
-}: {
-  open: boolean;
-  items: StockItem[];
-  user: CurrentUser;
-  shiftId: string | null;
-  onClose: () => void;
-}) {
-  const sorted = [...items].sort((a, b) => a.sort - b.sort);
-  const [itemId, setItemId] = useState('hay');
-  const [qty, setQty] = useState(1);
-  const [kg, setKg] = useState('');
-  const it = sorted.find((i) => i.id === itemId);
-  // килограммы и штуки вписывают числом (мешков для мусора бывает 25 и 50 в пачке), мешки корма — кнопками
-  const typed = it?.kind === 'kg' || it?.kind === 'count';
-  const isKg = it?.kind === 'kg';
-  const typedNum = Number(kg.replace(',', '.')) || 0;
-  const amount = !it ? 0 : toStockUnits(it, typed ? typedNum : qty);
-  const unitWord = !it ? '' : it.kind === 'count' ? plural(Math.round(typedNum), ...countWords(it.id, it.unit)) : plural(qty, ...packWords(it));
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Привезли фураж"
-      footer={
-        <Button
-          kind="primary"
-          big
-          full
-          disabled={!amount}
-          onClick={async () => {
-            if (!it) return;
-            await addStockMove(it.id, amount, 'in', user, shiftId);
-            toast(`${it.name}: +${isKg ? `${fmtNum(amount)} кг` : it.kind === 'count' ? `${fmtNum(amount, 0)} ${unitWord}` : `${qty} ${unitWord}`}`);
-            setQty(1);
-            setKg('');
-            onClose();
-          }}
-        >
-          Добавить
-        </Button>
-      }
-    >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-wrap gap-2">
-          {sorted.map((i) => (
-            <button
-              key={i.id}
-              type="button"
-              aria-pressed={i.id === itemId}
-              onClick={() => setItemId(i.id)}
-              className={`h-11 rounded-xl border px-3.5 text-[14px] font-bold transition-transform active:scale-[0.97] ${
-                i.id === itemId ? 'border-teal/60 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-ink shadow-(--shadow-key-on)' : 'border-edge bg-well text-ink2 shadow-(--shadow-well)'
-              }`}
-            >
-              {i.name}
-            </button>
-          ))}
-        </div>
-        {typed ? (
-          <Field label={isKg ? 'Сколько, кг' : `Сколько, ${countWords(it!.id, it!.unit)[2]}`}>
-            <input className={inputCls} type="text" inputMode="decimal" value={kg} onChange={(e) => setKg(e.target.value)} />
-          </Field>
-        ) : (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[15px] font-bold">
-              {qty} {unitWord}
-              {it?.kind === 'sack' && it.sack_kg ? <span className="ml-2 text-[13px] text-muted">≈ {fmtNum(amount)} кг</span> : null}
-            </span>
-            <Stepper label="Количество" value={qty} min={1} onChange={setQty} />
-          </div>
-        )}
-        <span className="flex items-center gap-2 text-[13px] font-semibold text-muted">
-          <Icon name="user" size={16} />
-          Запишется от имени: {user.full_name}
-        </span>
-      </div>
     </Sheet>
   );
 }
@@ -580,13 +548,15 @@ function AddItemSheet({
 /** Одна строка ленты: что, сколько, когда, кто. */
 function LedgerRow({ m, items }: { m: StockMove; items: StockItem[] }) {
   const it = items.find((i) => i.id === m.item_id);
-  const unit = it?.kind === 'count' ? countWords(it.id, it.unit)[2] : 'кг';
+  // «+92 тюка», «+5 тюков»; у пересчёта — «пересчёт: 34 тюка»
+  const unitFor = (n: number) => (it?.kind === 'count' ? plural(Math.round(Math.abs(n)), ...countWords(it.id, it.unit)) : 'кг');
+  const unit = unitFor(Number(m.delta));
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[14px] font-bold">{it?.name ?? m.item_id}</span>
         <span className="text-[12px] font-semibold text-muted">
-          {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unit}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
+          {m.counted != null ? `пересчёт: ${fmtNum(Number(m.counted))} ${unitFor(Number(m.counted))}` : (MOVE_LABEL[m.reason] ?? 'поправка')}
           {m.note ? `: ${m.note}` : ''} · {relDate(localDay(m.created_at))} {timeOf(m.created_at)} · {m.author_name}
         </span>
       </span>
@@ -598,7 +568,35 @@ function LedgerRow({ m, items }: { m: StockMove; items: StockItem[] }) {
   );
 }
 
-/** Сколько строк показывать сразу — остальное по «Показать ещё». */
+/** Поставка одной машиной: «15.10 10:00 · Соколов · 16 позиций», по тапу — что именно. */
+function DeliveryGroup({ g, items }: { g: { at: string; author: string; moves: StockMove[] }; items: StockItem[] }) {
+  const [open, setOpen] = useState(false);
+  const recount = g.moves.every((m) => m.counted != null);
+  return (
+    <Card className="overflow-hidden">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-11 w-full items-center gap-3 px-4 py-3 text-left">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-bold">
+            {recount ? 'Пересчёт' : 'Поставка'} · {g.moves.length} {plural(g.moves.length, 'позиция', 'позиции', 'позиций')}
+          </span>
+          <span className="truncate text-[12px] font-semibold text-muted">
+            {relDate(localDay(g.at))} {timeOf(g.at)} · {g.author} · {g.moves.map((m) => items.find((i) => i.id === m.item_id)?.name ?? m.item_id).join(', ')}
+          </span>
+        </span>
+        <Icon name="down" size={18} className={`shrink-0 text-muted transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="divide-y divide-edge border-t border-edge">
+          {g.moves.map((m) => (
+            <LedgerRow key={m.id} m={m} items={items} />
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Сколько поставок показывать сразу — остальное по «Показать ещё». */
 const LEDGER_PAGE = 20;
 
 /**
@@ -610,21 +608,21 @@ function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
   const [archive, setArchive] = useState(false);
   const { start, current, archive: past } = ledger(moves);
   if (!current.length && !past.length) return null;
-  const shown = more ? current : current.slice(0, LEDGER_PAGE);
+  // одна машина (приходы одного человека за пару часов) — одной строкой, позиции по тапу
+  const groups = deliveries(current);
+  const shown = more ? groups : groups.slice(0, LEDGER_PAGE);
   return (
     <Section id="stock-history" title="Привозили" aside={`за 30 дней, с ${shortDate(start)}`}>
-      {current.length ? (
-        <Card className="divide-y divide-edge overflow-hidden">
-          {shown.map((m) => (
-            <LedgerRow key={m.id} m={m} items={items} />
-          ))}
-        </Card>
+      {groups.length ? (
+        <div className="flex flex-col gap-2">
+          {shown.map((g) => (g.moves.length === 1 ? <Card key={g.moves[0].id} className="overflow-hidden"><LedgerRow m={g.moves[0]} items={items} /></Card> : <DeliveryGroup key={g.moves[0].id} g={g} items={items} />))}
+        </div>
       ) : (
         <Empty>За последние 30 дней ничего не привозили</Empty>
       )}
-      {current.length > LEDGER_PAGE && (
+      {groups.length > LEDGER_PAGE && (
         <Button full onClick={() => setMore(!more)}>
-          {more ? 'Свернуть' : `Показать ещё ${current.length - LEDGER_PAGE}`}
+          {more ? 'Свернуть' : `Показать ещё ${groups.length - LEDGER_PAGE}`}
         </Button>
       )}
       {past.length > 0 && (
