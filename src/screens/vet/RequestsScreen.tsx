@@ -446,7 +446,7 @@ export function NewRequestSheet({
     <Sheet
       open={initial !== null}
       onClose={onClose}
-      title="Назначение или задача"
+      title={who === 'work' ? 'Задача по работе' : 'Назначение слону'}
       footer={
         <Button
           kind="primary"
@@ -539,7 +539,7 @@ export function NewRequestSheet({
             value={text}
             onChange={(e) => setText(e.target.value)}
             className={`${inputCls} resize-none`}
-            placeholder={who === 'work' ? 'Например: перебрать сенник, сухие тюки ближе к выходу' : 'Например: давать тёплую воду, два раза за дежурство проверить, сколько выпила'}
+            placeholder={who === 'work' ? 'Например: перебрать сенник, сухие тюки ближе к выходу' : 'Например: марганцевые ванночки для ног, 15 мин'}
           />
         </Field>
         <div className="flex flex-col gap-3">
@@ -579,7 +579,7 @@ export function NewRequestSheet({
             <Chip on={options.length === 0} onClick={() => setOptions([])}>
               Просто «выполнено»
             </Chip>
-            {answerPresets(who).map((p) => (
+            {answerPresets().map((p) => (
               <Chip key={p.label} on={options.join('|') === p.options.join('|')} onClick={() => setOptions(p.options)}>
                 {p.label}
               </Chip>
@@ -597,7 +597,7 @@ export function NewRequestSheet({
                   .filter(Boolean),
               );
             }}
-            placeholder={who === 'work' ? 'Свои варианты через запятую: забрал, нет на месте' : 'Свои варианты через запятую: мутная, прозрачная, с песком'}
+            placeholder="Свои варианты через запятую: забрал, нет на месте"
           />
           {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кнопки ответа: {options.join(' · ')}</span>}
         </div>

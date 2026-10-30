@@ -109,7 +109,7 @@ export interface RequestTodo {
 }
 
 /** Ответы-неудачи: отметка «не получилось» не закрывает разовую задачу — её надо сделать ещё раз. */
-export const FAILED_ANSWERS = ['не получилось'];
+export const FAILED_ANSWERS = ['не получилось', 'не вышло'];
 
 /** Ответ отметки — вариант кнопки в начале заметки («ответ — комментарий»); без ответа — null. */
 export function markAnswer(m: RequestMark, req?: VetRequest): string | null {
@@ -185,21 +185,17 @@ export function whenLabel(req: VetRequest, today = isoDate()): string {
   return req.at_time ? `${day} к ${req.at_time.slice(0, 5)}` : day;
 }
 
-/** Готовые наборы ответов: про слонов — ветеринарные; про «Работу» (хоздела) — человеческие статусы. */
-export const WORK_PRESETS: { label: string; options: string[] }[] = [
-  // без «в работе»: любая отметка — выполнение, и разовая задача после неё закрылась бы
-  { label: 'Сделано / не получилось', options: ['сделано', 'не получилось'] }, // «не получилось» задачу не закрывает
-];
-
-export const answerPresets = (who: string) => (who === 'work' ? WORK_PRESETS : ANSWER_PRESETS);
-
-/** Готовые наборы ответов для заявки врача */
+/**
+ * Готовые наборы ответов — одни для слонов и для «Работы» (кроме «Просто выполнено»). Специфичное — «Свои варианты».
+ * Без «в работе»: любая отметка — выполнение, и разовая задача после неё закрылась бы.
+ * «не получилось» и «не вышло» задачу не закрывают (FAILED_ANSWERS); «частично» — закрывает.
+ */
 export const ANSWER_PRESETS: { label: string; options: string[] }[] = [
-  { label: 'Съела', options: ['всё', 'половину', 'отказ'] },
-  { label: 'Есть / нет', options: ['есть', 'нет'] },
-  { label: 'Норма / внимание / плохо', options: ['норма', 'внимание', 'плохо'] },
-  { label: 'Выпила', options: ['много', 'как обычно', 'мало'] },
+  { label: 'Сделано / не получилось', options: ['сделано', 'не получилось'] },
+  { label: 'Сделано / частично / не вышло', options: ['сделано', 'частично', 'не вышло'] },
 ];
+
+export const answerPresets = () => ANSWER_PRESETS;
 
 /** Кому адресовано назначение — для подписи */
 export function whoLabel(e: string): string {

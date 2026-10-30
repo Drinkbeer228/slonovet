@@ -98,12 +98,11 @@ describe('вход: что сказать человеку', () => {
 });
 
 describe('варианты ответа по адресату', () => {
-  it('для «Работы» — без «в работе» (отметка закрыла бы разовую задачу), для слонов — ветеринарные', async () => {
-    const { answerPresets } = await import('./shift');
-    const work = answerPresets('work').flatMap((p) => p.options);
-    expect(work).toContain('сделано');
-    expect(work).not.toContain('в работе');
-    expect(answerPresets('Одри').map((p) => p.label)).toContain('Съела');
+  it('одни универсальные для слонов и «Работы», без «в работе» (отметка закрыла бы разовую задачу)', async () => {
+    const { answerPresets, FAILED_ANSWERS } = await import('./shift');
+    expect(answerPresets().map((p) => p.label)).toEqual(['Сделано / не получилось', 'Сделано / частично / не вышло']);
+    expect(answerPresets().flatMap((p) => p.options)).not.toContain('в работе');
+    expect(FAILED_ANSWERS).toContain('не вышло');
   });
 });
 
