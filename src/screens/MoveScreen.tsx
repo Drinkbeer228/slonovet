@@ -237,7 +237,7 @@ function StopCard({ user }: { user: CurrentUser }) {
               <DateInput value={day} onChange={setDay} label="Когда приехали" />
             </Field>
             <span className="text-[13px] font-semibold text-muted">
-              По городу поставщики покажут, кто возит здесь.
+              По городу «Контакты» покажут, кто возит и кому звонить здесь.
             </span>
           </div>
         </Sheet>

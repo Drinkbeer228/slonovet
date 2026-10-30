@@ -130,15 +130,13 @@ export function Card({
   children,
   className = '',
   tone = 'glass',
-  ...rest
 }: {
   children: ReactNode;
   className?: string;
   tone?: keyof typeof TONE;
-  'data-tour'?: string;
 }) {
   return (
-    <div className={`rounded-2xl ${TONE[tone]} ${className}`} {...rest}>
+    <div className={`rounded-2xl ${TONE[tone]} ${className}`}>
       {children}
     </div>
   );
@@ -172,7 +170,6 @@ export function Plate({
   flat,
   children,
   className = '',
-  ...rest
 }: {
   glow: Glow;
   halo?: boolean;
@@ -180,10 +177,9 @@ export function Plate({
   flat?: boolean;
   children: ReactNode;
   className?: string;
-  'data-tour'?: string;
 }) {
   return (
-    <div className={`relative isolate overflow-hidden rounded-2xl border border-edge bg-surface/70 ${halo ? HALO[glow] : 'shadow-(--shadow-plate)'} ${className}`} {...rest}>
+    <div className={`relative isolate overflow-hidden rounded-2xl border border-edge bg-surface/70 ${halo ? HALO[glow] : 'shadow-(--shadow-plate)'} ${className}`}>
       {!flat && <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 -z-10 w-28 ${WASH[glow]}`} />}
       {children}
     </div>

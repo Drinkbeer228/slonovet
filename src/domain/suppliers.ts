@@ -1,7 +1,7 @@
 import type { StockCategory, Supplier } from './types';
 
-/** Что возят — чипами, без ввода. */
-export const SUPPLIES = ['Сено', 'Овощи', 'Зерно и каши', 'Опилки', 'Вода', 'Ветки', 'Другое'];
+/** Что за контакт — чипами, без ввода: корма и хозяйство (для «У кого» в закупке) и любые нужные в городе. */
+export const SUPPLIES = ['Сено', 'Овощи', 'Зерно и каши', 'Опилки', 'Вода', 'Ветки', 'Ветеринар', 'Ремонт и техника', 'Транспорт', 'Жильё', 'Другое'];
 
 /** Оценка словами и цветом (классы целиком — чтобы Tailwind их увидел). */
 export const QUALITY: Record<1 | 2 | 3, { label: string; cls: string }> = {
@@ -36,6 +36,9 @@ export function supplierCities(list: Supplier[], here: string | null): string[] 
   return [...set.entries()].sort(([a], [b]) => Number(here != null && b === norm(here)) - Number(here != null && a === norm(here)) || a.localeCompare(b, 'ru')).map(([, v]) => v);
 }
 
+/** Контакты-услуги: в «У кого» закупки не предлагаем. */
+const SERVICES = ['Ветеринар', 'Ремонт и техника', 'Транспорт', 'Жильё'];
+
 /** Что из справочника «возят» подходит к группе позиции склада. */
 const SUPPLY_FOR: Partial<Record<StockCategory, string[]>> = {
   feed: ['Сено', 'Ветки'],
@@ -52,5 +55,7 @@ const SUPPLY_FOR: Partial<Record<StockCategory, string[]>> = {
 export function suppliersFor(list: Supplier[], category: StockCategory | null, here: string | null): Supplier[] {
   const want = (category && SUPPLY_FOR[category]) || [];
   const fits = (s: Supplier) => Number(s.supplies.some((x) => want.includes(x)));
-  return findSuppliers(list, '', here, here).sort((a, b) => Number(a.quality === 1) - Number(b.quality === 1) || fits(b) - fits(a));
+  // ветеринар, мастер, перевозчик — не про закупку корма
+  const service = (s: Supplier) => s.supplies.length > 0 && s.supplies.every((x) => SERVICES.includes(x));
+  return findSuppliers(list, '', here, here).filter((s) => !service(s)).sort((a, b) => Number(a.quality === 1) - Number(b.quality === 1) || fits(b) - fits(a));
 }

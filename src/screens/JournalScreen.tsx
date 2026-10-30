@@ -73,14 +73,14 @@ function DaysView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2" data-tour="journal-day">
+      <div className="flex items-center gap-2">
         <IconButton icon="back" label="День раньше" onClick={() => step(1)} />
         <DateJump value={selected} onPick={jump} className={`h-11 flex-1 rounded-xl text-[15px] font-extrabold text-ink ${KEY}`}>
           {longDate(selected)}
         </DateJump>
         <IconButton icon="next" label="День позже" onClick={() => step(-1)} className={selected >= isoDate() ? 'opacity-30' : ''} />
       </div>
-      <div data-tour="journal-calendar">
+      <div>
         <Card className="flex flex-col gap-2 p-3">
           <div className="flex items-center justify-between px-1">
             <button type="button" disabled={!hasOlder} onClick={() => setPage(page + 1)} className="-my-1.5 h-11 pr-3 text-[14px] font-bold text-teal disabled:text-faint">
@@ -149,7 +149,7 @@ function DaysView() {
 
       {(byDay.get(selected) ?? []).map((s) => (
         <Fragment key={s.id}>
-          <div data-tour="journal-card">
+          <div>
             <ShiftCard shift={s} />
           </div>
           <ShiftDetails shift={s} />
@@ -248,7 +248,7 @@ function ShiftDetails({ shift }: { shift: Shift }) {
   const branchesText = branches ? `${branches}${b?.kinds?.length ? ` · ${b.kinds.join(', ')}` : ''}` : '—';
 
   return (
-    <div className="flex flex-col gap-5" data-tour="journal-details">
+    <div className="flex flex-col gap-5">
         {shift.note && (
           <Card className="p-4">
             <span className="mb-1 block text-[12px] font-extrabold tracking-wide text-muted">ЗАМЕТКА ДЕЖУРСТВУ</span>

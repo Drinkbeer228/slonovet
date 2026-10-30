@@ -11,8 +11,9 @@ type Draft = Omit<Supplier, 'updated_at'>;
 const blank = (city: string, user: CurrentUser): Draft => ({ id: newId(), city, name: '', supplies: [], phone: '', address: '', quality: null, note: '', created_by: user.full_name });
 
 /**
- * Поставщики по городам: сено, овощи, зерно, опилки. Возвращаемся в город через пару лет — проверенный контакт под рукой.
- * Текущий город (из «Переезда») — наверху; позвонить — одним нажатием.
+ * Контакты по городам: Город · Что · Кто. Сено и овощи, ветеринар, ремонт, транспорт — возвращаемся в город через пару лет,
+ * проверенный контакт под рукой. Текущий город (из «Переезда») — наверху; позвонить — одним нажатием.
+ * В базе это таблица suppliers: из неё же «У кого» в закупке.
  */
 export function SuppliersScreen({ user }: { user: CurrentUser }) {
   const list = useRows('suppliers');
@@ -27,14 +28,14 @@ export function SuppliersScreen({ user }: { user: CurrentUser }) {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex items-center justify-between gap-3 px-1">
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Поставщики</h1>
+        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Контакты</h1>
         {canWrite && (
           <Button kind="accent" icon="plus" onClick={() => setEdit(blank(city ?? here ?? '', user))}>
             Добавить
           </Button>
         )}
       </header>
-      <input className={inputCls} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: сено, Казань, Иван…" aria-label="Поиск поставщика" />
+      <input className={inputCls} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: сено, ветеринар, Казань, Иван…" aria-label="Поиск контакта" />
       {cities.length > 1 && (
         <div className="flex flex-wrap gap-2">
           <Chip on={!city} onClick={() => setCity(null)}>
@@ -49,35 +50,46 @@ export function SuppliersScreen({ user }: { user: CurrentUser }) {
         </div>
       )}
       {found.length === 0 ? (
-        <Empty>{list.length ? 'Никого не нашли' : 'Пока никого. Нашли хорошего поставщика — запишите, через год пригодится.'}</Empty>
+        <Empty>{list.length ? 'Никого не нашли' : 'Пока никого. Нашли хороший контакт — сено, ветеринара, мастера — запишите, через год пригодится.'}</Empty>
       ) : (
-        <Section title={city ?? (query ? 'Нашли' : 'Все')} aside={String(found.length)}>
-          <div className="flex flex-col gap-2.5">
-            {found.map((s) => (
-              <SupplierCard key={s.id} s={s} here={here} onEdit={canWrite ? () => setEdit({ ...s }) : undefined} />
-            ))}
-          </div>
-        </Section>
+        byCity(found).map(([c, group]) => (
+          <Section key={c} title={c ? `${c}${c === here ? ' · сейчас здесь' : ''}` : 'Без города'} aside={String(group.length)}>
+            <div className="flex flex-col gap-2.5">
+              {group.map((s) => (
+                <SupplierCard key={s.id} s={s} onEdit={canWrite ? () => setEdit({ ...s }) : undefined} />
+              ))}
+            </div>
+          </Section>
+        ))
       )}
       <SupplierSheet draft={edit} onClose={() => setEdit(null)} />
     </div>
   );
 }
 
-function SupplierCard({ s, here, onEdit }: { s: Supplier; here: string | null; onEdit?: () => void }) {
+/** Подряд идущие по городу — одной группой (порядок уже задан findSuppliers: текущий город первым). */
+function byCity(list: Supplier[]): [string, Supplier[]][] {
+  const out: [string, Supplier[]][] = [];
+  for (const s of list) {
+    const c = s.city.trim();
+    const last = out[out.length - 1];
+    if (last && last[0].toLowerCase() === c.toLowerCase()) last[1].push(s);
+    else out.push([c, [s]]);
+  }
+  return out;
+}
+
+/** Карточка: что (крупно) → кто → адрес, заметка → позвонить. */
+function SupplierCard({ s, onEdit }: { s: Supplier; onEdit?: () => void }) {
   const q = s.quality ? QUALITY[s.quality] : null;
   return (
     <Card className="flex flex-col gap-2 p-4">
       <button type="button" disabled={!onEdit} onClick={onEdit} className="flex flex-col gap-1 text-left disabled:opacity-100">
         <span className="flex items-center justify-between gap-2">
-          <span className="text-[17px] font-extrabold leading-tight">{s.name || 'Без имени'}</span>
+          <span className="text-[17px] font-extrabold leading-tight text-teal-fg">{s.supplies.length ? s.supplies.join(', ') : 'Контакт'}</span>
           {q && <span className={`shrink-0 text-[13px] font-extrabold ${q.cls}`}>{q.label}</span>}
         </span>
-        <span className="text-[13px] font-semibold text-muted">
-          {s.city}
-          {s.city === here ? ' · сейчас здесь' : ''}
-          {s.supplies.length ? ` · ${s.supplies.join(', ')}` : ''}
-        </span>
+        <span className="text-[16px] font-bold">{s.name || 'Без имени'}</span>
         {s.address && <span className="text-[14px] text-ink2">{s.address}</span>}
         {s.note && <span className="text-[14px] text-ink2">{s.note}</span>}
       </button>
@@ -112,7 +124,7 @@ function SupplierSheet({ draft, onClose }: { draft: Draft | null; onClose: () =>
         setD(null);
         onClose();
       }}
-      title={isNew ? 'Новый поставщик' : d.name || 'Поставщик'}
+      title={isNew ? 'Новый контакт' : d.name || 'Контакт'}
       footer={
         <Button kind="primary" big full disabled={!d.name.trim() || !d.city.trim()} onClick={save}>
           Сохранить
@@ -120,14 +132,11 @@ function SupplierSheet({ draft, onClose }: { draft: Draft | null; onClose: () =>
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Кто">
-          <input className={inputCls} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Например: КФХ Петров, Иван" autoComplete="off" />
-        </Field>
         <Field label="Город">
           <input className={inputCls} value={d.city} onChange={(e) => set({ city: e.target.value })} placeholder="Казань" autoComplete="off" />
         </Field>
         <div className="flex flex-col gap-2">
-          <span className="px-1 text-[14px] font-bold text-muted">Что возит</span>
+          <span className="px-1 text-[14px] font-bold text-muted">Что</span>
           <div className="flex flex-wrap gap-2">
             {SUPPLIES.map((x) => (
               <Chip key={x} on={d.supplies.includes(x)} onClick={() => set({ supplies: d.supplies.includes(x) ? d.supplies.filter((y) => y !== x) : [...d.supplies, x] })}>
@@ -136,6 +145,9 @@ function SupplierSheet({ draft, onClose }: { draft: Draft | null; onClose: () =>
             ))}
           </div>
         </div>
+        <Field label="Кто">
+          <input className={inputCls} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="КФХ Петров, ветеринар Иван Сергеевич" autoComplete="off" />
+        </Field>
         <Field label="Телефон">
           <input className={inputCls} value={d.phone} onChange={(e) => set({ phone: e.target.value })} inputMode="tel" placeholder="+7 900 000-00-00" autoComplete="off" />
         </Field>
@@ -163,7 +175,7 @@ function SupplierSheet({ draft, onClose }: { draft: Draft | null; onClose: () =>
       </div>
       <Confirm
         open={asking}
-        title="Удалить поставщика?"
+        title="Удалить контакт?"
         text={`${d.name}, ${d.city}. Контакт пропадёт у всех.`}
         okLabel="Удалить"
         onOk={async () => {

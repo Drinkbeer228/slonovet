@@ -255,6 +255,7 @@ export async function addMark(requestId: string, shift: Shift, user: CurrentUser
     request_id: requestId,
     shift_id: shift.id,
     done_by: user.full_name,
+    done_by_id: user.id,
     done_at: new Date().toISOString(),
     note,
     photo_path,
@@ -289,6 +290,7 @@ export async function addNote(input: {
     text: input.text.trim(),
     photo_path,
     author_name: input.user.full_name,
+    author_id: input.user.id,
     created_at: new Date().toISOString(),
   };
   await put('notes', note);
