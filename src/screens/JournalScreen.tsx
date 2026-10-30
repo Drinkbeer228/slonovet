@@ -13,6 +13,7 @@ import { durationText, feedStatus, gapBefore, missedTasks } from '../domain/moni
 import type { ElephantName } from '../domain/types';
 import { mealTitle } from './keeper/FeedingBlock';
 import { washText } from './keeper/QuestsBlock';
+import { sampleShift } from '../domain/demo';
 
 const EATEN: Record<string, string> = { all: 'всё', half: '½', none: 'отказ' };
 
@@ -160,6 +161,21 @@ function DaysView() {
         </Fragment>
       ))}
       {!byDay.get(selected) && <Empty>{shifts.length ? 'В этот день дежурства нет' : 'Дежурств пока нет'}</Empty>}
+      {!shifts.length && <SampleShift />}
+    </div>
+  );
+}
+
+/** Пока настоящих смен нет — заполненный образец, чтобы было видно, как будет выглядеть журнал. В базу не пишется. */
+function SampleShift() {
+  const s = sampleShift();
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border-2 border-dashed border-edge-hi p-3">
+      <p className="m-0 px-1 text-[14px] font-semibold text-muted">
+        <span className="font-extrabold tracking-wide text-teal">ОБРАЗЕЦ</span> — так будет выглядеть дежурство. Это не настоящая смена: первая появится здесь, когда кипер нажмёт «Принять дежурство».
+      </p>
+      <ShiftCard shift={s} />
+      <ShiftDetails shift={s} sample />
     </div>
   );
 }
@@ -228,7 +244,7 @@ function ShiftCard({ shift: s }: { shift: Shift }) {
  * Подробности дежурства под таблицей — по важности: «Что важно» (не норма, невыполненное, замечания, передача),
  * записи, выполненные назначения; «Кормление и уборка» (кормление, туалет, сено, мешки) — одной строкой, подробно по тапу.
  */
-function ShiftDetails({ shift }: { shift: Shift }) {
+function ShiftDetails({ shift, sample }: { shift: Shift; sample?: boolean }) {
   const [openRoutine, setOpenRoutine] = useState(false);
   const notes = useRows('notes');
   const next = acceptedBy(useRows('shifts'), shift);
@@ -260,7 +276,8 @@ function ShiftDetails({ shift }: { shift: Shift }) {
   const branches = b?.amount ? BRANCH_AMOUNT[b.amount] : b?.kg ? `${b.kg} кг` : '';
   const branchesText = branches ? `${branches}${b?.kinds?.length ? ` · ${b.kinds.join(', ')}` : ''}` : '—';
 
-  const missed = missedTasks(requests, marks, shift);
+  // у образца настоящие задачи не считаем — иначе он «не выполнил» назначения врача
+  const missed = sample ? [] : missedTasks(requests, marks, shift);
   // кормление и уборка одной строкой: что не так с кормлением — по имени, остальное числом
   const feedIssues = FEED_TIMES.flatMap((t) => {
     const f = shift.feeds[t];

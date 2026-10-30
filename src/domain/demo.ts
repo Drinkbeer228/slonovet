@@ -6,6 +6,44 @@ import { FEED_TIMES } from './shift';
 import { feedUsage } from './stock';
 import type { Container, ElephantName, Level, MetricKey, Note, Profile, RequestMark, Shift, StockMove, VetRequest } from './types';
 
+/**
+ * Образец заполненной смены — показывается в «Журнале», пока настоящих смен нет.
+ * Только на экране: в базу не пишется, склад и историю слонов не трогает.
+ */
+export function sampleShift(today = isoDate()): Shift {
+  const date = addDays(today, -1);
+  const ts = (d: string, time: string) => new Date(`${d}T${time}:00`).toISOString();
+  const state: Shift['state'] = {
+    Марго: { water: { level: 1, symptoms: ['пьёт мало'] } },
+    Одри: { food: { level: 1, symptoms: ['не доела'] } },
+  };
+  const feeds: Shift['feeds'] = {};
+  for (const t of FEED_TIMES) feeds[t] = { done: true, at: ts(date, t), eaten: { Претти: 'all', Марго: 'all', Одри: 'all' } };
+  feeds['13:00'].eaten!.Одри = 'half';
+  return {
+    id: 'sample',
+    date,
+    keeper_id: null,
+    keeper_name: 'Кипер (образец)',
+    status: 'handed',
+    safety: {},
+    state,
+    feeds,
+    quests: {
+      urine: { Претти: { ok: 5, miss: 0 }, Марго: { ok: 6, miss: 1 }, Одри: { ok: 3, miss: 0 } },
+      feces: { Претти: 6, Марго: 5, Одри: 5 },
+      branches: { amount: 2, kinds: ['Ива'] },
+      cleaning: { bags: 1, out: 0 },
+    },
+    hay_bales: 9,
+    note: 'Марго мало пьёт — проверь бак и подогрей воду. Одри не доела дневную кашу.',
+    accepted_at: ts(date, '08:00'),
+    handed_at: ts(today, '08:00'),
+    checked_at: ts(today, '08:00'),
+    updated_at: ts(today, '08:00'),
+  };
+}
+
 /** Демо-данные: 14 прошедших смен, заявки, склад. Только для режима без сервера. */
 export async function seedDemo() {
   if (getRows('shifts').length || getRows('stock_items').length) return;

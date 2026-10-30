@@ -85,7 +85,7 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Дежурство</h1>
         <Card className="p-4 text-[15px] text-muted">
-          Дежурств ещё не было.{!canWork(user) && ' Здесь появится дежурство, как только кипер его примет.'}
+          Дежурств ещё не было.{!canWork(user) && ' Здесь появится дежурство, как только кипер его примет.'} Как выглядит заполненная смена — образец в «Журнале».
         </Card>
         {accept}
       </div>
