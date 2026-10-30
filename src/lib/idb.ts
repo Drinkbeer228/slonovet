@@ -59,6 +59,19 @@ export async function idbPut(store: string, value: unknown): Promise<void> {
   await wrap(db.transaction(store, 'readwrite').objectStore(store).put(value));
 }
 
+/** Две записи в разные хранилища одной транзакцией: обрыв посередине не оставит правку без записи в очереди. */
+export async function idbPutPair(storeA: string, a: unknown, storeB: string, b: unknown): Promise<void> {
+  const db = await open();
+  const tx = db.transaction([storeA, storeB], 'readwrite');
+  tx.objectStore(storeA).put(a);
+  tx.objectStore(storeB).put(b);
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error('IndexedDB: запись отменена'));
+  });
+}
+
 export async function idbPutMany(store: string, values: unknown[]): Promise<void> {
   if (!values.length) return;
   const db = await open();

@@ -8,7 +8,7 @@ import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast } from '../
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { setTheme, useTheme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
-import { useRows } from '../lib/store';
+import { exportUnsent, requeueQuarantine, useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
 import { currentShift, dutyTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
@@ -82,6 +82,17 @@ export function OfflineBanner() {
       </span>
     </Plate>
   );
+}
+
+/** Скачать неотправленное и непринятое файлом: работа не пропадёт, даже если телефон придётся менять. */
+async function saveUnsentFile() {
+  const text = await exportUnsent();
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `slonovet-unsent-${isoDate()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 /** Значок в шапке — только когда есть что сказать: пример, нет сети, ошибка, сервер что-то не принял. В обычной работе его нет. */
@@ -281,8 +292,20 @@ export function MenuSheet({
               </span>
             ))}
             <span className="text-[13px] font-semibold text-muted">
-              На телефоне вернули, как на сервере. Если это важно — скажите администратору или сделайте ещё раз.
+              На телефоне вернули, как на сервере, а то, что вы внесли, сохранено отдельно и не потеряно. Если права вернули — отправьте ещё раз.
             </span>
+            <Button
+              icon="refresh"
+              onClick={async () => {
+                const n = await requeueQuarantine();
+                clearRejected();
+                toast(n ? `Отправляем ещё раз: ${n}` : 'Нечего отправлять');
+                syncNow();
+              }}
+            >
+              Отправить ещё раз
+            </Button>
+            <Button onClick={saveUnsentFile}>Сохранить в файл</Button>
             <Button onClick={clearRejected}>Понятно</Button>
           </Plate>
         )}
@@ -305,6 +328,7 @@ export function MenuSheet({
             >
               Отправить сейчас
             </Button>
+            <Button onClick={saveUnsentFile}>Сохранить неотправленное в файл</Button>
           </Card>
         )}
 

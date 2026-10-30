@@ -14,6 +14,8 @@ interface BlobEntry {
   /** сколько раз не приняли и почему — фото пробует снова, но остальное не ждёт */
   tries?: number;
   error?: string;
+  /** когда пробовали в последний раз — фото, которое сервер упорно не берёт, не долбим каждую минуту */
+  last_try?: string;
 }
 
 /** Сколько дней держать на телефоне уже отправленные фото (для показа без сети). */
@@ -46,7 +48,7 @@ export async function savePhoto(file: File, folder: string, id: string): Promise
  * Отправить фото, которые ещё на телефоне. Каждое — само по себе: фото, которое сервер не принял,
  * не останавливает ни остальные фото, ни отправку записей (повтор — при следующей синхронизации).
  */
-export async function uploadPendingPhotos(): Promise<{ sent: number; failed: number; error: string | null }> {
+export async function uploadPendingPhotos(deadline = Infinity): Promise<{ sent: number; failed: number; error: string | null }> {
   const client = getClient();
   if (!client) return { sent: 0, failed: 0, error: null };
   const all = await idbAll<BlobEntry>('blobs');
@@ -54,6 +56,13 @@ export async function uploadPendingPhotos(): Promise<{ sent: number; failed: num
   let failed = 0;
   let lastError: string | null = null;
   for (const e of all.filter((x) => !x.uploaded)) {
+    // время на фото в этом цикле вышло — остальное в следующий раз
+    if (Date.now() > deadline) break;
+    // после трёх неудач ждём всё дольше (10 минут за каждую, не дольше 6 часов)
+    if ((e.tries ?? 0) >= 3 && e.last_try) {
+      const wait = Math.min((e.tries ?? 0) * 10 * 60_000, 6 * 60 * 60_000);
+      if (Date.now() - Date.parse(e.last_try) < wait) continue;
+    }
     let message: string | null = null;
     try {
       const { error } = await client.storage.from('photos').upload(e.path, e.blob, { upsert: true, contentType: 'image/jpeg' });
@@ -64,7 +73,7 @@ export async function uploadPendingPhotos(): Promise<{ sent: number; failed: num
     if (message) {
       failed++;
       lastError = message;
-      await idbPut('blobs', { ...e, tries: (e.tries ?? 0) + 1, error: message });
+      await idbPut('blobs', { ...e, tries: (e.tries ?? 0) + 1, error: message, last_try: new Date().toISOString() });
       if (!navigator.onLine) break;
       continue;
     }

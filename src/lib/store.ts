@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { TABLES, type TableMap, type TableName } from '../domain/types';
-import { idbAll, idbClear, idbDelete, idbGet, idbPut, idbPutMany, EXTRA_STORES } from './idb';
+import { idbAll, idbClear, idbDelete, idbGet, idbPut, idbPutMany, idbPutPair, EXTRA_STORES } from './idb';
 import { applyPatches, diff, mergePatches, type Patch } from './patch';
 
 /**
@@ -113,7 +113,6 @@ export async function put<K extends TableName>(table: K, row: Omit<TableMap[K], 
   const prev = cache[table].get(full.id);
   cache[table].set(full.id, full);
   emit([table]);
-  await idbPut(table, full);
   if (cloud && table !== 'profiles') {
     const key = `${table}:${full.id}`;
     const entry: OutboxEntry = { key, table, row: full, ts: Date.now() };
@@ -127,11 +126,14 @@ export async function put<K extends TableName>(table: K, row: Omit<TableMap[K], 
     outbox.set(entry.key, entry);
     writing.add(key);
     try {
-      await idbPut('outbox', entry);
+      // строка и запись в очереди — одной транзакцией: либо обе, либо ни одной
+      await idbPutPair(table, full, 'outbox', entry);
     } finally {
       writing.delete(key);
     }
     onLocalChange?.();
+  } else {
+    await idbPut(table, full);
   }
   return full;
 }
@@ -217,6 +219,8 @@ export async function rejectOutbox(entry: OutboxEntry, serverRow: AnyRow | null)
   const cur = outbox.get(entry.key);
   // за время отправки строку успели поправить ещё раз — новая правка попробует сама
   if (cur && cur.ts !== entry.ts) return;
+  // не стираем бесследно: правка уходит в карантин (её можно отправить ещё раз или сохранить в файл)
+  await idbPut('meta', { key: `${QUARANTINE}${entry.key}:${entry.ts}`, value: { entry, at: new Date().toISOString() } });
   outbox.delete(entry.key);
   await idbDelete('outbox', entry.key);
   if (serverRow) {
@@ -227,6 +231,50 @@ export async function rejectOutbox(entry: OutboxEntry, serverRow: AnyRow | null)
     await idbDelete(entry.table, entry.row.id);
   }
   emit([entry.table]);
+}
+
+/** Карантин: правки, которые сервер не принял. Лежат в meta, чтобы не менять схему IndexedDB. */
+const QUARANTINE = 'quarantine:';
+
+interface Quarantined {
+  key: string;
+  entry: OutboxEntry;
+  at: string;
+}
+
+export async function getQuarantine(): Promise<Quarantined[]> {
+  const all = await idbAll<{ key: string; value: { entry: OutboxEntry; at: string } }>('meta');
+  return all.filter((m) => m.key.startsWith(QUARANTINE)).map((m) => ({ key: m.key, entry: m.value.entry, at: m.value.at }));
+}
+
+export async function clearQuarantine() {
+  for (const q of await getQuarantine()) await idbDelete('meta', q.key);
+}
+
+/** Вернуть всё из карантина в очередь (например, когда человеку вернули права): правка уйдёт как новая. */
+export async function requeueQuarantine(): Promise<number> {
+  const list = await getQuarantine();
+  for (const q of list) {
+    const { updated_at: _skip, ...row } = q.entry.row as AnyRow & { updated_at?: string };
+    void _skip;
+    await put(q.entry.table, row as never);
+    await idbDelete('meta', q.key);
+  }
+  return list.length;
+}
+
+/** Всё неотправленное и непринятое — текстом, чтобы сохранить в файл и не потерять работу. */
+export async function exportUnsent(): Promise<string> {
+  const quarantined = await getQuarantine();
+  return JSON.stringify(
+    {
+      exported_at: new Date().toISOString(),
+      outbox: getOutbox().map((e) => ({ table: e.table, row: e.row, patches: e.patches ?? null })),
+      quarantine: quarantined.map((q) => ({ at: q.at, table: q.entry.table, row: q.entry.row, patches: q.entry.patches ?? null })),
+    },
+    null,
+    2,
+  );
 }
 
 export async function dropOutbox(key: string, ts: number) {
@@ -277,12 +325,14 @@ export async function checkServer(tag: string) {
 
 async function resetLocal(keepEntry: (e: OutboxEntry) => boolean) {
   const keep = [...outbox.values()].filter(keepEntry);
+  const quarantined = await getQuarantine();
   for (const t of TABLES) {
     cache[t] = new Map();
     await idbClear(t);
   }
   await idbClear('outbox');
   await idbClear('meta'); // курсоры синхронизации — чтобы забрать с сервера всё заново
+  for (const q of quarantined) await idbPut('meta', { key: q.key, value: { entry: q.entry, at: q.at } }); // карантин не трогаем
   outbox.clear();
   for (const e of keep) {
     cache[e.table].set(e.row.id, e.row);
