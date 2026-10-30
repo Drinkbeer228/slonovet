@@ -4,13 +4,13 @@ import { MANAGES } from '../domain/access';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, Segmented, Sheet, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast } from '../ui/kit';
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
-import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
+import { setTheme, useTheme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
-import { currentShift, requestTodos } from '../domain/shift';
+import { currentShift, dutyTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
 import { balances, stockPerDay, stockView } from '../domain/stock';
 import { startTour } from './Tour';
@@ -53,14 +53,14 @@ export function Logo({ size = 32 }: { size?: number }) {
 /** Плашка «Посмотреть как»: чья роль на экране и как вернуться к себе. */
 export function PreviewBanner({ role }: { role: Role }) {
   return (
-    <Card className="mb-4 flex items-center gap-3 p-3.5 ring-1 ring-teal/50">
-      <Icon name="users" size={20} className="shrink-0 text-teal" />
+    <Plate glow="teal" className="mb-4 flex items-center gap-3 p-3.5">
+      <Icon name="users" size={20} className="shrink-0 text-teal-fg" />
       <span className="flex flex-1 flex-col">
         <span className="text-[14px] font-bold">Вы смотрите как: {ROLE_LABEL[role]}</span>
         <span className="text-[12px] font-semibold text-muted">только просмотр, изменения не сохраняются</span>
       </span>
       <Button onClick={() => setPreviewRole(null)}>Выйти</Button>
-    </Card>
+    </Plate>
   );
 }
 
@@ -72,15 +72,15 @@ export function OfflineBanner() {
   if (s.state !== 'offline' && s.state !== 'error' && !stale) return null;
   const when = s.lastSync ? `${relDate(localDay(s.lastSync), isoDate())} в ${timeOf(s.lastSync)}` : 'ещё не было';
   return (
-    <Card className="mb-4 flex gap-2.5 p-3.5 ring-1 ring-amber/50">
-      <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber" />
+    <Plate glow="amber" halo className="mb-4 flex gap-2.5 p-3.5">
+      <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber-fg" />
       <span className="flex flex-col gap-0.5">
-        <span className="text-[14px] font-bold text-amber">
+        <span className="text-[14px] font-bold text-amber-fg">
           Не отправлено: {s.pending} · связь с сервером {s.lastSync ? `была ${when}` : when}
         </span>
         <span className="text-[13px] font-semibold text-muted">Всё сохранено на телефоне и отправится само, как появится интернет. Подойдёт любой Wi‑Fi.</span>
       </span>
-    </Card>
+    </Plate>
   );
 }
 
@@ -94,21 +94,21 @@ export function SyncChip({ onClick }: { onClick: () => void }) {
   if (s.rejected.length && s.state !== 'demo') {
     icon = 'alert';
     text = 'не принято';
-    cls = 'text-coral';
+    cls = 'text-coral-fg';
   } else if (s.state === 'demo') {
     text = 'пример';
     icon = 'cloudOff';
   } else if (s.state === 'offline') {
     icon = 'cloudOff';
     text = s.pending ? `без сети · ${s.pending}` : 'без сети';
-    cls = 'text-amber';
+    cls = 'text-amber-fg';
   } else {
     icon = 'alert';
     text = 'ошибка';
-    cls = 'text-coral';
+    cls = 'text-coral-fg';
   }
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-10 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-bold ${cls}`}>
+    <button type="button" onClick={onClick} className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold ${KEY} ${cls}`}>
       <Icon name={icon} size={15} stroke={2.2} />
       {text}
     </button>
@@ -130,15 +130,10 @@ export function TopBar({
 }) {
   const badges = useBadges(user);
   return (
-    <header className="sticky top-0 z-30 border-b border-surface2 bg-bg/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-edge bg-bg/85 backdrop-blur-xl">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
         <Logo size={28} />
-        <span className="hidden text-[16px] font-extrabold tracking-tight md:inline">СлоноВет</span>
-        {/* кто вошёл и с какой ролью — одинаково у всех; на телефоне фамилия */}
-        <span className="flex min-w-0 flex-col leading-tight md:hidden">
-          <span className="truncate text-[15px] font-extrabold">{user.full_name.split(' ')[0]}</span>
-          <span className="self-start rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
-        </span>
+        <span className="text-[17px] font-extrabold tracking-tight">СлоноВет</span>
         <nav className="ml-4 hidden flex-1 items-center gap-1 md:flex" aria-label="Разделы">
           {tabs.map((t) => (
             <button
@@ -147,7 +142,7 @@ export function TopBar({
               aria-current={t === tab ? 'page' : undefined}
               data-tour={`nav-${t}`}
               onClick={() => onTab(t)}
-              className={`h-9 rounded-xl px-3.5 text-[14px] font-bold ${t === tab ? 'bg-surface text-ink' : 'text-muted hover:text-ink'}`}
+              className={`h-9 rounded-xl px-3.5 text-[14px] font-bold ${t === tab ? `${KEY} text-teal-fg` : 'border border-transparent text-muted hover:text-ink'}`}
             >
               {TAB_META[t].label}
               {badges[t] ? <span className="ml-1.5 rounded-full bg-amber px-1.5 py-0.5 text-[11px] font-extrabold text-bg">{badges[t]}</span> : null}
@@ -165,9 +160,9 @@ export function TopBar({
             onClick={onMenu}
             aria-label="Профиль и меню"
             data-tour="menu"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-surface2 text-[15px] font-extrabold"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface2 text-ink active:scale-95"
           >
-            {user.full_name.slice(0, 1)}
+            <Icon name="menu" size={22} />
           </button>
         </div>
       </div>
@@ -190,7 +185,7 @@ export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   const comments = useRows('request_comments');
   const read = useReadMarks(user.id);
   const shift = currentShift(shifts);
-  const left = shift ? requestTodos(requests, marks, shift).filter((t) => !t.done).length : 0;
+  const left = shift ? dutyTodos(requests, marks, shift).filter((t) => !t.done).length : 0;
   const low = useMemo(() => {
     const bal = balances(moves);
     const perDay = stockPerDay(items, diets, moves);
@@ -218,7 +213,7 @@ export function BottomNav({ user, tabs, tab, onTab }: { user: CurrentUser; tabs:
   return (
     <nav
       aria-label="Разделы"
-      className="pb-safe fixed inset-x-0 bottom-0 z-30 grid border-t border-surface2 bg-nav/95 px-2 pt-2 backdrop-blur md:hidden"
+      className="pb-safe fixed inset-x-0 bottom-0 z-30 grid border-t border-edge bg-nav/85 px-2 pt-2 backdrop-blur-xl md:hidden"
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
       {tabs.map((t) => {
@@ -233,9 +228,9 @@ export function BottomNav({ user, tabs, tab, onTab }: { user: CurrentUser; tabs:
               if (t !== tab) haptics.tap();
               onTab(t);
             }}
-            className={`flex flex-col items-center gap-1 py-1.5 text-[12px] ${on ? 'font-extrabold text-teal' : 'font-bold text-muted'}`}
+            className={`flex flex-col items-center gap-1 py-1.5 text-[12px] transition-transform active:scale-95 ${on ? 'font-extrabold text-teal-fg' : 'font-bold text-muted'}`}
           >
-            <span className="relative">
+            <span className={`relative ${on ? '[filter:drop-shadow(0_0_6px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent))]' : ''}`}>
               <Icon name={TAB_META[t].icon} size={22} />
               <Badge n={badges[t]} urgent={t === 'requests'} />
             </span>
@@ -277,8 +272,8 @@ export function MenuSheet({
 
         {/* сервер окончательно что-то не принял: правку на телефоне уже вернули как на сервере — сказать, что именно */}
         {session.mode === 'cloud' && s.rejected.length > 0 && (
-          <Card className="flex flex-col gap-2 p-4 ring-1 ring-coral/50">
-            <span className="text-[15px] font-bold text-coral">Сервер не принял: {s.rejected.length}</span>
+          <Plate glow="coral" halo className="flex flex-col gap-2 p-4">
+            <span className="text-[15px] font-bold text-coral-fg">Сервер не принял: {s.rejected.length}</span>
             {s.rejected.map((r, i) => (
               <span key={i} className="text-[14px] leading-snug">
                 {r.what} — {r.reason}
@@ -289,7 +284,7 @@ export function MenuSheet({
               На телефоне вернули, как на сервере. Если это важно — скажите администратору или сделайте ещё раз.
             </span>
             <Button onClick={clearRejected}>Понятно</Button>
-          </Card>
+          </Plate>
         )}
 
         {/* в обычной работе про отправку молчим; карточка — только если что-то не ушло */}
@@ -341,7 +336,7 @@ export function MenuSheet({
         <ThemeCard />
 
         {extra.length > 0 && (
-          <Card className="divide-y divide-surface2 overflow-hidden">
+          <Card className="divide-y divide-edge overflow-hidden">
             {extra.map((t) => (
               <button
                 key={t}
@@ -479,18 +474,36 @@ function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
   );
 }
 
-/** Вид приложения: тёмная, светлая или «Пиксель». */
+/** Тема: компактный переключатель «луна / солнце». Круглая клавиша перекрывает выбранную иконку. */
 function ThemeCard() {
   const theme = useTheme();
+  const light = theme === 'light';
   return (
-    <div className="flex flex-col gap-2">
-      <span className="px-1 text-[14px] font-bold text-muted">Вид</span>
-      <Segmented
-        label="Вид приложения"
-        options={(['dark', 'light', 'pixel'] as Theme[]).map((t) => ({ value: t, label: THEME_LABEL[t] }))}
-        value={theme}
-        onChange={setTheme}
-      />
+    <div className="flex items-center justify-between gap-3 px-1">
+      <span className="text-[15px] font-bold">Тема</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={light}
+        aria-label={`Светлая тема: ${light ? 'включена' : 'выключена'}`}
+        onClick={() => setTheme(light ? 'dark' : 'light')}
+        className={`relative h-11 w-[92px] rounded-full ${TONE.sunken}`}
+      >
+        <span className="pointer-events-none absolute inset-y-0 left-0 flex w-1/2 items-center justify-center text-faint">
+          <Icon name="moon" size={18} />
+        </span>
+        <span className="pointer-events-none absolute inset-y-0 right-0 flex w-1/2 items-center justify-center text-faint">
+          <Icon name="sun" size={18} />
+        </span>
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute left-[3px] top-[3px] flex h-[calc(100%-6px)] w-[calc(50%-3px)] items-center justify-center rounded-full text-teal-fg shadow-(--shadow-key-on) transition-transform duration-200 ease-out ${KEY} ${
+            light ? 'translate-x-full' : ''
+          }`}
+        >
+          <Icon name={light ? 'sun' : 'moon'} size={18} stroke={2.4} />
+        </span>
+      </button>
     </div>
   );
 }

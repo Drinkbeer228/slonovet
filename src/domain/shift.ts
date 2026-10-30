@@ -116,6 +116,10 @@ export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift
     .sort((a, b) => Number(a.done) - Number(b.done) || byPriority(a.req, b.req));
 }
 
+/** На «Дежурстве» — только по слонам (медицина, уход); «Работа» живёт на доске «Задачи». */
+export const dutyTodos = (requests: VetRequest[], marks: RequestMark[], shift: Shift): RequestTodo[] =>
+  requestTodos(requests, marks, shift).filter((t) => t.req.elephant !== 'work');
+
 /**
  * Срок задачи для порядка: разовая — день и час (у старых — «до какого числа»), курс — до какого числа.
  * Без срока — в конец. Строки сравниваются как есть: «2026-10-26 16:00» < «2026-10-27 99:99» < «9999».

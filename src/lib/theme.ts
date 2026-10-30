@@ -1,9 +1,8 @@
 import { useSyncExternalStore } from 'react';
 
-export type Theme = 'dark' | 'light' | 'pixel';
+export type Theme = 'dark' | 'light';
 
-export const THEME_LABEL: Record<Theme, string> = { dark: 'Тёмная', light: 'Светлая', pixel: 'Пиксель' };
-const META_COLOR: Record<Theme, string> = { dark: '#0b1217', light: '#f3f6f7', pixel: '#5c94fc' };
+const META_COLOR: Record<Theme, string> = { dark: '#0b1217', light: '#f3f6f7' };
 
 const KEY_THEME = 'slonovet.theme';
 
@@ -24,7 +23,7 @@ function write(key: string, value: string) {
 
 let current: Theme = (() => {
   const t = read(KEY_THEME);
-  return t === 'light' || t === 'pixel' ? t : 'dark';
+  return t === 'light' ? t : 'dark'; // любое другое значение (и сохранённое старыми версиями) — тёмная
 })();
 const listeners = new Set<() => void>();
 
@@ -33,8 +32,6 @@ function apply() {
   root.dataset.theme = current;
   root.style.colorScheme = current === 'dark' ? 'dark' : 'light';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', META_COLOR[current]);
-  // пиксельный шрифт — тоже свой, и только когда выбрана эта тема
-  if (current === 'pixel') import('@fontsource/press-start-2p/400.css').catch(() => undefined);
 }
 
 export function initTheme() {

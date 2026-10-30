@@ -1,12 +1,12 @@
 import { canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
 import { handOver, updateShift } from '../../domain/actions';
-import { FEED_TIMES, acceptedBy, currentShift, lastHanded, newShift, requestTodos, shiftFlags } from '../../domain/shift';
+import { FEED_TIMES, acceptedBy, currentShift, lastHanded, newShift, dutyTodos, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Plate, Section, Sheet, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { NotesList } from '../common/NotesList';
@@ -32,12 +32,12 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
   if (sample && preview) {
     return (
       <div className="flex flex-col gap-4">
-        <Card className="flex items-center gap-3 p-3.5 ring-1 ring-teal/40">
+        <Plate glow="teal" className="flex items-center gap-3 p-3.5">
           <span className="flex-1 text-[13px] font-semibold text-muted">
             Пример: так выглядит открытое дежурство у кипера. Нажимать можно — ничего не сохраняется.
           </span>
           <Button onClick={() => setPreviewSample(null)}>Скрыть</Button>
-        </Card>
+        </Plate>
         <OpenShift shift={sample} user={user} readOnly={false} />
       </div>
     );
@@ -94,23 +94,35 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-0.5 px-1">
-        <span className="text-[13px] font-semibold text-muted">
-          {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
-          {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
-        </span>
-        <h1 className="m-0 text-[26px] font-extrabold tracking-tight">
-          {handed ? 'Прошлое дежурство' : 'Дежурство'} · {shift.keeper_name}
-        </h1>
-        {readOnly && !accept && (
-          <span className="text-[13px] font-semibold text-muted">
-            {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
+      {/* компактный бар: кто дежурит, с какого часа и статус смены — в одну строку */}
+      <header className="flex flex-col gap-1.5">
+        <Card tone="glass" className="flex items-center gap-3 px-3.5 py-2.5">
+          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-[16px] font-extrabold text-teal-fg">
+            {shift.keeper_name.trim().charAt(0).toUpperCase()}
           </span>
-        )}
-        {stale && (
-          <span className="mt-1 inline-flex items-center gap-1.5 text-[13px] font-bold text-amber">
-            <Icon name="alert" size={16} />
-            Дежурство от {relDate(shift.date)} не сдано
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h1 className="m-0 truncate text-[17px] font-extrabold leading-tight">{shift.keeper_name}</h1>
+            <span className="truncate text-[13px] font-semibold text-muted">
+              {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
+              {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
+            </span>
+          </div>
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold ${
+              stale
+                ? 'bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg'
+                : handed
+                  ? 'bg-surface2 text-ink2'
+                  : 'bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg'
+            }`}
+          >
+            {stale && <Icon name="alert" size={12} stroke={3} />}
+            {stale ? 'Не сдано' : handed ? 'Сдано' : 'На смене'}
+          </span>
+        </Card>
+        {readOnly && !accept && (
+          <span className="px-1 text-[13px] font-semibold text-muted">
+            {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
           </span>
         )}
       </header>
@@ -199,7 +211,7 @@ function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; 
   const marks = useRows('request_marks');
 
   const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done);
-  const reqLeft = requestTodos(requests, marks, shift).filter((t) => !t.done);
+  const reqLeft = dutyTodos(requests, marks, shift).filter((t) => !t.done);
   const flags = shiftFlags(shift);
   const warnings = [
     feedsLeft.length ? `Не отмечено кормление: ${feedsLeft.join(', ')}` : null,
@@ -213,7 +225,7 @@ function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; 
       title="Сдать дежурство"
       footer={
         <Button
-          kind="primary"
+          kind="accent"
           big
           full
           disabled={!checked}
@@ -229,19 +241,19 @@ function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; 
     >
       <div className="flex flex-col gap-4">
         {warnings.length > 0 ? (
-          <Card className="flex flex-col gap-1.5 p-3.5 ring-1 ring-amber/40">
+          <Plate glow="amber" halo className="flex flex-col gap-1.5 p-3.5">
             {warnings.map((w) => (
-              <span key={w} className="flex items-start gap-2 text-[14px] font-semibold text-amber">
+              <span key={w} className="flex items-start gap-2 text-[14px] font-semibold text-amber-fg">
                 <Icon name="alert" size={16} className="mt-0.5" />
                 {w}
               </span>
             ))}
-          </Card>
+          </Plate>
         ) : (
-          <Card className="flex items-center gap-2 p-3.5 text-[14px] font-bold text-teal">
+          <Plate glow="teal" className="flex items-center gap-2 p-3.5 text-[14px] font-bold text-teal-fg">
             <Icon name="check" size={18} stroke={2.6} />
             Всё отмечено
-          </Card>
+          </Plate>
         )}
         {flags.length > 0 && (
           <p className="m-0 text-[14px] font-semibold text-ink2">
@@ -254,14 +266,14 @@ function HandoverSheet({ open, shift, onClose }: { open: boolean; shift: Shift; 
             {shift.note.trim() ? shift.note : <span className="text-muted">Без заметки. Можно написать на экране, в блоке «Передать следующему дежурному».</span>}
           </Card>
         </div>
-        <Card className="overflow-hidden ring-1 ring-teal/40">
+        <Plate glow="teal" halo={checked}>
           <Check
             on={checked}
             label="Осмотрел всех трёх и проверил тазы"
             sub="всё, что не отмечено в таблице и в кормлении, — норма"
             onChange={setChecked}
           />
-        </Card>
+        </Plate>
         <p className="m-0 text-[13px] font-semibold text-muted">Следующий дежурный принимает дежурство под своим логином.</p>
       </div>
     </Sheet>

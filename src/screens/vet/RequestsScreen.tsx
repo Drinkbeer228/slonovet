@@ -9,12 +9,13 @@ import type { CurrentUser, ElephantName, Purchase, RequestFrequency, VetRequest 
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, PhotoPick, PhotoThumb, Section, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast, type Glow } from '../../ui/kit';
 import { canCloseRequest, canEdit } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
 import { ArriveSheet, NewPurchaseSheet, OrderSheet, PurchaseDetail, PurchaseRow } from '../PurchasesView';
 import { DiscussionThread } from '../Discussion';
+import { MarkSheet } from '../keeper/RequestsBlock';
 import { unreadCount, useReadMarks } from '../../lib/comments';
 
 const VIEW_KEY = 'slonovet_requests_view';
@@ -66,7 +67,7 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
       <header className="flex items-center justify-between gap-3 px-1">
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Задачи</h1>
         {/* на «Закупках» — сразу форма закупки; иначе задача (на «Работе» — уже с адресатом «Работа») */}
-        <Button kind="primary" icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : setCreating(view === 'work' ? 'work' : 'Претти'))}>
+        <Button kind="accent" icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : setCreating(view === 'work' ? 'work' : 'Претти'))}>
           {view === 'purchases' ? 'Купить' : 'Новая'}
         </Button>
       </header>
@@ -85,24 +86,24 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
             title={
               <span className="flex items-center gap-2">
                 {GROUP_TITLE[g]}
-                <span className="rounded-full bg-surface2 px-2 py-0.5 text-[13px] font-bold text-muted">{list.length}</span>
+                <span className="rounded-full border border-edge-hi bg-surface2 px-2 py-0.5 text-[13px] font-bold text-ink2 shadow-[inset_0_1px_0_var(--color-hl)]">{list.length}</span>
               </span>
             }
             aside={
               closed ? (
-                <button type="button" onClick={() => setShowClosed(!showClosed)} className="py-1 font-bold text-teal">
+                <button type="button" onClick={() => setShowClosed(!showClosed)} className="-mr-2 -my-2 flex h-11 items-center px-2 font-bold text-teal">
                   {showClosed ? 'Скрыть' : 'Показать'}
                 </button>
               ) : undefined
             }
           >
             {(!closed || showClosed) && (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5">
                 {list.map((i) =>
                   i.kind === 'request' ? (
                     <BoardRequest key={i.req.id} item={i} user={user} onOpen={setOpen} />
                   ) : (
-                    <BoardCard key={i.p.id} type="purchases" label={TASK_TYPE.purchases.label}>
+                    <BoardCard key={i.p.id} type="purchases" label={TASK_TYPE.purchases.label} urgent={i.p.urgent && (i.p.status === 'new' || i.p.status === 'ordered')}>
                       <PurchaseRow p={i.p} buyer={buyer} onOpen={setOpenBuy} onOrder={setOrdering} onArrive={arrive} />
                     </BoardCard>
                   ),
@@ -130,11 +131,29 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
   );
 }
 
-/** Рамка карточки на доске: цветная полоска слева и подпись типа с иконкой — тип видно не только по цвету. */
-function BoardCard({ type, label, right, children }: { type: BoardType; label: string; right?: ReactNode; children: ReactNode }) {
+/**
+ * Плита карточки на доске: свечение по левому краю цветом типа (слоны — teal, работа — sky, закупка — violet),
+ * у срочного и просроченного — coral. Тип читается и по иконке с подписью, не только по свету.
+ */
+function BoardCard({
+  type,
+  label,
+  right,
+  urgent,
+  late,
+  children,
+}: {
+  type: BoardType;
+  label: string;
+  right?: ReactNode;
+  urgent?: boolean;
+  late?: boolean;
+  children: ReactNode;
+}) {
   const t = TASK_TYPE[type];
+  const glow: Glow = urgent || late ? 'coral' : t.glow;
   return (
-    <Card className={`flex flex-col gap-1.5 border-l-4 px-4 py-3 ${t.stripe}`}>
+    <Plate glow={glow} halo={urgent} className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
           <Icon name={t.icon} size={15} />
@@ -143,11 +162,9 @@ function BoardCard({ type, label, right, children }: { type: BoardType; label: s
         {right}
       </div>
       {children}
-    </Card>
+    </Plate>
   );
 }
-
-const pill = (cls: string, text: string) => <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-extrabold ${cls}`}>{text}</span>;
 
 function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind: 'request' }>; user: CurrentUser; onOpen: (r: VetRequest) => void }) {
   const marks = useRows('request_marks');
@@ -161,30 +178,31 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
   const talk = comments.filter((c) => c.request_id === r.id && !c.deleted).length;
   const fresh = unreadCount(comments, r.id, user.id, read[r.id]);
   return (
-    <button type="button" onClick={() => onOpen(r)} className={`text-left ${closed ? 'opacity-60' : ''}`}>
+    <button type="button" onClick={() => onOpen(r)} className="text-left">
       <BoardCard
         type={item.type}
+        urgent={!closed && r.urgent}
+        late={late}
         label={item.type === 'work' ? TASK_TYPE.work.label : whoLabel(r.elephant)}
         right={
           <span className="flex items-center gap-1.5">
-            {late && pill('bg-coral/15 text-coral', 'ПРОСРОЧЕНО')}
-            {r.urgent && !closed && pill('bg-coral/15 text-coral', 'СРОЧНО')}
-            <span className="text-[12px] font-semibold text-muted">
-              {r.status === 'closed' ? 'закрыта' : `${whenLabel(r) || FREQ_LABEL[r.frequency]}${r.due_date ? ` · до ${shortDate(r.due_date)}` : ''}`}
-            </span>
+            {r.urgent && !closed && <UrgentBadge />}
+            {late && <LateBadge />}
           </span>
         }
       >
-        <span className="text-[15px] font-semibold leading-snug">
+        <span className={`text-[15px] font-semibold leading-snug ${closed ? 'text-ink2' : ''}`}>
           {r.text}
-          {r.photo_path && <span className="text-[12px] font-bold text-muted"> · фото</span>}
+          {r.photo_path && <span className="text-[13px] font-bold text-muted"> · фото</span>}
+        </span>
+        <span className={`flex items-center gap-1.5 text-[13px] font-bold ${late ? 'text-coral' : 'text-ink2'}`}>
+          {late && <Icon name="alert" size={14} />}
+          {r.status === 'closed' ? 'закрыта' : `${whenLabel(r) || FREQ_LABEL[r.frequency]}${r.due_date ? ` · до ${shortDate(r.due_date)}` : ''}`}
         </span>
         {r.frequency !== 'once' && !closed && (
-          <div className="h-1.5 overflow-hidden rounded-full bg-surface2">
-            <div className={`h-full ${TASK_TYPE[item.type].bar}`} style={{ width: `${Math.round((p.done / p.total) * 100)}%` }} />
-          </div>
+          <Meter value={p.total ? p.done / p.total : 0} tone={TASK_TYPE[item.type].glow} label="Выполнено дежурств" />
         )}
-        <span className="text-[12px] font-semibold text-muted">
+        <span className={`text-[13px] font-semibold ${closed ? 'text-ink2' : 'text-muted'}`}>
           {p.last && (r.frequency === 'once' || closed)
             ? `Выполнил: ${p.last.done_by}, ${relDate(localDay(p.last.done_at))} ${timeOf(p.last.done_at)}`
             : r.frequency === 'once'
@@ -192,7 +210,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
               : `${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}${p.last ? ` · последнее ${relDate(localDay(p.last.done_at))}, ${p.last.done_by}` : ''}`}
         </span>
         {talk > 0 && (
-          <span className={`text-[12px] font-bold ${fresh ? 'text-coral' : 'text-muted'}`}>
+          <span className={`text-[13px] font-bold ${fresh ? 'text-coral' : 'text-muted'}`}>
             Обсуждение · {talk}
             {fresh ? ` · новых ${fresh}` : ''}
           </span>
@@ -206,6 +224,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
   const marks = useRows('request_marks');
   const shift = currentShift(useRows('shifts'));
   const [confirm, setConfirm] = useState(false);
+  const [marking, setMarking] = useState(false);
   if (!req) return null;
   // отметить может любой (директор сам обработал Претти) — но только в открытое дежурство и если в нём ещё не отмечено
   const todo = shift && req.status === 'active' ? requestTodos([req], marks, shift)[0] : undefined;
@@ -248,7 +267,9 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
         {todo && !todo.done && (
           <div className="flex flex-col gap-2">
             {req.needs_photo ? (
-              <span className="text-[13px] font-semibold text-muted">Врач просит фото — отметьте на вкладке «Дежурство», там можно снять.</span>
+              <Button kind="primary" icon="camera" full onClick={() => setMarking(true)}>
+                Отметить с фото
+              </Button>
             ) : req.options?.length ? (
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
                 {req.options.map((o) => (
@@ -260,7 +281,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
                       haptics.success();
                       toast(`Отмечено: ${o}`);
                     }}
-                    className="h-11 rounded-xl bg-ink px-2 text-[15px] font-extrabold text-bg"
+                    className={`h-11 rounded-xl px-2 text-[15px] font-extrabold text-ink ${KEY}`}
                   >
                     {o}
                   </button>
@@ -305,6 +326,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
           <DiscussionThread req={req} user={user} />
         </Section>
       </div>
+      {shift && todo && <MarkSheet todo={marking ? todo : null} answer="" shift={shift} user={user} onClose={() => setMarking(false)} />}
       <Confirm
         open={confirm}
         title="Закрыть задачу?"
@@ -436,7 +458,7 @@ export function NewRequestSheet({
           </div>
         </div>
         {who === 'work' && onBuy && (
-          <button type="button" onClick={onBuy} className="-mt-2 self-start px-1 py-1 text-[14px] font-bold text-teal">
+          <button type="button" onClick={onBuy} className="-mt-2 flex h-11 items-center self-start px-1 text-[14px] font-bold text-teal">
             Купить? → Закупки
           </button>
         )}
@@ -509,7 +531,7 @@ export function NewRequestSheet({
           {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кнопки ответа: {options.join(' · ')}</span>}
         </div>
         {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
-        <Card className="divide-y divide-surface2 overflow-hidden">
+        <Card className="divide-y divide-edge overflow-hidden">
           <Check on={photo} label="Нужно фото в ответ" sub="кипер отметит выполнение с фото" onChange={setPhoto} />
           <Check on={urgent} label="Срочно" sub="наверху экрана у кипера" onChange={setUrgent} />
         </Card>

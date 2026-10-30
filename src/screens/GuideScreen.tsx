@@ -28,7 +28,7 @@ export function GuideScreen({ role }: { role: Role }) {
       />
       {part === 'guide' && (
         <Section title="Подсказки по разделам">
-          <Card className="divide-y divide-surface2 overflow-hidden">
+          <Card className="divide-y divide-edge overflow-hidden">
             {TOUR_TABS.filter((t) => sectionTour(t.tab, role)).map((t) => (
               <button
                 key={t.tab}
@@ -48,7 +48,7 @@ export function GuideScreen({ role }: { role: Role }) {
       {part === 'guide' &&
         GUIDE.map((s) => (
           <Section key={s.id} title={s.title} id={s.id}>
-            <Card className="divide-y divide-surface2 overflow-hidden">
+            <Card className="divide-y divide-edge overflow-hidden">
               {s.items.map((it, i) => (
                 <div key={i} className="flex gap-3 px-4 py-3">
                   {it.head && <span className="w-[92px] shrink-0 text-[14px] font-extrabold text-teal">{it.head}</span>}

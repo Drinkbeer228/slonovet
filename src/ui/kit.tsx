@@ -7,13 +7,25 @@ import { haptics } from '../lib/haptics';
 
 /* ---------- Кнопки ---------- */
 
-type BtnKind = 'primary' | 'light' | 'ghost' | 'danger';
+type BtnKind = 'primary' | 'light' | 'accent' | 'ghost' | 'danger';
+
+/* Физика: любая кнопка — выпуклая клавиша (блик по верхней фаске, мягкая тень, пружина при тапе). Цвета и свет — из токенов index.css. */
+const SHEEN = 'bg-[linear-gradient(to_bottom,var(--color-sheen),transparent_60%)]';
+const SHEEN_TEAL = 'bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)]';
+
+/** Нажимаемая клавиша: верхний блик, мягкая тень, пружина при тапе. */
+export const KEY = `border border-edge-hi bg-surface2 ${SHEEN} shadow-(--shadow-key) transition-transform active:scale-[0.97]`;
 
 const BTN: Record<BtnKind, string> = {
-  primary: 'bg-teal text-teal-ink border-transparent',
-  light: 'bg-ink text-bg border-transparent',
-  ghost: 'bg-transparent text-ink border-line',
-  danger: 'bg-transparent text-coral border-coral/50',
+  // основное действие: бирюза с бликом
+  primary: `bg-teal ${SHEEN_TEAL} text-teal-ink border-transparent shadow-(--shadow-key)`,
+  // «светлая» клавиша теперь графитовая: белые плашки на тёмном слепят
+  light: `${KEY} text-ink`,
+  // сочный бирюзовый ключ: верхний блик, внутренняя кромка и мягкое свечение цветом темы
+  accent: `bg-teal ${SHEEN_TEAL} text-teal-ink border-transparent shadow-(--shadow-glow-teal) active:scale-[0.97]!`,
+  ghost: `${KEY} text-ink`,
+  // тёмно-коралловое стекло вместо пустой красной рамки
+  danger: `border-coral/40 bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] ${SHEEN} text-coral-fg shadow-(--shadow-key)`,
 };
 
 export function Button({
@@ -78,7 +90,7 @@ export function IconButton({ icon, label, onClick, className = '' }: { icon: Ico
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border border-line text-ink active:scale-95 ${className}`}
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border text-ink ${/border-transparent/.test(className) ? 'active:scale-95' : KEY} ${className}`}
     >
       <Icon name={icon} size={20} />
     </button>
@@ -99,21 +111,143 @@ export function Section({ title, aside, children, id }: { title: ReactNode; asid
   );
 }
 
-export function Card({ children, className = '', ...rest }: { children: ReactNode; className?: string; 'data-tour'?: string }) {
+/**
+ * Уровни глубины: flat — как было; glass — полированная плита над фоном; sunken — утопленная «лунка»
+ * (мониторинг, контейнеры сегментов, прогресс, поля). Свет и тени — токены index.css, светлая тема переопределяет их там же.
+ * Размытие (backdrop-blur) здесь не нужно: за карточками ровный фон, а на слабых телефонах оно тормозит прокрутку.
+ */
+export const TONE = {
+  flat: 'bg-surface',
+  glass: 'border border-edge bg-surface/70 shadow-(--shadow-plate)',
+  sunken: 'border border-edge bg-well shadow-(--shadow-well)',
+};
+
+/** Световой чип для тегов. */
+export const CHIP =
+  'inline-flex items-center gap-1 rounded-full border border-edge-hi bg-surface2 px-2.5 py-1 text-[12px] font-bold text-ink shadow-[inset_0_1px_0_var(--color-hl)]';
+
+export function Card({
+  children,
+  className = '',
+  tone = 'glass',
+  ...rest
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: keyof typeof TONE;
+  'data-tour'?: string;
+}) {
   return (
-    <div className={`rounded-2xl bg-surface ${className}`} {...rest}>
+    <div className={`rounded-2xl ${TONE[tone]} ${className}`} {...rest}>
       {children}
     </div>
   );
 }
+
+export type Glow = 'teal' | 'amber' | 'coral' | 'sky' | 'violet';
+
+/** Тлеющее свечение по левому краю плиты; цвет — токен темы, сила --wash (в светлой теме слабее). */
+const WASH: Record<Glow, string> = {
+  teal: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-teal)_var(--wash),transparent),transparent)]',
+  amber: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-amber)_var(--wash),transparent),transparent)]',
+  coral: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-coral)_var(--wash),transparent),transparent)]',
+  sky: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-sky)_var(--wash),transparent),transparent)]',
+  violet: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-violet)_var(--wash),transparent),transparent)]',
+};
+const HALO: Record<Glow, string> = {
+  teal: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]',
+  amber: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]',
+  coral: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]',
+  sky: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-sky)_var(--glow),transparent)]',
+  violet: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-violet)_var(--glow),transparent)]',
+};
+
+/**
+ * Стеклянная плита со свечением по левому краю — вместо цветных рамок и полосок (баннеры, срочные и просроченные задачи).
+ * halo добавляет мягкое внешнее свечение: для срочного. Свечение — усиление, смысл несёт текст и иконка.
+ */
+export function Plate({
+  glow,
+  halo,
+  flat,
+  children,
+  className = '',
+  ...rest
+}: {
+  glow: Glow;
+  halo?: boolean;
+  /** без свечения: обычная стеклянная плита (для состояния «не срочно», чтобы разметка не прыгала) */
+  flat?: boolean;
+  children: ReactNode;
+  className?: string;
+  'data-tour'?: string;
+}) {
+  return (
+    <div className={`relative isolate overflow-hidden rounded-2xl border border-edge bg-surface/70 ${halo ? HALO[glow] : 'shadow-(--shadow-plate)'} ${className}`} {...rest}>
+      {!flat && <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 -z-10 w-28 ${WASH[glow]}`} />}
+      {children}
+    </div>
+  );
+}
+
+const FILL: Record<Glow, string> = {
+  teal: 'bg-teal shadow-[0_0_10px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]',
+  amber: 'bg-amber shadow-[0_0_10px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]',
+  coral: 'bg-coral shadow-[0_0_10px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]',
+  sky: 'bg-sky shadow-[0_0_10px_color-mix(in_srgb,var(--color-sky)_var(--glow),transparent)]',
+  violet: 'bg-violet shadow-[0_0_10px_color-mix(in_srgb,var(--color-violet)_var(--glow),transparent)]',
+};
+
+/** Полоска прогресса или уровня: жёсткий желоб и светящаяся заливка. value — доля 0..1. */
+export function Meter({ value, tone = 'teal', label, className = '' }: { value: number; tone?: Glow; label?: string; className?: string }) {
+  const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      className={`h-2 overflow-hidden rounded-full p-px ${TONE.sunken} ${className}`}
+    >
+      <div className={`h-full rounded-full bg-[linear-gradient(to_bottom,rgb(255_255_255/0.3),transparent)] ${FILL[tone]}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+/** Светодиодная ячейка: заполненная с бликом и свечением, пустая — утоплена. */
+export const PAD = {
+  teal: 'bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/0.3),transparent_60%)] shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_0_8px_-2px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]',
+  amber: 'bg-dot1 bg-[linear-gradient(to_bottom,rgb(255_255_255/0.3),transparent_60%)] shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_0_8px_-2px_color-mix(in_srgb,var(--color-dot1)_var(--glow),transparent)]',
+  coral: 'bg-dot2 bg-[linear-gradient(to_bottom,rgb(255_255_255/0.3),transparent_60%)] shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_0_8px_-2px_color-mix(in_srgb,var(--color-dot2)_var(--glow),transparent)]',
+  empty: 'bg-well shadow-(--shadow-well)',
+};
 
 /** Подпись под заголовком чужого раздела: смотреть можно, менять — хозяину. */
 export function ReadOnlyNote({ who }: { who: string }) {
   return <span className="px-1 text-[13px] font-semibold text-muted">Только просмотр — меняет {who}</span>;
 }
 
+/** Метки состояния задачи: СРОЧНО — заливкой, ПРОСРОЧЕНО — контуром, чтобы различались не только словом. */
+export function UrgentBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-coral px-2 py-1 text-[12px] font-extrabold leading-none tracking-wide text-teal-ink shadow-[0_0_12px_-2px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent),inset_0_1px_0_rgb(255_255_255/0.3)]">
+      <Icon name="alert" size={12} stroke={3} />
+      СРОЧНО
+    </span>
+  );
+}
+
+export function LateBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-md border border-coral px-2 py-[3px] text-[12px] font-extrabold leading-none tracking-wide text-coral-fg shadow-[0_0_10px_-3px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]">
+      ПРОСРОЧЕНО
+    </span>
+  );
+}
+
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-2xl bg-surface px-4 py-5 text-center text-[14px] font-semibold text-muted">{children}</div>;
+  return <div className={`rounded-2xl px-4 py-5 text-center text-[14px] font-semibold text-muted ${TONE.sunken}`}>{children}</div>;
 }
 
 /* ---------- Переключатели ---------- */
@@ -132,7 +266,7 @@ export function Segmented<T extends string>({
   dots?: Partial<Record<T, boolean>>;
 }) {
   return (
-    <div role="group" aria-label={label} className="grid gap-1 rounded-2xl bg-surface p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+    <div role="group" aria-label={label} className={`grid gap-1 rounded-2xl p-1 ${TONE.sunken}`} style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -141,7 +275,9 @@ export function Segmented<T extends string>({
             type="button"
             aria-pressed={on}
             onClick={() => onChange(o.value)}
-            className={`h-11 rounded-xl text-[15px] font-extrabold ${on ? 'bg-ink text-bg' : 'text-muted'}`}
+            className={`h-11 rounded-xl text-[15px] font-extrabold transition-transform active:scale-[0.97] ${
+              on ? `${KEY} text-teal-fg [text-shadow:0_0_12px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]` : 'border border-transparent text-muted'
+            }`}
           >
             {o.label}
             {dots?.[o.value] && <span className="ml-1.5 inline-block h-[7px] w-[7px] rounded-full bg-dot1 align-middle" />}
@@ -153,13 +289,17 @@ export function Segmented<T extends string>({
 }
 
 export function Chip({ on, children, onClick, tone = 'ink' }: { on: boolean; children: ReactNode; onClick: () => void; tone?: 'ink' | 'amber' }) {
-  const active = tone === 'amber' ? 'border-amber bg-amber/15 text-amber' : 'border-ink bg-ink text-bg';
+  // выбранный — подсвеченное цветное стекло с чёткой гранью, текст ink (держит контраст в обеих темах); невыбранный — матовый в лунке
+  const active =
+    tone === 'amber'
+      ? 'border-amber/60 bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-ink shadow-[inset_0_1px_0_var(--color-hl),0_0_16px_-4px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]'
+      : 'border-teal/60 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-ink shadow-(--shadow-key-on)';
   return (
     <button
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`h-11 rounded-xl border px-3.5 text-[14px] font-bold ${on ? active : 'border-line bg-surface text-ink2'}`}
+      className={`h-11 rounded-xl border px-3.5 text-[14px] font-bold transition-transform active:scale-[0.97] ${on ? active : 'border-edge bg-well text-ink2 shadow-(--shadow-well)'}`}
     >
       {children}
     </button>
@@ -180,7 +320,7 @@ export function Check({ on, label, sub, onChange }: { on: boolean; label: ReactN
 
 export function Tick({ on }: { on: boolean }) {
   return (
-    <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${on ? 'bg-teal text-teal-ink' : 'border-2 border-tick text-transparent'}`}>
+    <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${on ? 'bg-teal text-teal-ink shadow-(--shadow-key-on)' : 'border-2 border-tick bg-well text-transparent shadow-(--shadow-well)'}`}>
       <Icon name="check" size={16} stroke={3} />
     </span>
   );
@@ -188,12 +328,12 @@ export function Tick({ on }: { on: boolean }) {
 
 export function Stepper({ value, onChange, min = 0, label }: { value: number; onChange: (v: number) => void; min?: number; label: string }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-0.5 rounded-2xl p-0.5 ${TONE.sunken}`}>
       <button
         type="button"
         aria-label={`${label}: меньше`}
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="h-11 w-11 rounded-xl border border-line bg-surface2 text-[22px] font-bold"
+        className={`h-10 w-10 rounded-[14px] text-[22px] font-bold ${KEY}`}
       >
         −
       </button>
@@ -204,7 +344,7 @@ export function Stepper({ value, onChange, min = 0, label }: { value: number; on
         type="button"
         aria-label={`${label}: больше`}
         onClick={() => onChange(value + 1)}
-        className="h-11 w-11 rounded-xl border border-line bg-surface2 text-[22px] font-bold"
+        className={`h-10 w-10 rounded-[14px] text-[22px] font-bold ${KEY}`}
       >
         +
       </button>
@@ -316,12 +456,12 @@ export function CalendarSheet({
   const canNext = !max || addDays(`${month}-${String(daysIn).padStart(2, '0')}`, 1) <= max;
 
   return createPortal(
-    <div className="fixed inset-0 z-[65] flex items-end justify-center bg-black/60 md:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[65] flex items-end justify-center bg-scrim md:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Выбор даты"
-        className="animate-sheet flex w-full max-w-sm flex-col gap-3 rounded-t-3xl border border-line bg-bg p-4 pb-[max(16px,env(safe-area-inset-bottom))] md:rounded-3xl"
+        className="animate-sheet flex w-full max-w-sm flex-col gap-3 rounded-t-3xl border border-b-0 border-edge-hi bg-bg/90 bg-[linear-gradient(to_bottom,var(--color-hl-soft),transparent_90px)] p-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-(--shadow-sheet) backdrop-blur-xl md:rounded-3xl md:border-b"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -417,7 +557,7 @@ export function DateInput({
 }
 
 export const inputCls =
-  'w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[16px] text-ink placeholder:text-faint outline-none focus:border-teal';
+  'w-full rounded-xl border border-tick bg-well px-3.5 py-3 text-[16px] shadow-(--shadow-well) text-ink placeholder:text-faint outline-none focus:border-teal';
 
 /* ---------- Нижняя шторка / диалог ---------- */
 
@@ -494,24 +634,24 @@ export function Sheet({
   const drag = useSheetDrag(open, onClose);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim md:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
-        className="animate-sheet flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-3xl border border-line bg-bg md:rounded-3xl"
+        className="animate-sheet flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-3xl border border-b-0 border-edge-hi bg-bg/90 bg-[linear-gradient(to_bottom,var(--color-hl-soft),transparent_90px)] shadow-(--shadow-sheet) backdrop-blur-xl md:rounded-3xl md:border-b"
         style={drag.style}
         onClick={(e) => e.stopPropagation()}
       >
         {/* потянуть шапку вниз — закрыть, как в привычных приложениях */}
         <div className="flex touch-none justify-center pt-2.5 md:hidden" {...drag.handlers}>
-          <span className="h-1.5 w-10 rounded-full bg-line" aria-hidden="true" />
+          <span className="h-1.5 w-10 rounded-full bg-muted/40" aria-hidden="true" />
         </div>
         <div className="flex touch-none items-center gap-3 px-5 pb-2 pt-2 md:pt-4" {...drag.handlers}>
           <h2 className="m-0 flex-1 text-[19px] font-extrabold">{title}</h2>
           <IconButton icon="x" label="Закрыть" onClick={onClose} className="border-transparent" />
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-4">{children}</div>
-        {footer && <div className="pb-safe border-t border-line px-5 pt-3">{footer}</div>}
+        {footer && <div className="pb-safe border-t border-edge px-5 pt-3">{footer}</div>}
       </div>
     </div>
   );
@@ -596,8 +736,8 @@ export function Toaster() {
       {list.map((t) => (
         <div
           key={t.id}
-          className={`animate-sheet rounded-xl border px-4 py-2.5 text-[14px] font-bold shadow-2xl ${
-            t.kind === 'error' ? 'border-coral/60 bg-toast-err text-coral' : 'border-teal/50 bg-toast-ok text-teal'
+          className={`animate-sheet rounded-xl border px-4 py-2.5 text-[14px] font-bold shadow-(--shadow-plate) backdrop-blur-md ${
+            t.kind === 'error' ? 'border-coral/60 bg-toast-err text-coral-fg' : 'border-teal/50 bg-toast-ok text-teal-fg'
           }`}
         >
           {t.text}
@@ -682,9 +822,15 @@ export function FilePreview({ file, onRemove }: { file: File; onRemove: () => vo
 /* ---------- Цвета уровней ---------- */
 
 export const LEVEL_CELL = [
-  'border-transparent bg-surface2 text-faint font-semibold',
-  'border-amber bg-amber/15 text-amber font-extrabold',
-  'border-coral bg-coral/15 text-coral font-extrabold',
+  // норма — матовая клавиша
+  `border-edge bg-surface2 ${SHEEN} text-ink2 font-semibold shadow-(--shadow-key)`,
+  // внимание и плохо — подсвечены изнутри, с цветным бликом по верхней кромке
+  'border-transparent bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg font-extrabold shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-amber)_55%,transparent),inset_0_0_14px_-4px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]',
+  'border-transparent bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg font-extrabold shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-coral)_55%,transparent),inset_0_0_14px_-4px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]',
 ];
 
-export const LEVEL_DOT = ['bg-dot0', 'bg-dot1', 'bg-dot2'];
+export const LEVEL_DOT = [
+  'bg-dot0',
+  'bg-dot1 shadow-[0_0_8px_color-mix(in_srgb,var(--color-dot1)_var(--glow),transparent)]',
+  'bg-dot2 shadow-[0_0_8px_color-mix(in_srgb,var(--color-dot2)_var(--glow),transparent)]',
+];

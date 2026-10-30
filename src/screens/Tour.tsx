@@ -224,7 +224,7 @@ export function Tour({ user, tab, onTab, preview = false }: { user: CurrentUser;
           rect ? '' : 'top-1/2 bottom-auto -translate-y-1/2'
         }`}
       >
-        <div className="animate-sheet flex w-full max-w-sm flex-col gap-3 rounded-3xl border border-line bg-bg p-4 shadow-xl">
+        <div className="animate-sheet flex w-full max-w-sm flex-col gap-3 rounded-3xl border border-edge-hi bg-bg/85 bg-[linear-gradient(to_bottom,var(--color-hl-soft),transparent_70px)] p-4 shadow-(--shadow-plate) backdrop-blur-xl">
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-[17px] font-extrabold">{step.title}</span>
             {steps.length > 1 && (
@@ -240,7 +240,7 @@ export function Tour({ user, tab, onTab, preview = false }: { user: CurrentUser;
                 Пропустить
               </Button>
             )}
-            <Button kind="primary" full onClick={next}>
+            <Button kind="accent" full onClick={next}>
               {last ? 'Понятно' : 'Дальше'}
             </Button>
           </div>

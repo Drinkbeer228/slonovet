@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { addMark } from '../../domain/actions';
 import { haptics } from '../../lib/haptics';
-import { FREQ_LABEL, overdue, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import { FREQ_LABEL, dutyTodos, overdue, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import type { CurrentUser, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
 import { TASK_TYPE, taskType } from '../taskType';
 import { Icon } from '../../ui/Icon';
 import { remove, useRows } from '../../lib/store';
-import { shortDate, timeOf, stampOf } from '../../lib/dates';
-import { Button, Card, Chip, FilePreview, IconButton, PhotoPick, PhotoThumb, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { shortDate, timeOf } from '../../lib/dates';
+import { Button, CHIP, Card, Chip, FilePreview, IconButton, KEY, LateBadge, PhotoPick, PhotoThumb, Plate, Section, Sheet, TONE, UrgentBadge, inputCls, toast } from '../../ui/kit';
 
 export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
-  const todos = requestTodos(requests, marks, shift);
+  const todos = dutyTodos(requests, marks, shift);
   const left = todos.filter((t) => !t.done).length;
   const [marking, setMarking] = useState<{ todo: RequestTodo; answer: string } | null>(null);
   const [talk, setTalk] = useState<VetRequest | null>(null);
@@ -64,35 +64,47 @@ function RequestCard({
   const when = whenLabel(req);
   const multi = needed > 1;
   const who = whoLabel(req.elephant);
+  const tag = CHIP;
   return (
-    <Card className={`flex flex-col gap-2.5 border-l-4 p-3.5 ${t.stripe} ${done ? 'opacity-60' : req.urgent || late ? 'ring-1 ring-coral/60' : ''}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
-          <Icon name={t.icon} size={15} />
-          {who}
-          {req.urgent && !done && <span className="rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">СРОЧНО</span>}
-          {late && <span className="rounded-md bg-coral/15 px-1.5 py-0.5 text-[11px] text-coral">ПРОСРОЧЕНО</span>}
-        </span>
-        <span className={`text-[12px] ${when ? 'font-extrabold text-ink' : 'font-semibold text-muted'}`}>
-          {when || FREQ_LABEL[req.frequency]}
-          {req.due_date ? ` · до ${shortDate(req.due_date)}` : ''}
+    <Plate glow="coral" halo={!done && req.urgent} flat={done || !req.urgent} className="flex flex-col gap-2.5 p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <h3 className={`m-0 flex min-w-0 items-center gap-2 text-[20px] font-extrabold leading-tight ${t.text}`}>
+          <Icon name={t.icon} size={18} />
+          <span className="truncate">{who}</span>
+        </h3>
+        <span className="flex shrink-0 items-center gap-2">
+          {req.urgent && !done && <UrgentBadge />}
+          {late && <LateBadge />}
+          <span className="-my-1.5 -mr-1 ml-0.5">
+            <DiscussionButton req={req} user={user} onOpen={onTalk} compact />
+          </span>
         </span>
       </div>
-      <p className="m-0 text-[15px] font-medium leading-snug">{req.text}</p>
-      {req.photo_path && <PhotoThumb path={req.photo_path} size={96} />}
-      <span className="-mt-1.5 text-[12px] font-semibold text-muted">
-        {stampOf(req.created_at)} · {req.author_name}
-      </span>
+      <p className={`m-0 text-[15px] font-medium leading-snug ${done ? 'text-ink2' : ''}`}>{req.text}</p>
+      {req.photo_path && <PhotoThumb path={req.photo_path} size={72} />}
+      <div className="flex flex-wrap gap-1.5">
+        <span className={late ? `${tag} !border-coral/40 !bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] !text-coral-fg` : tag}>
+          {late && <Icon name="alert" size={12} stroke={3} />}
+          {when || FREQ_LABEL[req.frequency]}
+        </span>
+        {req.due_date && <span className={tag}>до {shortDate(req.due_date)}</span>}
+        {req.needs_photo && !done && (
+          <span className={tag}>
+            <Icon name="camera" size={12} />с фото
+          </span>
+        )}
+      </div>
       {marks.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {marks.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 text-[13px] font-semibold text-muted">
+            <div key={m.id} className="flex items-center gap-2 text-[13px] font-semibold text-ink2">
               {m.photo_path && <PhotoThumb path={m.photo_path} size={36} />}
+              <Icon name="check" size={14} stroke={3} className="shrink-0 text-teal" />
               <span className="flex-1">
                 Выполнил: {m.done_by}, {timeOf(m.done_at)}
                 {m.note ? ` — ${m.note}` : ''}
               </span>
-              <button type="button" className="-my-2 px-2 py-3 text-[13px] font-bold text-muted underline" onClick={() => remove('request_marks', m.id)}>
+              <button type="button" className="-my-1.5 flex h-11 items-center px-2 text-[13px] font-bold text-muted underline" onClick={() => remove('request_marks', m.id)}>
                 отменить
               </button>
             </div>
@@ -100,12 +112,13 @@ function RequestCard({
         </div>
       )}
       {!done && req.options?.length ? (
-        <div className="flex flex-col gap-2">
-          {multi && <span className="text-[12px] font-semibold text-muted">отмечено {marks.length} из {needed}</span>}
+        <div className="flex flex-col gap-1.5">
+          {multi && <span className="text-[13px] font-semibold text-muted">отмечено {marks.length} из {needed}</span>}
           <div className="flex gap-2">
-            <div className="grid flex-1 gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
+            {/* один цельный переключатель вместо отдельных кнопок */}
+            <div role="group" aria-label="Ответ" className={`grid flex-1 gap-1 rounded-xl p-0.5 ${TONE.sunken}`} style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
               {req.options.map((o) => (
-                <button key={o} type="button" onClick={() => onQuick(o)} className="h-11 rounded-xl bg-ink px-2 text-[15px] font-extrabold text-bg">
+                <button key={o} type="button" onClick={() => onQuick(o)} className={`h-10 min-w-0 truncate rounded-[10px] px-1.5 text-[14px] font-bold text-ink ${KEY}`}>
                   {o}
                 </button>
               ))}
@@ -116,20 +129,18 @@ function RequestCard({
       ) : (
         !done && (
           <div className="flex gap-2">
-            <Button kind="light" icon="check" full onClick={() => onQuick()}>
+            <Button kind="accent" icon="check" full onClick={() => onQuick()}>
               {multi ? `Отметить (${marks.length} из ${needed})` : req.needs_photo ? 'Выполнено — фото' : 'Выполнено'}
             </Button>
             {!req.needs_photo && <IconButton icon="camera" label="Отметить с фото или заметкой" onClick={onDetailed} />}
           </div>
         )
       )}
-      {req.needs_photo && !done && <span className="text-[12px] font-semibold text-muted">врач просит фото</span>}
-      <DiscussionButton req={req} user={user} onOpen={onTalk} />
-    </Card>
+    </Plate>
   );
 }
 
-function MarkSheet({ todo, answer, shift, user, onClose }: { todo: RequestTodo | null; answer: string; shift: Shift; user: CurrentUser; onClose: () => void }) {
+export function MarkSheet({ todo, answer, shift, user, onClose }: { todo: RequestTodo | null; answer: string; shift: Shift; user: CurrentUser; onClose: () => void }) {
   const [note, setNote] = useState('');
   const [picked, setPicked] = useState('');
   useEffect(() => setPicked(answer), [answer, todo]);

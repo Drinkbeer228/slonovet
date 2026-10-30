@@ -4,7 +4,7 @@ import { setCell, toggleSymptom } from '../../domain/actions';
 import { shiftFlags } from '../../domain/shift';
 import type { ElephantName, Level, MetricKey, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
-import { Button, Card, LEVEL_CELL, LEVEL_DOT, Section, Segmented, Sheet } from '../../ui/kit';
+import { Button, Card, Chip, LEVEL_CELL, LEVEL_DOT, Section, Segmented, Sheet, TONE } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import type { NoteDraft } from '../common/NoteSheet';
 
@@ -23,7 +23,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
 
   return (
     <Section title="Состояние" id="sec-state">
-      <Card className="flex flex-col gap-1 p-2">
+      <Card tone="sunken" className="flex flex-col gap-1 p-2">
         <div className="grid grid-cols-[88px_repeat(3,minmax(0,1fr))] gap-1 pb-1.5 pt-1">
           <span />
           {ELEPHANTS.map((e) => (
@@ -47,7 +47,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
                   disabled={readOnly}
                   aria-label={`${el}, ${m.label}: ${label}${n ? `, признаков: ${n}` : ''}`}
                   onClick={() => tap(el, m.key)}
-                  className={`relative h-11 rounded-[10px] border text-[13px] ${LEVEL_CELL[level]}`}
+                  className={`relative h-11 rounded-[10px] border text-[13px] transition-transform active:scale-[0.97] ${LEVEL_CELL[level]}`}
                 >
                   {label}
                   {/* сколько признаков отмечено — уголком, чтобы не теснить слово */}
@@ -61,7 +61,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
 
       {/* отклонения — короткой строкой под таблицей: «Претти · общее — внимание: вялая, качается ✎» */}
       {flags.length > 0 && (
-        <div className="flex flex-col divide-y divide-surface2 overflow-hidden rounded-2xl bg-surface">
+        <div className={`flex flex-col divide-y divide-edge overflow-hidden rounded-2xl ${TONE.glass}`}>
           {flags.map((f) => {
             const n = notes.filter((x) => x.shift_id === shift.id && x.elephant === f.elephant && x.metric === f.metric).length;
             return (
@@ -77,7 +77,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
                   <span className="font-bold">
                     {f.elephant} · {METRIC_LABEL[f.metric].toLowerCase()}
                   </span>
-                  <span className={`font-bold ${f.level === 2 ? 'text-coral' : 'text-amber'}`}> — {LEVEL_LABEL[f.level]}</span>
+                  <span className={`font-bold ${f.level === 2 ? 'text-coral-fg' : 'text-amber-fg'}`}> — {LEVEL_LABEL[f.level]}</span>
                   {f.symptoms.length > 0 && <span className="text-ink2">: {f.symptoms.join(', ')}</span>}
                   {n > 0 && <span className="text-muted"> · записи: {n}</span>}
                 </span>
@@ -153,15 +153,9 @@ function CellSheet({
               {meta.symptoms.map((sym) => {
                 const on = symptoms.includes(sym);
                 return (
-                  <button
-                    key={sym}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleSymptom(shift, el, m, sym)}
-                    className={`h-11 rounded-[10px] border px-3 text-[14px] font-bold ${on ? 'border-ink bg-ink text-bg' : 'border-line bg-surface2 text-ink2'}`}
-                  >
+                  <Chip key={sym} on={on} onClick={() => toggleSymptom(shift, el, m, sym)}>
                     {sym}
-                  </button>
+                  </Chip>
                 );
               })}
             </div>

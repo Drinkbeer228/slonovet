@@ -2,7 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { BRANCH_AMOUNT, BRANCH_KINDS, ELEPHANTS } from '../../domain/elephants';
 import { setBags, updateShift } from '../../domain/actions';
 import type { CurrentUser, ElephantName, Quests, Shift } from '../../domain/types';
-import { Card, Chip, Section, Segmented, Stepper, inputCls } from '../../ui/kit';
+import { Button, Card, Chip, KEY, Section, Segmented, Stepper, TONE, inputCls } from '../../ui/kit';
 import { Icon, type IconName } from '../../ui/Icon';
 import { WhyLink } from '../common/Why';
 import { ExtraIssues } from './ExtraIssues';
@@ -26,30 +26,36 @@ function Quest({
   return (
     <Card className="overflow-hidden">
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
-        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${complete ? 'bg-teal/15 text-teal' : 'bg-surface2 text-ink2'}`}>
+        <span
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border ${
+            complete ? 'border-teal/40 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg shadow-(--shadow-key-on)' : `${KEY} text-ink2`
+          }`}
+        >
           <Icon name={complete ? 'check' : icon} size={18} stroke={complete ? 2.6 : 2} />
         </span>
         <span className="flex-1 text-[15px] font-bold">{title}</span>
-        <span className={`text-[13px] font-bold ${complete ? 'text-teal' : 'text-muted'}`}>{progress}</span>
+        <span className={`text-[13px] font-bold ${complete ? 'text-teal-fg' : 'text-muted'}`}>{progress}</span>
         <Icon name="down" size={18} className={`text-muted transition ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="border-t border-surface2 px-4 py-3">{children}</div>}
+      {open && <div className="border-t border-edge px-4 py-3">{children}</div>}
     </Card>
   );
 }
 
 function Counter({ value, onPlus, onMinus, label, tone }: { value: number; onPlus: () => void; onMinus: () => void; label: string; tone: 'teal' | 'amber' }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <button type="button" aria-label={`${label}: убрать`} onClick={onMinus} disabled={value === 0} className="h-11 w-11 rounded-xl border border-line bg-surface2 text-[20px] font-bold text-ink2 disabled:opacity-30">
+    <div className={`flex items-center gap-0.5 rounded-2xl p-0.5 ${TONE.sunken}`}>
+      <button type="button" aria-label={`${label}: убрать`} onClick={onMinus} disabled={value === 0} className={`h-10 w-10 rounded-[14px] text-[20px] font-bold text-ink2 disabled:opacity-30 ${KEY}`}>
         −
       </button>
       <button
         type="button"
         aria-label={`${label}: добавить`}
         onClick={onPlus}
-        className={`inline-flex h-11 min-w-[64px] items-center justify-center gap-1 rounded-xl border px-2 text-[15px] font-extrabold ${
-          tone === 'teal' ? 'border-teal/50 bg-teal/10 text-teal' : 'border-amber/50 bg-amber/10 text-amber'
+        className={`inline-flex h-10 min-w-[60px] items-center justify-center gap-1 rounded-[14px] border px-2 text-[15px] font-extrabold transition-transform active:scale-[0.97] ${
+          tone === 'teal'
+            ? 'border-teal/50 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg shadow-(--shadow-key-on)'
+            : 'border-amber/50 bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg shadow-[inset_0_1px_0_var(--color-hl),0_0_16px_-4px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]'
         }`}
       >
         {value}
@@ -101,7 +107,7 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
               <Counter tone="amber" label={`${el}, мимо`} value={q.urine?.[el]?.miss ?? 0} onPlus={() => urine(el, 'miss', 1)} onMinus={() => urine(el, 'miss', -1)} />
             </div>
           ))}
-          <div className="mt-1 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2 border-t border-surface2 pt-3">
+          <div className="mt-1 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2 border-t border-edge pt-3">
             <span className="text-[12px] font-bold text-muted">кал, раз за дежурство</span>
             <span />
             {ELEPHANTS.map((el) => (
@@ -165,7 +171,7 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
         </div>
       </Quest>
 
-      <Card className="divide-y divide-surface2 overflow-hidden">
+      <Card className="divide-y divide-edge overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3">
           <span className="flex flex-1 flex-col gap-0.5">
             <span className="text-[15px] font-bold">Мешков взяли</span>
@@ -207,7 +213,11 @@ function WashCard({ shift }: { shift: Shift }) {
   return (
     <Card className="flex flex-col gap-3 p-3.5">
       <div className="flex items-center gap-3">
-        <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${w ? 'bg-teal/15 text-teal' : 'bg-surface2 text-ink2'}`}>
+        <span
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border ${
+            w ? 'border-teal/40 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg shadow-(--shadow-key-on)' : `${KEY} text-ink2`
+          }`}
+        >
           <Icon name={w ? 'check' : 'drop'} size={18} stroke={w ? 2.6 : 2} />
         </span>
         <span className="flex-1 text-[15px] font-bold">{w ? 'Слоних мыли' : 'Мытьё'}</span>
@@ -225,9 +235,7 @@ function WashCard({ shift }: { shift: Shift }) {
             не мыли
           </button>
         ) : (
-          <button type="button" onClick={() => set({})} className="h-11 rounded-xl border border-line px-3.5 text-[14px] font-bold">
-            Мыли сегодня
-          </button>
+          <Button onClick={() => set({})}>Мыли сегодня</Button>
         )}
       </div>
       {w && <WashNote value={w.note ?? ''} onCommit={(note) => set({ note })} />}

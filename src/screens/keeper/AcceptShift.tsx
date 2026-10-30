@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { LEVEL_LABEL, METRIC_LABEL, SAFETY_CHECKS } from '../../domain/elephants';
 import { acceptShift, takeOverShift } from '../../domain/actions';
-import { acceptedBy, lastHanded, requestTodos, shiftFlags } from '../../domain/shift';
+import { acceptedBy, dutyTodos, lastHanded, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
 import { getSession } from '../../lib/auth';
-import { Button, Card, Chip, Section, inputCls, toast } from '../../ui/kit';
+import { Button, CHIP, Card, Chip, KEY, Plate, Section, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { WhyLink } from '../common/Why';
 
@@ -47,19 +47,19 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
       return (parts.includes(r) ? parts.filter((x) => x !== r) : [...parts, r]).join('. ');
     });
   const flags = shiftFlags(prev);
-  const openReqs = prev ? requestTodos(requests, marks, { ...prev, date: isoDate(), id: '__new__' }).filter((t) => !t.done) : [];
+  const openReqs = prev ? dutyTodos(requests, marks, { ...prev, date: isoDate(), id: '__new__' }).filter((t) => !t.done) : [];
 
   return (
     <div className="flex flex-col gap-6">
       <span className="-mt-2 px-1 text-[13px] font-semibold text-muted">{longDate(isoDate())}</span>
 
       {takeover && (
-        <Card className="flex gap-2.5 p-3.5 ring-1 ring-amber/50">
-          <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber" />
+        <Plate glow="amber" halo className="flex gap-2.5 p-3.5">
+          <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber-fg" />
           <span className="text-[14px] font-semibold leading-snug text-ink2">
             Без кода: у {takeover.keeper_name} нет связи. Его дежурство отметим сданным, в журнале останется «принято без кода». Его записи дойдут, когда его телефон выйдет на связь.
           </span>
-        </Card>
+        </Plate>
       )}
 
       {prev && (
@@ -75,7 +75,7 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
                 {flags.map((f) => (
                   <span
                     key={`${f.elephant}-${f.metric}`}
-                    className={`rounded-lg px-2.5 py-1 text-[13px] font-bold ${f.level === 2 ? 'bg-coral/15 text-coral' : 'bg-amber/15 text-amber'}`}
+                    className={`${CHIP} !text-[13px] ${f.level === 2 ? '!border-coral/40 !bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] !text-coral-fg' : '!border-amber/40 !bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] !text-amber-fg'}`}
                   >
                     {f.elephant} · {METRIC_LABEL[f.metric].toLowerCase()} — {LEVEL_LABEL[f.level]}
                     {f.symptoms.length > 0 && <span className="font-semibold">: {f.symptoms.join(', ')}</span>}
@@ -94,12 +94,12 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
       )}
 
       <Section title="Проверка при приёме" aside={`${SAFETY_CHECKS.filter((c) => checks[c.key] !== undefined).length} из ${SAFETY_CHECKS.length}`}>
-        <Card className="divide-y divide-surface2 overflow-hidden">
+        <Card className="divide-y divide-edge overflow-hidden">
           {SAFETY_CHECKS.map((c) => (
             <YesNo key={c.key} label={c.label} value={checks[c.key]} onChange={(v) => setChecks((s) => ({ ...s, [c.key]: v }))} />
           ))}
         </Card>
-        {failed.length > 0 && <p className="m-0 px-1 text-[13px] font-semibold text-amber">Пункты с крестиком попадут в замечания прошлому дежурному.</p>}
+        {failed.length > 0 && <p className="m-0 px-1 text-[13px] font-semibold text-amber-fg">Пункты с крестиком попадут в замечания прошлому дежурному.</p>}
       </Section>
 
       {prev && (
@@ -176,13 +176,15 @@ function YesNo({ label, value, onChange }: { label: string; value: boolean | und
   const btn = 'inline-flex h-11 w-11 items-center justify-center rounded-xl border';
   return (
     <div className="flex items-center gap-2 px-4 py-2">
-      <span className={`flex-1 text-[15px] font-bold ${value === false ? 'text-coral' : value ? 'text-faint' : ''}`}>{label}</span>
+      <span className={`flex-1 text-[15px] font-bold ${value === false ? 'text-coral-fg' : value ? 'text-faint' : ''}`}>{label}</span>
       <button
         type="button"
         aria-label={`${label}: в порядке`}
         aria-pressed={value === true}
         onClick={() => onChange(value === true ? undefined : true)}
-        className={`${btn} ${value === true ? 'border-teal bg-teal text-bg' : 'border-line text-muted'}`}
+        className={`${btn} ${
+          value === true ? 'border-transparent bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)] text-teal-ink shadow-(--shadow-key-on)' : `${KEY} text-muted`
+        }`}
       >
         <Icon name="check" size={20} stroke={2.6} />
       </button>
@@ -191,7 +193,11 @@ function YesNo({ label, value, onChange }: { label: string; value: boolean | und
         aria-label={`${label}: не в порядке`}
         aria-pressed={value === false}
         onClick={() => onChange(value === false ? undefined : false)}
-        className={`${btn} ${value === false ? 'border-coral bg-coral text-bg' : 'border-line text-muted'}`}
+        className={`${btn} ${
+          value === false
+            ? 'border-transparent bg-coral bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)] text-teal-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.3),0_0_16px_-4px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]'
+            : `${KEY} text-muted`
+        }`}
       >
         <Icon name="x" size={20} stroke={2.6} />
       </button>

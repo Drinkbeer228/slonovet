@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import { platform, promptInstall, useInstall, type Platform } from '../lib/install';
-import { Button, Card, Segmented, Sheet, toast } from '../ui/kit';
+import { Button, KEY, Plate, Segmented, Sheet, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 /**
@@ -35,7 +35,7 @@ const WHY = 'Так данные на телефоне не сотрутся, п
 function Steps({ os }: { os: Platform }) {
   const step = (n: number, body: React.ReactNode) => (
     <li className="flex gap-3">
-      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface2 text-[14px] font-extrabold">{n}</span>
+      <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[14px] font-extrabold ${KEY}`}>{n}</span>
       <span className="pt-0.5 text-[15px] leading-snug">{body}</span>
     </li>
   );
@@ -143,9 +143,9 @@ export function InstallBanner() {
     setHidden(true);
   };
   return (
-    <Card className="mb-4 flex flex-col gap-2.5 p-3.5 ring-1 ring-teal/50">
+    <Plate glow="teal" className="mb-4 flex flex-col gap-2.5 p-3.5">
       <span className="flex gap-2.5">
-        <Icon name="install" size={20} className="mt-0.5 shrink-0 text-teal" />
+        <Icon name="install" size={20} className="mt-0.5 shrink-0 text-teal-fg" />
         <span className="flex flex-col gap-0.5">
           <span className="text-[14px] font-bold">Поставьте СлоноВет на экран телефона</span>
           {os === 'ios' && !canPrompt ? (
@@ -159,7 +159,7 @@ export function InstallBanner() {
       </span>
       <div className="flex gap-2">
         {canPrompt ? (
-          <Button kind="primary" icon="install" onClick={() => promptInstall()}>
+          <Button kind="accent" icon="install" onClick={() => promptInstall()}>
             Установить приложение
           </Button>
         ) : (
@@ -167,6 +167,6 @@ export function InstallBanner() {
         )}
         <Button onClick={dismiss}>Не сейчас</Button>
       </div>
-    </Card>
+    </Plate>
   );
 }
