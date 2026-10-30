@@ -30,6 +30,20 @@ export function newShift(
   };
 }
 
+/**
+ * Отсыпной: человек сдал суточное дежурство (не меньше 18 часов) — следующие 24 часа он отдыхает.
+ * Задачу ему поставить можно, но экран предупредит.
+ */
+export const REST_HOURS = 24;
+export function onRestDay(userId: string, shifts: Shift[], now = Date.now()): boolean {
+  return shifts.some((s) => {
+    if (s.keeper_id !== userId || s.deleted || !s.handed_at || !s.accepted_at) return false;
+    const end = Date.parse(s.handed_at);
+    const long = end - Date.parse(s.accepted_at) >= 18 * 3600_000;
+    return long && now >= end && now < end + REST_HOURS * 3600_000;
+  });
+}
+
 /** Смена, которая приняла эту (если уже приняли). */
 export function acceptedBy(shifts: Shift[], shift: Shift | undefined): Shift | undefined {
   return shift ? shifts.find((s) => s.accepted_from === shift.id) : undefined;
@@ -94,24 +108,46 @@ export interface RequestTodo {
   done: boolean;
 }
 
-export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift: Shift): RequestTodo[] {
+/** Ответы-неудачи: отметка «не получилось» не закрывает разовую задачу — её надо сделать ещё раз. */
+export const FAILED_ANSWERS = ['не получилось'];
+
+/** Ответ отметки — вариант кнопки в начале заметки («ответ — комментарий»); без ответа — null. */
+export function markAnswer(m: RequestMark, req?: VetRequest): string | null {
+  const head = (m.note ?? '').split(' — ')[0].trim();
+  if (!head) return null;
+  return req?.options?.includes(head) || FAILED_ANSWERS.includes(head) ? head : null;
+}
+
+export const isFailedMark = (m: RequestMark, req?: VetRequest) => FAILED_ANSWERS.includes(markAnswer(m, req) ?? '');
+
+/** Отметки, которые засчитываются выполнением (не удалённые и не «не получилось»). */
+export const closingMarks = (marks: RequestMark[], req: VetRequest) => marks.filter((m) => m.request_id === req.id && !m.deleted && !isFailedMark(m, req));
+
+/**
+ * today — сегодняшний день (на экране — isoDate()): задача «на сегодня», поставленная после полуночи,
+ * видна и в смене, принятой вчера вечером. Без него — день смены (так считают тесты на фиксированных датах).
+ * Срочное видно сразу, даже если поставлено на будущий день, — так же, как на доске.
+ */
+export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift: Shift, today = shift.date): RequestTodo[] {
+  const day = today > shift.date ? today : shift.date;
   return requests
-    .filter((r) => r.status === 'active' && (!r.due_date || r.due_date >= shift.date) && (!r.on_date || r.on_date <= shift.date))
+    .filter((r) => r.status === 'active' && (!r.due_date || r.due_date >= shift.date) && (!r.on_date || r.on_date <= day || r.urgent))
     .map((req) => {
       const allMarks = marks.filter((m) => m.request_id === req.id);
       const here = allMarks.filter((m) => m.shift_id === shift.id);
       const needed = req.frequency === 'feeding' ? FEED_TIMES.length : 1;
-      const done = req.frequency === 'once' ? allMarks.length > 0 : here.length >= needed;
+      // «не получилось» не закрывает разовую задачу: она остаётся и ждёт повторной попытки
+      const done = req.frequency === 'once' ? closingMarks(allMarks, req).length > 0 : here.length >= needed;
       return { req, marks: here, allMarks, needed, done };
     })
-    .filter((t) => !(t.req.frequency === 'once' && t.done && t.marks.length === 0))
+    .filter((t) => !(t.req.frequency === 'once' && t.done && closingMarks(t.marks, t.req).length === 0))
     // невыполненное: срочное всегда наверху, дальше по сроку (у просроченного он самый ранний), при равном — кто раньше поставлен
     .sort((a, b) => Number(a.done) - Number(b.done) || byPriority(a.req, b.req));
 }
 
 /** На «Дежурстве» — только по слонам (медицина, уход); «Работа» живёт на доске «Задачи». */
-export const dutyTodos = (requests: VetRequest[], marks: RequestMark[], shift: Shift): RequestTodo[] =>
-  requestTodos(requests, marks, shift).filter((t) => t.req.elephant !== 'work');
+export const dutyTodos = (requests: VetRequest[], marks: RequestMark[], shift: Shift, today = shift.date): RequestTodo[] =>
+  requestTodos(requests, marks, shift, today).filter((t) => t.req.elephant !== 'work');
 
 /**
  * Срок задачи для порядка: разовая — день и час (у старых — «до какого числа»), курс — до какого числа.
@@ -138,7 +174,8 @@ export function overdue(req: VetRequest, done: boolean, now = new Date()): boole
   if (req.on_date < today) return true;
   if (req.on_date > today || !req.at_time) return false;
   const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  return hm >= req.at_time.slice(0, 5);
+  // «к 16:00» — ровно в 16:00 ещё вовремя
+  return hm > req.at_time.slice(0, 5);
 }
 
 /** «26.10 · к 16:00», «сегодня к 16:00» — для карточки; пусто, если дня нет. */
@@ -151,7 +188,7 @@ export function whenLabel(req: VetRequest, today = isoDate()): string {
 /** Готовые наборы ответов: про слонов — ветеринарные; про «Работу» (хоздела) — человеческие статусы. */
 export const WORK_PRESETS: { label: string; options: string[] }[] = [
   // без «в работе»: любая отметка — выполнение, и разовая задача после неё закрылась бы
-  { label: 'Сделано / не получилось', options: ['сделано', 'не получилось'] },
+  { label: 'Сделано / не получилось', options: ['сделано', 'не получилось'] }, // «не получилось» задачу не закрывает
 ];
 
 export const answerPresets = (who: string) => (who === 'work' ? WORK_PRESETS : ANSWER_PRESETS);
@@ -178,7 +215,7 @@ export const FREQ_LABEL: Record<VetRequest['frequency'], string> = {
 /** Сколько смен должно было быть отмечено и сколько отмечено — для прогресса у врача. */
 export function requestProgress(req: VetRequest, marks: RequestMark[], shifts: Shift[]) {
   const mine = marks.filter((m) => m.request_id === req.id);
-  if (req.frequency === 'once') return { done: Math.min(1, mine.length), total: 1, last: lastMark(mine) };
+  if (req.frequency === 'once') return { done: Math.min(1, closingMarks(mine, req).length), total: 1, last: lastMark(mine) };
   const created = localDay(req.created_at);
   const relevant = shifts.filter((s) => s.date >= created && (!req.due_date || s.date <= req.due_date));
   const per = req.frequency === 'feeding' ? FEED_TIMES.length : 1;
