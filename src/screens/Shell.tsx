@@ -49,10 +49,6 @@ export function menuTabs(role: Role): Tab[] {
 
 export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
 
-export function Logo({ size = 32 }: { size?: number }) {
-  return <img src={`${import.meta.env.BASE_URL}icon-64.png`} alt="" width={size} height={size} className="rounded-[22%]" />;
-}
-
 /** Плашка «Посмотреть как»: чья роль на экране и как вернуться к себе. */
 export function PreviewBanner({ role }: { role: Role }) {
   return (
@@ -146,8 +142,10 @@ export function TopBar({
   return (
     <header className="sticky top-0 z-30 border-b border-edge bg-bg/85 backdrop-blur-xl">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
-        <Logo size={28} />
-        <span className="text-[17px] font-extrabold tracking-tight">СлоноВет</span>
+        {/* надписью, как на логотипе: «Вет» бирюзой; картинка — только на входе и на иконке приложения */}
+        <span className="text-[19px] font-extrabold tracking-tight">
+          Слоно<span className="text-teal-fg">Вет</span>
+        </span>
         <nav className="ml-4 hidden flex-1 items-center gap-1 md:flex" aria-label="Разделы">
           {tabs.map((t) => (
             <button
