@@ -22,32 +22,19 @@ export function stopOfDay(stops: TourStop[], day: string): TourStop | undefined 
   return sortStops(stops).find((s) => s.arrive_on <= day);
 }
 
-export type LedgerFilter = 'all' | 'in' | 'out' | 'waste';
-export const LEDGER_FILTERS: { value: LedgerFilter; label: string }[] = [
-  { value: 'all', label: 'Все' },
-  { value: 'in', label: 'Приходы' },
-  { value: 'out', label: 'Выдачи' },
-  { value: 'waste', label: 'Брак' },
-];
-
-/** Что показывает лента: приходы, пересчёты, брак и выдачи вне рациона (кормление по рациону — не здесь). */
-const IN_LEDGER: StockMove['reason'][] = ['in', 'fix', 'waste', 'extra'];
-
-export function matchesLedger(m: StockMove, f: LedgerFilter): boolean {
-  if (!IN_LEDGER.includes(m.reason)) return false;
-  if (f === 'in') return m.reason === 'in';
-  if (f === 'out') return m.reason === 'extra';
-  if (f === 'waste') return m.reason === 'waste';
-  return true;
-}
+/**
+ * Лента «Привозили»: приходы и пересчёты — чтобы помнить, когда и что привозили, и вовремя заказать снова.
+ * Выдачи и брак не считаем: «Фураж» — не бухгалтерия, в цирке продукты всё равно раздают друг другу.
+ */
+const IN_LEDGER: StockMove['reason'][] = ['in', 'fix'];
 
 /**
  * Лента фуража: текущий город отдельно, прошлые — архивом по городам (свежие сверху).
  * Без отмеченных городов архив — всё старше 30 дней одним блоком «Раньше».
  */
-export function ledger(moves: StockMove[], stops: TourStop[], f: LedgerFilter, today = isoDate()) {
+export function ledger(moves: StockMove[], stops: TourStop[], today = isoDate()) {
   const start = periodStart(stops, today);
-  const list = moves.filter((m) => !m.deleted && matchesLedger(m, f)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  const list = moves.filter((m) => !m.deleted && IN_LEDGER.includes(m.reason)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const current = list.filter((m) => localDay(m.created_at) >= start);
   const groups = new Map<string, { stop: TourStop | undefined; moves: StockMove[] }>();
   for (const m of list) {

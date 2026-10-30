@@ -14,17 +14,15 @@ describe('гастроли: город и лента фуража', () => {
     expect(currentStop(stops, '2026-10-01')?.city).toBe('Казань');
   });
 
-  it('лента: текущий город отдельно, прошлое — архивом по городам; фильтр по типу', () => {
-    const moves = [mv('a', 'in', '2026-10-25'), mv('b', 'waste', '2026-10-26', -1), mv('c', 'in', '2026-09-15'), mv('d', 'feed', '2026-10-26', -2), mv('e', 'extra', '2026-08-01', -1)];
-    const all = ledger(moves, stops, 'all', '2026-10-30');
-    expect(all.current.map((m) => m.id)).toEqual(['b', 'a']); // кормление по рациону в ленту не входит
-    expect(all.archive.map((g) => [g.stop?.city ?? 'Раньше', g.moves.map((m) => m.id)])).toEqual([['Казань', ['c']], ['Раньше', ['e']]]);
-    expect(ledger(moves, stops, 'in', '2026-10-30').current.map((m) => m.id)).toEqual(['a']);
-    expect(ledger(moves, stops, 'waste', '2026-10-30').current.map((m) => m.id)).toEqual(['b']);
+  it('«Привозили»: только приходы и пересчёты; текущий город отдельно, прошлое — архивом по городам', () => {
+    const moves = [mv('a', 'in', '2026-10-25'), mv('f', 'fix', '2026-10-26'), mv('b', 'extra', '2026-10-26', -1), mv('c', 'in', '2026-09-15'), mv('d', 'feed', '2026-10-26', -2), mv('e', 'in', '2026-08-01')];
+    const r = ledger(moves, stops, '2026-10-30');
+    expect(r.current.map((m) => m.id)).toEqual(['f', 'a']); // выдачи и кормление — не здесь
+    expect(r.archive.map((g) => [g.stop?.city ?? 'Раньше', g.moves.map((m) => m.id)])).toEqual([['Казань', ['c']], ['Раньше', ['e']]]);
   });
 
   it('без отмеченных городов — последние 30 дней, остальное «Раньше»', () => {
-    const r = ledger([mv('new', 'in', '2026-10-25'), mv('old', 'in', '2026-09-01')], [], 'all', '2026-10-30');
+    const r = ledger([mv('new', 'in', '2026-10-25'), mv('old', 'in', '2026-09-01')], [], '2026-10-30');
     expect(r.current.map((m) => m.id)).toEqual(['new']);
     expect(r.archive[0].moves.map((m) => m.id)).toEqual(['old']);
   });

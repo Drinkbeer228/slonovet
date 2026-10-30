@@ -5,10 +5,10 @@ import { addStockMove, countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
-import { LEDGER_FILTERS, currentStop, ledger, type LedgerFilter } from '../domain/stops';
+import { currentStop, ledger } from '../domain/stops';
 import { newId, put, useRows } from '../lib/store';
 import { localDay, plural, relDate, shortDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Segmented, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 const MOVE_LABEL: Partial<Record<string, string>> = { in: 'приход', fix: 'поправка', waste: 'брак', extra: 'вне рациона' };
@@ -600,21 +600,19 @@ function LedgerRow({ m, items }: { m: StockMove; items: StockItem[] }) {
 const LEDGER_PAGE = 20;
 
 /**
- * «Приход, выдачи и брак»: по умолчанию — только текущий город (с дня приезда); прошлые города — свёрнутым архивом.
- * Сверху фильтр «Все / Приходы / Выдачи / Брак». История не теряется — она просто не мешает.
+ * «Привозили»: приходы и пересчёты текущего города (с дня приезда); прошлые города — свёрнутым архивом.
+ * Не бухгалтерия: только чтобы помнить, что и когда привозили, и вовремя заказать.
  */
 function Ledger({ moves, items }: { moves: StockMove[]; items: StockItem[] }) {
   const stops = useRows('tour_stops');
-  const [filter, setFilter] = useState<LedgerFilter>('all');
   const [more, setMore] = useState(false);
   const [archive, setArchive] = useState(false);
-  const { start, current, archive: past } = ledger(moves, stops, filter);
+  const { start, current, archive: past } = ledger(moves, stops);
   const here = currentStop(stops);
-  if (!current.length && !past.length && filter === 'all') return null;
+  if (!current.length && !past.length) return null;
   const shown = more ? current : current.slice(0, LEDGER_PAGE);
   return (
-    <Section id="stock-history" title="Приход, выдачи и брак" aside={here ? `${here.city} · с ${shortDate(here.arrive_on)}` : `с ${shortDate(start)}`}>
-      <Segmented label="Какие движения" value={filter} onChange={setFilter} options={LEDGER_FILTERS} />
+    <Section id="stock-history" title="Привозили" aside={here ? `${here.city} · с ${shortDate(here.arrive_on)}` : `с ${shortDate(start)}`}>
       {current.length ? (
         <Card className="divide-y divide-edge overflow-hidden">
           {shown.map((m) => (
