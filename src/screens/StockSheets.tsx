@@ -34,15 +34,18 @@ function AmountRow({ it, value, onChange, hint }: { it: StockItem; value: string
         <span className="text-[15px] font-bold">{it.name}</span>
         {hint && <span className="text-[12px] font-semibold text-muted">{hint}</span>}
       </span>
-      <input
-        className={`${inputCls} h-11 w-20 text-right`}
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/[^\d.,]/g, ''))}
-        aria-label={`${it.name}, ${unitOf(it).label}`}
-        placeholder="0"
-      />
-      <span className="w-14 text-[13px] font-semibold text-muted">{unitOf(it).label}</span>
+      {/* поле — своей колонкой: общий inputCls растягивает на всю ширину и налезал на название */}
+      <span className="w-24 shrink-0">
+        <input
+          className={`${inputCls} h-11 text-right`}
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/[^\d.,]/g, ''))}
+          aria-label={`${it.name}, ${unitOf(it).label}`}
+          placeholder="0"
+        />
+      </span>
+      <span className="w-14 shrink-0 text-[13px] font-semibold text-muted">{unitOf(it).label}</span>
     </label>
   );
 }
