@@ -37,7 +37,7 @@ export function HandedShift({ shift, onAcceptOwn }: { shift: Shift; onAcceptOwn:
         <Button kind="ghost" full onClick={() => setCancel(true)}>
           Вернуть дежурство себе
         </Button>
-        <button type="button" onClick={onAcceptOwn} className="py-2 text-[13px] font-bold text-muted">
+        <button type="button" onClick={onAcceptOwn} className="min-h-11 py-2 text-[13px] font-bold text-muted">
           Принимаю дальше сам →
         </button>
       </div>
@@ -85,10 +85,10 @@ export function NotHandedHint({ shift, user }: { shift: Shift; user: CurrentUser
       <p className="m-0 text-[15px] font-bold">Дежурит {shift.keeper_name}</p>
       <p className="m-0 text-[14px] text-ink2">Если он ушёл и не сдал смену, можно заступить сразу.</p>
       <div className="flex flex-wrap gap-x-5">
-        <button type="button" onClick={() => syncNow().catch(() => undefined)} className="py-2 text-[13px] font-bold text-teal">
+        <button type="button" onClick={() => syncNow().catch(() => undefined)} className="min-h-11 py-2 text-[13px] font-bold text-teal">
           Он уже сдал? Обновить
         </button>
-        <button type="button" onClick={() => setTakeover(true)} className="py-2 text-[13px] font-bold text-teal">
+        <button type="button" onClick={() => setTakeover(true)} className="min-h-11 py-2 text-[13px] font-bold text-teal">
           Заступить (смена не сдана)
         </button>
       </div>

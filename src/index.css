@@ -58,7 +58,7 @@
   --shadow-sheet: 0 -14px 44px -8px rgb(0 0 0 / 0.75);
 }
 
-/* Светлая тема: для улицы днём */
+/* Светлая тема: для улицы днём. Вторичный текст держит 6:1 и выше даже на surface2 — на солнце 4.5 не хватает */
 :root[data-theme='light'] {
   --color-bg: #f3f6f7;
   --color-surface: #ffffff;
@@ -66,16 +66,16 @@
   --color-line: #c9d5db;
   --color-ink: #0f1b22;
   --color-ink2: #2b3f4d;
-  --color-muted: #4d6270;
-  --color-faint: #5d717e;
-  --color-teal: #07796b;
+  --color-muted: #3a4c58;
+  --color-faint: #4a5d69;
+  --color-teal: #066b5f;
   --color-teal-ink: #ffffff;
   --color-amber: #8f5a00;
   --color-coral: #c22e1d;
   --color-sky: #1665b0;
   --color-violet: #6a3fc4;
   --color-nav: #ffffff;
-  --color-tick: #7b8f9b;
+  --color-tick: #6b7f8b;
   --color-track: #9fb0ba;
   --color-dot0: #9bd6cc;
   --color-dot1: #f0a81a;
@@ -88,8 +88,8 @@
   --color-coral-fg: #a32718;
   --color-sky-fg: #13599b;
   --color-violet-fg: #663cbc;
-  --color-edge: rgb(15 27 34 / 0.1);
-  --color-edge-hi: rgb(15 27 34 / 0.14);
+  --color-edge: rgb(15 27 34 / 0.14);
+  --color-edge-hi: rgb(15 27 34 / 0.2);
   --color-hl: rgb(255 255 255 / 0.9);
   --color-hl-soft: rgb(255 255 255 / 0.7);
   --color-sheen: rgb(255 255 255 / 0.7);

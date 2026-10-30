@@ -4,7 +4,6 @@ import { ELEPHANTS } from '../../domain/elephants';
 import { FREQ_LABEL, answerPresets, currentShift, onRestDay, overdue, requestProgress, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import { addMark, setPurchaseStatus } from '../../domain/actions';
 import { GROUPS, GROUP_TITLE, boardAttention, boardGroups, type BoardFilter, type BoardItem, type BoardType } from '../../domain/board';
-import { haptics } from '../../lib/haptics';
 import type { CurrentUser, ElephantName, Purchase, RequestFrequency, Shift, VetRequest } from '../../domain/types';
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
@@ -240,7 +239,6 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
 function QuickMark({ req, todo, shift, user, onPhoto }: { req: VetRequest; todo: RequestTodo; shift: Shift; user: CurrentUser; onPhoto: () => void }) {
   const mark = async (answer = '') => {
     await addMark(req.id, shift, user, answer);
-    haptics.success();
     toast(answer ? `Отмечено: ${answer}` : 'Отмечено');
   };
   if (req.needs_photo) {
@@ -326,7 +324,6 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
                     type="button"
                     onClick={async () => {
                       await addMark(req.id, shift!, user, o);
-                      haptics.success();
                       toast(`Отмечено: ${o}`);
                     }}
                     className={`h-11 rounded-xl px-2 text-[15px] font-extrabold text-ink ${KEY}`}
@@ -342,7 +339,6 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
                 full
                 onClick={async () => {
                   await addMark(req.id, shift!, user);
-                  haptics.success();
                   toast('Отмечено');
                 }}
               >

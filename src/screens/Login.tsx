@@ -116,7 +116,7 @@ export function Login() {
             {busy ? 'Входим…' : 'Войти'}
           </Button>
           {!navigator.onLine && <p className="m-0 text-center text-[13px] font-semibold text-muted">Для первого входа нужен интернет</p>}
-          <button type="button" onClick={() => setForgot(!forgot)} aria-expanded={forgot} className="mx-auto py-2 text-[14px] font-bold text-teal">
+          <button type="button" onClick={() => setForgot(!forgot)} aria-expanded={forgot} className="mx-auto min-h-11 py-2 text-[14px] font-bold text-teal">
             Забыли пароль?
           </button>
           {forgot && (
@@ -129,7 +129,7 @@ export function Login() {
 
       {!isServerFromEnv() && (
         <Card className="flex flex-col gap-3 p-4">
-          <button type="button" className="text-left text-[15px] font-bold" onClick={() => setServerOpen(!serverOpen)} aria-expanded={serverOpen}>
+          <button type="button" className="min-h-11 text-left text-[15px] font-bold" onClick={() => setServerOpen(!serverOpen)} aria-expanded={serverOpen}>
             {cfg ? 'Сервер подключён · изменить' : 'Подключить сервер Supabase'}
           </button>
           {serverOpen && (

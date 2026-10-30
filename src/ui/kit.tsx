@@ -274,7 +274,10 @@ export function Segmented<T extends string>({
             key={o.value}
             type="button"
             aria-pressed={on}
-            onClick={() => onChange(o.value)}
+            onClick={() => {
+              if (!on) haptics.tap();
+              onChange(o.value);
+            }}
             className={`h-11 rounded-xl text-[15px] font-extrabold transition-transform active:scale-[0.97] ${
               on ? `${KEY} text-teal-fg [text-shadow:0_0_12px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]` : 'border border-transparent text-muted'
             }`}
@@ -298,7 +301,10 @@ export function Chip({ on, children, onClick, tone = 'ink' }: { on: boolean; chi
     <button
       type="button"
       aria-pressed={on}
-      onClick={onClick}
+      onClick={() => {
+        haptics.tap();
+        onClick();
+      }}
       className={`h-11 rounded-xl border px-3.5 text-[14px] font-bold transition-transform active:scale-[0.97] ${on ? active : 'border-edge bg-well text-ink2 shadow-(--shadow-well)'}`}
     >
       {children}
@@ -308,7 +314,11 @@ export function Chip({ on, children, onClick, tone = 'ink' }: { on: boolean; chi
 
 export function Check({ on, label, sub, onChange }: { on: boolean; label: ReactNode; sub?: ReactNode; onChange: (v: boolean) => void }) {
   return (
-    <button type="button" role="checkbox" aria-checked={on} onClick={() => onChange(!on)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+    <button type="button" role="checkbox" aria-checked={on} onClick={() => {
+        haptics.tap();
+        onChange(!on);
+      }}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left">
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={`text-[15px] font-bold ${on ? 'text-faint' : ''}`}>{label}</span>
         {sub && <span className="text-[12px] font-semibold text-muted">{sub}</span>}
@@ -332,8 +342,11 @@ export function Stepper({ value, onChange, min = 0, label }: { value: number; on
       <button
         type="button"
         aria-label={`${label}: меньше`}
-        onClick={() => onChange(Math.max(min, value - 1))}
-        className={`h-10 w-10 rounded-[14px] text-[22px] font-bold ${KEY}`}
+        onClick={() => {
+          haptics.tap();
+          onChange(Math.max(min, value - 1));
+        }}
+        className={`h-11 w-11 rounded-[14px] text-[22px] font-bold ${KEY}`}
       >
         −
       </button>
@@ -343,8 +356,11 @@ export function Stepper({ value, onChange, min = 0, label }: { value: number; on
       <button
         type="button"
         aria-label={`${label}: больше`}
-        onClick={() => onChange(value + 1)}
-        className={`h-10 w-10 rounded-[14px] text-[22px] font-bold ${KEY}`}
+        onClick={() => {
+          haptics.tap();
+          onChange(value + 1);
+        }}
+        className={`h-11 w-11 rounded-[14px] text-[22px] font-bold ${KEY}`}
       >
         +
       </button>
@@ -713,7 +729,10 @@ function emitToasts() {
   toastListeners.forEach((l) => l());
 }
 
+/** Всплывашка + виброотклик: «готово» — мягкий двойной, ошибка — настойчивый. */
 export function toast(text: string, kind: 'ok' | 'error' = 'ok') {
+  if (kind === 'ok') haptics.success();
+  else haptics.error();
   const id = Date.now() + Math.random();
   toasts = [...toasts, { id, text, kind }];
   emitToasts();
@@ -812,8 +831,10 @@ export function FilePreview({ file, onRemove }: { file: File; onRemove: () => vo
   return (
     <div className="relative h-20 w-20 overflow-hidden rounded-xl bg-surface2">
       {url && <img src={url} alt="" className="h-full w-full object-cover" />}
-      <button type="button" onClick={onRemove} aria-label="Убрать фото" className="absolute right-1 top-1 rounded-lg bg-black/70 p-1 text-ink">
+      <button type="button" onClick={onRemove} aria-label="Убрать фото" className="absolute right-0 top-0 flex h-11 w-11 items-start justify-end p-1.5 text-white">
+        <span className="rounded-lg bg-black/70 p-1">
         <Icon name="x" size={14} stroke={2.6} />
+        </span>
       </button>
     </div>
   );
