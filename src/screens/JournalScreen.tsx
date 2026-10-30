@@ -146,6 +146,11 @@ function DaysView() {
               <span className={`h-2.5 w-2.5 rounded-[3px] ${PAD.coral}`} />
               плохо
             </span>
+            {/* открытая смена в календаре бледнее — объясняем здесь, а не загадкой */}
+            <span className="inline-flex items-center gap-1">
+              <span className={`h-2.5 w-2.5 rounded-[3px] opacity-60 ${PAD.teal}`} />
+              идёт
+            </span>
           </div>
         </Card>
       </div>
@@ -320,7 +325,7 @@ function ShiftDetails({ shift, sample }: { shift: Shift; sample?: boolean }) {
               )}
               {shift.note && (
                 <span className="px-4 py-2.5 text-[14px] leading-relaxed">
-                  <span className="font-bold text-muted">Передал следующему:</span> {shift.note}
+                  <span className="font-bold text-muted">{shift.handed_at ? 'Передал следующему:' : 'Заметка следующему:'}</span> {shift.note}
                 </span>
               )}
             </Card>
