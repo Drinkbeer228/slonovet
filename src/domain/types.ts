@@ -226,6 +226,19 @@ export interface Supplier extends Base {
   created_by: string;
 }
 
+/** Контейнер с реквизитом: номер как на ящике («6», «6А», «Р-12»), фура и опись по строке на предмет. */
+export interface Container extends Base {
+  number: string;
+  truck: string;
+  contents: string;
+  note: string;
+  /** схема погрузки («тетрис»): порядок и место в фуре — каркас, пока не заполняется */
+  load_order?: number | null;
+  slot_x?: number | null;
+  slot_y?: number | null;
+  created_by: string;
+}
+
 export type PurchaseStatus = 'new' | 'ordered' | 'done' | 'cancelled';
 
 /** Закупка: кто-то просит купить; администратор/директор отмечает «заказано» и «привезли». */
@@ -259,6 +272,7 @@ export interface TableMap {
   purchases: Purchase;
   tour_stops: TourStop;
   suppliers: Supplier;
+  containers: Container;
 }
 
 export type TableName = keyof TableMap;
@@ -277,6 +291,7 @@ export const TABLES: TableName[] = [
   'purchases',
   'tour_stops',
   'suppliers',
+  'containers',
 ];
 
 export interface CurrentUser {
