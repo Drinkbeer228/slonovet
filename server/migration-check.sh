@@ -59,20 +59,20 @@ begin
   raise notice 'ok: колонки, триггер и политика на месте';
 
   -- 2. принятие без сдачи: смена Б закрывает открытую смену А как takeover
-  perform public.apply_shift_patch('T-A', jsonb_build_object('date', '2030-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2030-01-01T08:00:00Z'), '[]');
-  perform public.apply_shift_patch('T-B', jsonb_build_object('date', '2030-01-01', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2030-01-01T20:00:00Z', 'accepted_from', 'T-A'), '[]');
+  perform public.apply_shift_patch('T-A', jsonb_build_object('id', 'T-A', 'date', '2030-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2030-01-01T08:00:00Z'), '[]');
+  perform public.apply_shift_patch('T-B', jsonb_build_object('id', 'T-B', 'date', '2030-01-01', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2030-01-01T20:00:00Z', 'accepted_from', 'T-A'), '[]');
   select status, close_reason, closed_by into s from public.shifts where id = 'T-A';
   if s.status <> 'handed' or s.close_reason <> 'takeover' or s.closed_by <> kb then raise exception 'FAIL takeover: % % %', s.status, s.close_reason, s.closed_by; end if;
   raise notice 'ok: принятие без сдачи закрыло прежнюю смену (takeover)';
 
   -- 3. новые сутки у того же человека: rollover
-  perform public.apply_shift_patch('T-C', jsonb_build_object('date', '2030-01-02', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2030-01-02T08:00:00Z', 'accepted_from', 'T-B'), '[]');
+  perform public.apply_shift_patch('T-C', jsonb_build_object('id', 'T-C', 'date', '2030-01-02', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2030-01-02T08:00:00Z', 'accepted_from', 'T-B'), '[]');
   select close_reason into s from public.shifts where id = 'T-B';
   if s.close_reason <> 'rollover' then raise exception 'FAIL rollover: %', s.close_reason; end if;
   raise notice 'ok: новые сутки закрыли прежнюю как rollover';
 
   -- 4. опоздавшая старая смена приходит уже закрытой и никому не отказывают
-  perform public.apply_shift_patch('T-D', jsonb_build_object('date', '2030-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2030-01-01T12:00:00Z'), '[]');
+  perform public.apply_shift_patch('T-D', jsonb_build_object('id', 'T-D', 'date', '2030-01-01', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2030-01-01T12:00:00Z'), '[]');
   select status, close_reason into s from public.shifts where id = 'T-D';
   if s.status <> 'handed' or s.close_reason <> 'superseded' then raise exception 'FAIL superseded: % %', s.status, s.close_reason; end if;
   select count(*) into n from public.shifts where status = 'open' and not deleted;
@@ -94,14 +94,14 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', s.uid, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     begin
-      perform public.apply_shift_patch('T-R-' || s.who, jsonb_build_object('date', '2030-01-05', 'keeper_id', s.uid, 'keeper_name', 'X', 'status', 'open', 'accepted_at', '2030-01-05T08:00:00Z'), '[]');
+      perform public.apply_shift_patch('T-R-' || s.who, jsonb_build_object('id', 'T-R-' || s.who, 'date', '2030-01-05', 'keeper_id', s.uid, 'keeper_name', 'X', 'status', 'open', 'accepted_at', '2030-01-05T08:00:00Z'), '[]');
       raise notice 'ok: % записал свою смену', s.who;
     exception when others then
       execute 'reset role';
       raise exception 'FAIL: % не смог записать свою смену: %', s.who, sqlerrm;
     end;
     begin
-      perform public.apply_shift_patch('T-X-' || s.who, jsonb_build_object('date', '2030-01-06', 'keeper_id', ka, 'keeper_name', 'чужая', 'status', 'open', 'accepted_at', '2030-01-06T08:00:00Z'), '[]');
+      perform public.apply_shift_patch('T-X-' || s.who, jsonb_build_object('id', 'T-X-' || s.who, 'date', '2030-01-06', 'keeper_id', ka, 'keeper_name', 'чужая', 'status', 'open', 'accepted_at', '2030-01-06T08:00:00Z'), '[]');
       execute 'reset role';
       raise exception 'FAIL: % записал смену за другого', s.who;
     exception when insufficient_privilege then
