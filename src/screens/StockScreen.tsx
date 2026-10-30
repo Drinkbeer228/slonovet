@@ -1,7 +1,7 @@
 import { EDITORS, canEdit } from '../domain/access';
 import { PurchasesBlock } from './PurchasesView';
 import { useMemo, useState } from 'react';
-import { addStockMove, countStock } from '../domain/actions';
+import { addStockMove, addStockMoveNote, countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { STOCK_CATEGORIES, toStockUnits, balances, categoryOf, countText, deleteBlocker, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
@@ -174,7 +174,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       )}
 
       <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
-        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по рациону в 19:00, мешки — по счётчику «Мешков взяли». Фрукты и овощи на манеже и шоу — «Вне рациона» в дежурстве, остальные расхождения — поправка остатка.
+        Каши и зерно из рациона списываются сами, когда кипер отмечает кормление. Сено — по числу выданных тюков, овощи — по рациону в 19:00, мешки — по счётчику «Мешков взяли». Фрукты и овощи на манеже и шоу — «Вне рациона» в дежурстве; испортилось (сырое сено, гниль, мыши) — «Списать брак» в позиции; остальные расхождения — поправка остатка.
         {canWrite && ' Нажми на позицию, чтобы поправить остаток, переименовать или удалить.'}
       </p>
 
@@ -323,6 +323,7 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
             </Field>
           </div>
         )}
+        <WasteBlock item={it} user={user} shiftId={shiftId} onDone={close} />
         <div className="flex flex-col gap-3 border-t border-edge pt-4">
           <Field label="Название">
             <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
@@ -350,6 +351,46 @@ function AdjustSheet({ view, user, shiftId, onClose }: { view: StockView | null;
         onClose={() => setConfirmDelete(false)}
       />
     </Sheet>
+  );
+}
+
+/** Почему списали брак — чипами, без ввода. */
+const WASTE_REASONS = ['Сырое / гниль', 'Мыши, погрызли', 'Испортилось в дороге', 'Другое'];
+
+/**
+ * «Списать брак» прямо в позиции: сколько и почему. Уходит со склада отдельным движением «брак» —
+ * его видно в ленте «Приход, выдачи и брак» под фильтром «Брак».
+ */
+function WasteBlock({ item, user, shiftId, onDone }: { item: StockItem; user: CurrentUser; shiftId: string | null; onDone: () => void }) {
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState(WASTE_REASONS[0]);
+  const unit = item.kind === 'count' ? countWords(item.id, item.unit)[2] : 'кг';
+  const n = Number(amount.replace(',', '.')) || 0;
+  return (
+    <div className="flex flex-col gap-2 border-t border-edge pt-4">
+      <span className="text-[15px] font-bold">Списать брак</span>
+      <div className="flex flex-wrap gap-2">
+        {WASTE_REASONS.map((r) => (
+          <Chip key={r} on={reason === r} onClick={() => setReason(r)}>
+            {r}
+          </Chip>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input className={inputCls} type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={`Сколько, ${unit}`} aria-label={`Сколько брака, ${unit}`} />
+        <Button
+          className="shrink-0"
+          disabled={n <= 0}
+          onClick={async () => {
+            await addStockMoveNote(item.id, -n, 'waste', reason, user, shiftId);
+            toast(`${item.name}: списано ${fmtNum(n)} ${unit} — ${reason.toLowerCase()}`);
+            onDone();
+          }}
+        >
+          Списать
+        </Button>
+      </div>
+    </div>
   );
 }
 
