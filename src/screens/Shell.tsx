@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
-import { MANAGES } from '../domain/access';
+import { MANAGES, canEdit } from '../domain/access';
+import { boardAttention } from '../domain/board';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
@@ -184,7 +185,7 @@ export function TopBar({
 /**
  * Цифры на разделах — чтобы не открывать вкладку проверять: на «Дежурстве» — сколько назначений ждёт
  * ответа в открытом дежурстве, на «Фураже» — сколько позиций заканчивается (как в плашке «Заканчивается»),
- * на «Задачах» — в скольких задачах новое в обсуждении.
+ * на «Задачах» — новое в обсуждении плюс просроченное и срочное без отметки.
  */
 export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   const requests = useRows('requests');
@@ -194,9 +195,10 @@ export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   const moves = useRows('stock_moves');
   const diets = useRows('diets');
   const comments = useRows('request_comments');
+  const purchases = useRows('purchases');
   const read = useReadMarks(user.id);
   const shift = currentShift(shifts);
-  const left = shift ? dutyTodos(requests, marks, shift).filter((t) => !t.done).length : 0;
+  const left = shift ? dutyTodos(requests, marks, shift, isoDate()).filter((t) => !t.done).length : 0;
   const low = useMemo(() => {
     const bal = balances(moves);
     const perDay = stockPerDay(items, diets, moves);
@@ -204,7 +206,10 @@ export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   }, [items, moves, diets]);
   const active = new Set(requests.filter((r) => r.status === 'active' && !r.deleted).map((r) => r.id));
   const talk = unreadRequests(comments, user.id, read, active);
-  return { shift: left, stock: low, requests: talk };
+  // на «Задачах»: новое в обсуждении + просроченное и срочное без отметки (у закупщиков — и срочные закупки)
+  const att = boardAttention(requests, purchases, marks);
+  const late = att.elephants + att.work + (canEdit('purchases', user.role) ? att.purchases : 0);
+  return { shift: left, stock: low, requests: talk + late };
 }
 
 function Badge({ n, urgent }: { n?: number; urgent?: boolean }) {

@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react';
 import { addMark } from '../../domain/actions';
 import { haptics } from '../../lib/haptics';
-import { FREQ_LABEL, dutyTodos, overdue, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
-import type { CurrentUser, Shift, VetRequest } from '../../domain/types';
+import { FREQ_LABEL, dutyTodos, isFailedMark, markAnswer, overdue, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import { canUndoMark } from '../../domain/access';
+import type { CurrentUser, RequestMark, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
 import { TASK_TYPE, taskType } from '../taskType';
 import { Icon } from '../../ui/Icon';
 import { remove, useRows } from '../../lib/store';
-import { shortDate, timeOf } from '../../lib/dates';
-import { Button, CHIP, Card, Chip, FilePreview, IconButton, KEY, LateBadge, PhotoPick, PhotoThumb, Plate, Section, Sheet, TONE, UrgentBadge, inputCls, toast } from '../../ui/kit';
+import { isoDate, localDay, relDate, shortDate, timeOf } from '../../lib/dates';
+import { Button, CHIP, Card, Chip, Confirm, FilePreview, IconButton, KEY, LateBadge, PhotoPick, PhotoThumb, Plate, Section, Sheet, TONE, UrgentBadge, inputCls, toast } from '../../ui/kit';
 
 export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
-  const todos = dutyTodos(requests, marks, shift);
+  const todos = dutyTodos(requests, marks, shift, isoDate());
   const left = todos.filter((t) => !t.done).length;
   const [marking, setMarking] = useState<{ todo: RequestTodo; answer: string } | null>(null);
   const [talk, setTalk] = useState<VetRequest | null>(null);
@@ -26,6 +27,7 @@ export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser
           key={t.req.id}
           todo={t}
           user={user}
+          shiftKeeper={shift.keeper_id}
           onTalk={() => setTalk(t.req)}
           onQuick={async (answer = '') => {
             if (t.req.needs_photo) {
@@ -45,15 +47,56 @@ export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser
   );
 }
 
-function RequestCard({
+/**
+ * Строка отметки: кто, когда и что ответил. «Не получилось» — коралловым и с восклицательным знаком,
+ * чтобы не читалось как «выполнено». Отменить можно крупной кнопкой и только после подтверждения.
+ */
+export function MarkLine({ m, req, user, shiftKeeper, withDay }: { m: RequestMark; req: VetRequest; user: CurrentUser; shiftKeeper: string | null; withDay?: boolean }) {
+  const [asking, setAsking] = useState(false);
+  const failed = isFailedMark(m, req);
+  const answer = markAnswer(m, req);
+  const rest = answer ? m.note.slice(answer.length).replace(/^\s*—\s*/, '') : m.note;
+  const when = `${withDay ? `${relDate(localDay(m.done_at))} ` : ''}${timeOf(m.done_at)}`;
+  return (
+    <div className="flex items-center gap-2 text-[13px] font-semibold text-ink2">
+      {m.photo_path && <PhotoThumb path={m.photo_path} size={44} />}
+      <Icon name={failed ? 'alert' : 'check'} size={14} stroke={3} className={`shrink-0 ${failed ? 'text-coral' : 'text-teal'}`} />
+      <span className="flex-1">
+        <span className={failed ? 'font-extrabold text-coral-fg' : 'text-ink'}>{failed ? 'Не получилось' : answer ? `«${answer}»` : 'Выполнено'}</span>
+        {` · ${m.done_by}, ${when}`}
+        {rest ? ` — ${rest}` : ''}
+      </span>
+      {canUndoMark(m, user, shiftKeeper) && (
+        <Button className="-my-1 shrink-0" onClick={() => setAsking(true)}>
+          Отменить
+        </Button>
+      )}
+      <Confirm
+        open={asking}
+        title="Отменить отметку?"
+        text={`${m.done_by}, ${when}${m.note ? ` — ${m.note}` : ''}. Задача снова будет ждать отметки.`}
+        okLabel="Отменить отметку"
+        onOk={async () => {
+          await remove('request_marks', m.id);
+          toast('Отметка отменена');
+        }}
+        onClose={() => setAsking(false)}
+      />
+    </div>
+  );
+}
+
+export function RequestCard({
   todo,
   user,
+  shiftKeeper,
   onQuick,
   onDetailed,
   onTalk,
 }: {
   todo: RequestTodo;
   user: CurrentUser;
+  shiftKeeper: string | null;
   onQuick: (answer?: string) => void;
   onDetailed: () => void;
   onTalk: () => void;
@@ -97,17 +140,7 @@ function RequestCard({
       {marks.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {marks.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 text-[13px] font-semibold text-ink2">
-              {m.photo_path && <PhotoThumb path={m.photo_path} size={36} />}
-              <Icon name="check" size={14} stroke={3} className="shrink-0 text-teal" />
-              <span className="flex-1">
-                Выполнил: {m.done_by}, {timeOf(m.done_at)}
-                {m.note ? ` — ${m.note}` : ''}
-              </span>
-              <button type="button" className="-my-1.5 flex h-11 items-center px-2 text-[13px] font-bold text-muted underline" onClick={() => remove('request_marks', m.id)}>
-                отменить
-              </button>
-            </div>
+            <MarkLine key={m.id} m={m} req={req} user={user} shiftKeeper={shiftKeeper} />
           ))}
         </div>
       )}
@@ -118,7 +151,7 @@ function RequestCard({
             {/* один цельный переключатель вместо отдельных кнопок */}
             <div role="group" aria-label="Ответ" className={`grid flex-1 gap-1 rounded-xl p-0.5 ${TONE.sunken}`} style={{ gridTemplateColumns: `repeat(${Math.min(req.options.length, 3)}, minmax(0, 1fr))` }}>
               {req.options.map((o) => (
-                <button key={o} type="button" onClick={() => onQuick(o)} className={`h-10 min-w-0 truncate rounded-[10px] px-1.5 text-[14px] font-bold text-ink ${KEY}`}>
+                <button key={o} type="button" onClick={() => onQuick(o)} className={`h-11 min-w-0 truncate rounded-[10px] px-1.5 text-[14px] font-bold text-ink ${KEY}`}>
                   {o}
                 </button>
               ))}
