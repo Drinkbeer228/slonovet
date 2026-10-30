@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { canEdit } from '../domain/access';
 import type { CurrentUser, Purchase, PurchaseStatus, Supplier } from '../domain/types';
 import { logEvent } from '../lib/log';
-import { newId, put, useRows } from '../lib/store';
+import { newId, put, useEffectiveDiets, useRows } from '../lib/store';
 import { isoDate, localDay, relDate, shortDate, timeOf } from '../lib/dates';
 import { arrivePurchase, setPurchaseStatus } from '../domain/actions';
 import { currentShift } from '../domain/shift';
 import { currentStop } from '../domain/stops';
 import { QUALITY, suppliersFor } from '../domain/suppliers';
-import { categoryOf, countWords, fmtNum, packWords, toStockUnits } from '../domain/stock';
+import { balances, categoryOf, countWords, fmtNum, orderHint, packWords, stockPerDay, stockView, toStockUnits } from '../domain/stock';
 import { Button, Card, Check, Chip, DateInput, Field, KEY, Section, Sheet, UrgentBadge, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
@@ -273,6 +273,10 @@ export function NewPurchaseSheet({
   }, [open, preset]);
 
   const item = items.find((i) => i.id === itemId);
+  // сколько взять на неделю по рациону — подсказка под «Сколько», тап подставляет
+  const moves = useRows('stock_moves');
+  const { diets } = useEffectiveDiets();
+  const weekHint = item ? (orderHint(stockView(item, balances(moves).get(item.id) ?? 0, stockPerDay(items, diets, moves).get(item.id) ?? null))?.text ?? '') : '';
   const title = itemId === 'other' ? other.trim() : (item?.name ?? '');
   const sorted = [...items].sort((a, b) => a.sort - b.sort);
   const produce = sorted.filter((i) => categoryOf(i) === 'veg');
@@ -341,16 +345,25 @@ export function NewPurchaseSheet({
             <input className={inputCls} value={other} onChange={(e) => setOther(e.target.value)} placeholder="Например: соль-лизунец" />
           </Field>
         )}
-        <Field label="Сколько" hint="можно не писать">
+        <Field
+          label="Сколько — необязательно"
+          hint={
+            weekHint && amount !== weekHint ? (
+              <button type="button" onClick={() => setAmount(weekHint)} className="-my-2 flex h-11 items-center font-bold text-teal-fg">
+                на неделю ≈ {weekHint} — подставить
+              </button>
+            ) : undefined
+          }
+        >
           <input className={inputCls} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Например: 10 мешков" />
         </Field>
-        <Field label="Примечание" hint="можно не писать">
+        <Field label="Примечание — необязательно">
           <input className={inputCls} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Например: сено луговое" />
         </Field>
         <Card className="overflow-hidden">
           <Check on={urgent} label="Срочно" sub="заканчивается совсем" onChange={setUrgent} />
         </Card>
-        <p className="m-0 px-1 text-[14px] font-semibold text-muted">Закажет администратор или директор — отметят «Заказано» и «Привезли».</p>
+        <p className="m-0 px-1 text-[13px] font-semibold text-muted">Закажет администратор или директор.</p>
       </div>
     </Sheet>
   );
