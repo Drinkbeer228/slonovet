@@ -45,7 +45,8 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
 
   return (
     <div className="flex flex-col gap-6">
-      <span className="-mt-2 px-1 text-[13px] font-semibold text-muted">{longDate(isoDate())}</span>
+      {/* без отрицательного отступа: область прокрутки шторки обрезала бы дату сверху */}
+      <span className="px-1 text-[13px] font-semibold text-muted">{longDate(isoDate())}</span>
 
       {takeover && (
         <Plate glow="amber" halo className="flex gap-2.5 p-3.5">
@@ -94,6 +95,7 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
           ))}
         </Card>
         {failed.length > 0 && <p className="m-0 px-1 text-[13px] font-semibold text-amber-fg">Пункты с крестиком попадут в замечания прошлому дежурному.</p>}
+        {!allOk && <p className="m-0 px-1 text-[13px] font-semibold text-muted">Проверку можно пропустить: ответь, что успеешь, ✓ или ✗</p>}
       </Section>
 
       {prev && (
@@ -117,7 +119,8 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
         </Section>
       )}
 
-      <div className="flex flex-col gap-2">
+      {/* кнопка приёма всегда видна внизу шторки — не листать мимо проверки и замечаний */}
+      <div className="sticky -bottom-4 z-10 -mx-5 -mb-4 border-t border-edge bg-bg px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
         <Button
           kind="accent"
           big
@@ -133,7 +136,6 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
         >
           {remarks.trim() || failed.length ? 'Принять с замечаниями' : 'Принять дежурство'}
         </Button>
-        {!allOk && <p className="m-0 text-center text-[13px] font-semibold text-muted">Проверку можно пропустить: ответь, что успеешь, ✓ или ✗</p>}
       </div>
     </div>
   );
