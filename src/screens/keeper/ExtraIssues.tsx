@@ -4,14 +4,15 @@ import { categoryOf, fmtNum } from '../../domain/stock';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { remove, useRows } from '../../lib/store';
 import { timeOf } from '../../lib/dates';
-import { Button, Card, Chip, Field, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Chip, Field, Sheet, inputCls, toast } from '../../ui/kit';
+import { RowIcon } from './RowIcon';
 
 /** Поводы выдачи вне рациона: бананы и яблоки на манеже и репетициях, овощи на шоу. */
 const REASONS = ['Манеж', 'Репетиция', 'Шоу', 'Доп. кормление', 'Другое'];
 
 /**
  * «Выдали вне рациона»: фрукты на манеже, овощи на шоу. В пару тапов — что и сколько,
- * и это списывается со склада так же, как кормление.
+ * и это списывается со склада так же, как кормление. Строка карточки «За дежурство».
  */
 export function ExtraIssues({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const items = useRows('stock_items');
@@ -20,32 +21,34 @@ export function ExtraIssues({ shift, user }: { shift: Shift; user: CurrentUser }
   const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
 
   return (
-    <Card className="flex flex-col gap-2 p-4">
-      <span className="text-[15px] font-bold">Вне рациона</span>
-      {moves.length === 0 ? (
-        <span className="text-[13px] font-semibold text-muted">Фрукты на манеже, овощи на шоу — тоже уходят со склада</span>
-      ) : (
-        moves
-          .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
-          .map((m) => (
-            <div key={m.id} className="flex items-center gap-2 text-[14px]">
-              <span className="flex-1 font-semibold">
-                {nameOf(m.item_id)} · {fmtNum(-Number(m.delta))} кг
-                <span className="text-muted">
-                  {m.note ? ` · ${m.note}` : ''} · {timeOf(m.created_at)}
-                </span>
+    <div className="flex flex-col gap-2 px-4 py-3">
+      <div className="flex items-center gap-3">
+        <RowIcon icon="bowl" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[15px] font-bold">Вне рациона</span>
+          <span className="text-[12px] font-semibold text-muted">манеж и шоу</span>
+        </span>
+        <Button icon="plus" onClick={() => setOpen(true)}>
+          Выдали
+        </Button>
+      </div>
+      {moves
+        .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
+        .map((m) => (
+          <div key={m.id} className="flex items-center gap-2 pl-12 text-[14px]">
+            <span className="flex-1 font-semibold">
+              {nameOf(m.item_id)} · {fmtNum(-Number(m.delta))} кг
+              <span className="text-muted">
+                {m.note ? ` · ${m.note}` : ''} · {timeOf(m.created_at)}
               </span>
-              <button type="button" className="-my-2 px-2 py-3 text-[13px] font-bold text-muted underline" onClick={() => remove('stock_moves', m.id)}>
-                отменить
-              </button>
-            </div>
-          ))
-      )}
-      <Button icon="plus" full onClick={() => setOpen(true)}>
-        Выдали вне рациона
-      </Button>
+            </span>
+            <button type="button" className="-my-2 px-2 py-3 text-[13px] font-bold text-muted underline" onClick={() => remove('stock_moves', m.id)}>
+              отменить
+            </button>
+          </div>
+        ))}
       <ExtraSheet open={open} shift={shift} user={user} onClose={() => setOpen(false)} />
-    </Card>
+    </div>
   );
 }
 

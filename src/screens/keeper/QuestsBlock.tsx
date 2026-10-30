@@ -6,9 +6,11 @@ import { Button, Card, Chip, KEY, Section, Segmented, Stepper, TONE, inputCls } 
 import { Icon, type IconName } from '../../ui/Icon';
 import { WhyLink } from '../common/Why';
 import { ExtraIssues } from './ExtraIssues';
+import { RowIcon } from './RowIcon';
 import { nowTime } from '../../lib/dates';
 import { logEvent } from '../../lib/log';
 
+/** Раскрывающаяся строка карточки: итог справа, подробности — по тапу. */
 function Quest({
   icon,
   title,
@@ -24,21 +26,15 @@ function Quest({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <Card className="overflow-hidden">
+    <div>
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
-        <span
-          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border ${
-            complete ? 'border-teal/40 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg shadow-(--shadow-key-on)' : `${KEY} text-ink2`
-          }`}
-        >
-          <Icon name={complete ? 'check' : icon} size={18} stroke={complete ? 2.6 : 2} />
-        </span>
+        <RowIcon icon={icon} done={complete} />
         <span className="flex-1 text-[15px] font-bold">{title}</span>
-        <span className={`text-[13px] font-bold ${complete ? 'text-teal-fg' : 'text-muted'}`}>{progress}</span>
-        <Icon name="down" size={18} className={`text-muted transition ${open ? 'rotate-180' : ''}`} />
+        <span className={`text-right text-[13px] font-bold ${complete ? 'text-teal-fg' : 'text-muted'}`}>{progress}</span>
+        <Icon name="down" size={18} className={`shrink-0 text-muted transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="border-t border-edge px-4 py-3">{children}</div>}
-    </Card>
+    </div>
   );
 }
 
@@ -87,140 +83,144 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
 
   return (
     <Section id="sec-quests" title="За дежурство">
-      <Quest
-        icon="drop"
-        title="Туалет"
-        progress={`баков ${urineTotal}${missTotal ? ` · мимо ${missTotal}` : ''} · кал ${fecesTotal}`}
-        complete={false}
-      >
-        <div className="flex flex-col gap-2.5">
-          <p className="m-0 text-[12px] font-semibold text-muted">Моча — сколько баков собрали; «мимо» — сколько раз не поймали.</p>
-          <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 text-[12px] font-bold text-muted">
-            <span />
-            <span className="w-[116px] text-center">баков мочи</span>
-            <span className="w-[116px] text-center">мимо</span>
-          </div>
-          {ELEPHANTS.map((el) => (
-            <div key={el} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2">
-              <span className="text-[15px] font-bold">{el}</span>
-              <Counter tone="teal" label={`${el}, баков мочи`} value={q.urine?.[el]?.ok ?? 0} onPlus={() => urine(el, 'ok', 1)} onMinus={() => urine(el, 'ok', -1)} />
-              <Counter tone="amber" label={`${el}, мимо`} value={q.urine?.[el]?.miss ?? 0} onPlus={() => urine(el, 'miss', 1)} onMinus={() => urine(el, 'miss', -1)} />
-            </div>
-          ))}
-          <div className="mt-1 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2 border-t border-edge pt-3">
-            <span className="text-[12px] font-bold text-muted">кал, раз за дежурство</span>
-            <span />
-            {ELEPHANTS.map((el) => (
-              <Fragment key={el}>
-                <span className="text-[15px] font-bold">{el}</span>
-                <Counter tone="teal" label={`${el}, кал`} value={feces(el)} onPlus={() => poop(el, 1)} onMinus={() => poop(el, -1)} />
-              </Fragment>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-0 pt-1">
-            <WhyLink id="urine-tank" label="зачем в бак?" />
-            <WhyLink id="urine-miss" label="зачем отмечать «мимо»?" />
-            <WhyLink id="ammonia" label="почему убирать сразу?" />
-            <WhyLink id="dry-bedding" label="почему сухая подстилка?" />
-            <WhyLink id="floor-mold" label="почему не под пол?" />
-          </div>
-        </div>
-      </Quest>
-
-      <Quest
-        icon="leaf"
-        title="Ветки"
-        progress={BRANCH_AMOUNT[branches]}
-        complete={branches > 0}
-      >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <span className="text-[14px] font-bold text-muted">Сколько дали, на глаз</span>
-            <Segmented
-              label="Сколько веток"
-              value={String(branches)}
-              onChange={(v) =>
-                updateShift(shift, (s) => {
-                  s.quests.branches = { ...(s.quests.branches ?? { kinds: [] }), amount: Number(v) };
-                })
-              }
-              options={BRANCH_AMOUNT.map((l, i) => ({ value: String(i), label: ['нет', l, 'обычно', l][i] }))}
-            />
-            <div className="flex flex-wrap gap-2">
-              {BRANCH_KINDS.map((k) => {
-                const on = q.branches?.kinds?.includes(k) ?? false;
-                return (
-                  <Chip
-                    key={k}
-                    on={on}
-                    onClick={() =>
-                      updateShift(shift, (s) => {
-                        const kinds = new Set(s.quests.branches?.kinds ?? []);
-                        if (kinds.has(k)) kinds.delete(k);
-                        else kinds.add(k);
-                        s.quests.branches = { ...(s.quests.branches ?? {}), kinds: [...kinds] };
-                      })
-                    }
-                  >
-                    {k}
-                  </Chip>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </Quest>
-
+      {/* одна плита, строки одного вида: иконка, что это, итог или управление справа */}
       <Card className="divide-y divide-edge overflow-hidden">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <span className="flex flex-1 flex-col gap-0.5">
-            <span className="text-[15px] font-bold">Мешков взяли</span>
-            <span className="text-[12px] font-semibold text-muted">240 л, из запаса</span>
-          </span>
-          <Stepper label="Мешков взяли" value={q.cleaning?.bags ?? 0} onChange={(v) => setBags(shift, v, user)} />
+        <Quest
+          icon="drop"
+          title="Туалет"
+          progress={`баков ${urineTotal}${missTotal ? ` · мимо ${missTotal}` : ''} · кал ${fecesTotal}`}
+          complete={false}
+        >
+          <div className="flex flex-col gap-2.5">
+            <p className="m-0 text-[12px] font-semibold text-muted">Моча — сколько баков собрали; «мимо» — сколько раз не поймали.</p>
+            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 text-[12px] font-bold text-muted">
+              <span />
+              <span className="w-[116px] text-center">баков мочи</span>
+              <span className="w-[116px] text-center">мимо</span>
+            </div>
+            {ELEPHANTS.map((el) => (
+              <div key={el} className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2">
+                <span className="text-[15px] font-bold">{el}</span>
+                <Counter tone="teal" label={`${el}, баков мочи`} value={q.urine?.[el]?.ok ?? 0} onPlus={() => urine(el, 'ok', 1)} onMinus={() => urine(el, 'ok', -1)} />
+                <Counter tone="amber" label={`${el}, мимо`} value={q.urine?.[el]?.miss ?? 0} onPlus={() => urine(el, 'miss', 1)} onMinus={() => urine(el, 'miss', -1)} />
+              </div>
+            ))}
+            <div className="mt-1 grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2 border-t border-edge pt-3">
+              <span className="text-[12px] font-bold text-muted">кал, раз за дежурство</span>
+              <span />
+              {ELEPHANTS.map((el) => (
+                <Fragment key={el}>
+                  <span className="text-[15px] font-bold">{el}</span>
+                  <Counter tone="teal" label={`${el}, кал`} value={feces(el)} onPlus={() => poop(el, 1)} onMinus={() => poop(el, -1)} />
+                </Fragment>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-0 pt-1">
+              <WhyLink id="urine-tank" label="зачем в бак?" />
+              <WhyLink id="urine-miss" label="зачем отмечать «мимо»?" />
+              <WhyLink id="ammonia" label="почему убирать сразу?" />
+              <WhyLink id="dry-bedding" label="почему сухая подстилка?" />
+              <WhyLink id="floor-mold" label="почему не под пол?" />
+            </div>
+          </div>
+        </Quest>
+
+        <Quest
+          icon="leaf"
+          title="Ветки"
+          progress={BRANCH_AMOUNT[branches]}
+          complete={branches > 0}
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <span className="text-[14px] font-bold text-muted">Сколько дали, на глаз</span>
+              <Segmented
+                label="Сколько веток"
+                value={String(branches)}
+                onChange={(v) =>
+                  updateShift(shift, (s) => {
+                    s.quests.branches = { ...(s.quests.branches ?? { kinds: [] }), amount: Number(v) };
+                  })
+                }
+                options={BRANCH_AMOUNT.map((l, i) => ({ value: String(i), label: ['нет', l, 'обычно', l][i] }))}
+              />
+              <div className="flex flex-wrap gap-2">
+                {BRANCH_KINDS.map((k) => {
+                  const on = q.branches?.kinds?.includes(k) ?? false;
+                  return (
+                    <Chip
+                      key={k}
+                      on={on}
+                      onClick={() =>
+                        updateShift(shift, (s) => {
+                          const kinds = new Set(s.quests.branches?.kinds ?? []);
+                          if (kinds.has(k)) kinds.delete(k);
+                          else kinds.add(k);
+                          s.quests.branches = { ...(s.quests.branches ?? {}), kinds: [...kinds] };
+                        })
+                      }
+                    >
+                      {k}
+                    </Chip>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Quest>
+
+        <div className="flex gap-3 px-4 py-3">
+          <RowIcon icon="trash" done={(q.cleaning?.bags ?? 0) > 0} />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <span className="flex min-h-9 items-center text-[15px] font-bold">Мешки, 240 л</span>
+            <div className="flex items-center gap-3">
+              <span className="flex flex-1 flex-col gap-0.5">
+                <span className="text-[14px] font-bold">Взяли</span>
+                <span className="text-[12px] font-semibold text-muted">из запаса</span>
+              </span>
+              <Stepper label="Мешков взяли" value={q.cleaning?.bags ?? 0} onChange={(v) => setBags(shift, v, user)} />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="flex flex-1 flex-col gap-0.5">
+                <span className="text-[14px] font-bold">Вывезли</span>
+                <span className="text-[12px] font-semibold text-muted">на мусорку</span>
+              </span>
+              <Stepper
+                label="Мешков вывезли"
+                value={q.cleaning?.out ?? 0}
+                onChange={(v) =>
+                  updateShift(shift, (s) => {
+                    s.quests.cleaning = { ...(s.quests.cleaning ?? {}), out: v };
+                  })
+                }
+              />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3 px-4 py-3">
-          <span className="flex flex-1 flex-col gap-0.5">
-            <span className="text-[15px] font-bold">Мешков вывезли</span>
-            <span className="text-[12px] font-semibold text-muted">на мусорку</span>
-          </span>
-          <Stepper
-            label="Мешков вывезли"
-            value={q.cleaning?.out ?? 0}
-            onChange={(v) =>
-              updateShift(shift, (s) => {
-                s.quests.cleaning = { ...(s.quests.cleaning ?? {}), out: v };
-              })
-            }
-          />
-        </div>
+
+        <ExtraIssues shift={shift} user={user} />
+
+        <WashRow shift={shift} />
       </Card>
-
-      <ExtraIssues shift={shift} user={user} />
-
-      <WashCard shift={shift} />
     </Section>
   );
 }
 
 /** Мытьё: одно нажатие; комментарий — только если было что-то особенное. */
-function WashCard({ shift }: { shift: Shift }) {
+function WashRow({ shift }: { shift: Shift }) {
   const w = shift.quests?.wash ?? (shift.quests?.shower ? { at: '' } : undefined);
   const set = (patch: Partial<NonNullable<Quests['wash']>>) =>
     updateShift(shift, (s) => {
       s.quests.wash = { at: nowTime(), ...(s.quests.wash ?? {}), ...patch };
     });
   return (
-    <Card className="flex flex-col gap-3 p-3.5">
+    <div className="flex flex-col gap-3 px-4 py-3">
       <div className="flex items-center gap-3">
-        <span
-          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border ${
-            w ? 'border-teal/40 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg shadow-(--shadow-key-on)' : `${KEY} text-ink2`
-          }`}
-        >
-          <Icon name={w ? 'check' : 'drop'} size={18} stroke={w ? 2.6 : 2} />
+        <RowIcon icon="sparkle" done={Boolean(w)} />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[15px] font-bold">{w ? 'Слоних мыли' : 'Мытьё'}</span>
+          {w?.at && <span className="text-[12px] font-semibold text-muted">в {w.at}</span>}
         </span>
-        <span className="flex-1 text-[15px] font-bold">{w ? 'Слоних мыли' : 'Мытьё'}</span>
         {w ? (
           <button
             type="button"
@@ -238,8 +238,12 @@ function WashCard({ shift }: { shift: Shift }) {
           <Button onClick={() => set({})}>Мыли сегодня</Button>
         )}
       </div>
-      {w && <WashNote value={w.note ?? ''} onCommit={(note) => set({ note })} />}
-    </Card>
+      {w && (
+        <div className="pl-12">
+          <WashNote value={w.note ?? ''} onCommit={(note) => set({ note })} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -255,7 +259,7 @@ function WashNote({ value, onCommit }: { value: string; onCommit: (v: string) =>
         onCommit(text.trim());
         logEvent('wash.note', { text: text.trim().slice(0, 200) }); // частые фразы потом превратим в кнопки
       }}
-      placeholder="Если вели себя странно или что-то особенное (необязательно)"
+      placeholder="Что-то особенное?"
     />
   );
 }
