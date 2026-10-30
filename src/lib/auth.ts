@@ -90,8 +90,8 @@ export async function resumeSession() {
 export function loginErrorText(error: { status?: number; code?: string; name?: string } | null): string {
   if (!error) return 'Неверный логин или пароль';
   if (error.code === 'invalid_credentials' || error.status === 400) return 'Неверный логин или пароль';
-  if (error.status === 429) return 'Слишком много попыток входа. Подождите минуту и попробуйте снова.';
-  return 'Нет связи с сервером. Проверьте интернет — подойдёт любой Wi‑Fi — и попробуйте ещё раз.';
+  if (error.status === 429) return 'Слишком много попыток входа. Подожди минуту и попробуй снова.';
+  return 'Нет связи с сервером. Проверь интернет — подойдёт любой Wi‑Fi — и попробуй ещё раз.';
 }
 
 export async function loginCloud(login: string, password: string): Promise<void> {
@@ -106,7 +106,7 @@ export async function loginCloud(login: string, password: string): Promise<void>
   }
   diag('login-token');
   const { data: profile, error: pErr } = await client.from('profiles').select('*').eq('id', data.user.id).single();
-  if (pErr || !profile) throw new Error('Профиль не найден. Попросите администратора проверить учётную запись.');
+  if (pErr || !profile) throw new Error('Профиль не найден. Попроси того, кто ведёт «Персонал», проверить учётную запись.');
   const p = profile as Profile;
   if (!p.active) {
     await client.auth.signOut();

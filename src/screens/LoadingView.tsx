@@ -139,7 +139,7 @@ export function LoadingView({ user, canWrite }: { user: CurrentUser; canWrite: b
       </Plate>
 
       {queue.length === 0 ? (
-        <Empty>Нечего грузить. В «Описи» укажите габариты контейнеров (длина и ширина) — или добавьте временный ящик.</Empty>
+        <Empty>Нечего грузить. В «Описи» укажи габариты контейнеров (длина и ширина) — или добавь временный ящик.</Empty>
       ) : (
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
           <TruckPlan truck={truck} placed={result.placed} letterOf={letterOf} picked={picked} onTap={tap} />
@@ -215,7 +215,7 @@ export function LoadingView({ user, canWrite }: { user: CurrentUser; canWrite: b
       )}
       {noDims.length > 0 && (
         <p className="m-0 px-1 text-[13px] font-semibold text-muted">
-          Без габаритов — не считаются: {noDims.map(containerName).join(', ')}. Впишите длину и ширину в «Описи».
+          Без габаритов — не считаются: {noDims.map(containerName).join(', ')}. Впиши длину и ширину в «Описи».
         </p>
       )}
 

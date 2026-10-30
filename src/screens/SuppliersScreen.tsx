@@ -35,7 +35,7 @@ export function SuppliersScreen({ user }: { user: CurrentUser }) {
           </Button>
         )}
       </header>
-      <input className={inputCls} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: сено, ветеринар, Казань, Иван…" aria-label="Поиск контакта" />
+      <input className={inputCls} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: сено, Казань…" aria-label="Поиск контакта" />
       {cities.length > 1 && (
         <div className="flex flex-wrap gap-2">
           <Chip on={!city} onClick={() => setCity(null)}>
@@ -50,7 +50,7 @@ export function SuppliersScreen({ user }: { user: CurrentUser }) {
         </div>
       )}
       {found.length === 0 ? (
-        <Empty>{list.length ? 'Никого не нашли' : 'Пока никого. Нашли хороший контакт — сено, ветеринара, мастера — запишите, через год пригодится.'}</Empty>
+        <Empty>{list.length ? 'Никого не нашли' : 'Пока никого. Нашёл хороший контакт — сено, ветеринара, мастера — запиши, через год пригодится.'}</Empty>
       ) : (
         byCity(found).map(([c, group]) => (
           <Section key={c} title={c ? `${c}${c === here ? ' · сейчас здесь' : ''}` : 'Без города'} aside={String(group.length)}>

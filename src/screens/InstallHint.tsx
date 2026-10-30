@@ -42,28 +42,28 @@ function Steps({ os }: { os: Platform }) {
   if (os === 'ios')
     return (
       <ol className="m-0 flex list-none flex-col gap-3 p-0">
-        {step(1, <>Откройте slonovet.ru в <b>Safari</b> (в других браузерах на iPhone так нельзя).</>)}
+        {step(1, <>Открой slonovet.ru в <b>Safari</b> (в других браузерах на iPhone так нельзя).</>)}
         {step(
           2,
           <>
-            Нажмите «Поделиться» <Icon name="share" size={17} className="inline align-[-3px] text-teal" /> внизу экрана (в новых iOS — сначала «⋯»).
+            Нажми «Поделиться» <Icon name="share" size={17} className="inline align-[-3px] text-teal" /> внизу экрана (в новых iOS — сначала «⋯»).
           </>,
         )}
-        {step(3, <>Прокрутите и выберите «На экран „Домой"».</>)}
-        {step(4, <>Нажмите «Добавить» и дальше открывайте СлоноВет с иконки.</>)}
+        {step(3, <>Прокрути и выбери «На экран „Домой"».</>)}
+        {step(4, <>Нажми «Добавить» и дальше открывай СлоноВет с иконки.</>)}
       </ol>
     );
   if (os === 'android')
     return (
       <ol className="m-0 flex list-none flex-col gap-3 p-0">
-        {step(1, <>Откройте slonovet.ru в <b>Chrome</b>.</>)}
-        {step(2, <>Нажмите ⋮ справа вверху.</>)}
-        {step(3, <>Выберите «Установить приложение» (или «Добавить на главный экран»).</>)}
+        {step(1, <>Открой slonovet.ru в <b>Chrome</b>.</>)}
+        {step(2, <>Нажми ⋮ справа вверху.</>)}
+        {step(3, <>Выбери «Установить приложение» (или «Добавить на главный экран»).</>)}
       </ol>
     );
   return (
     <ol className="m-0 flex list-none flex-col gap-3 p-0">
-      {step(1, <>В Chrome или Edge нажмите значок установки справа в адресной строке.</>)}
+      {step(1, <>В Chrome или Edge нажми значок установки справа в адресной строке.</>)}
       {step(2, <>Или меню ⋮ → «Установить СлоноВет».</>)}
     </ol>
   );
@@ -78,7 +78,7 @@ export function InstallSheet() {
     <Sheet open={isOpen} onClose={close} title="Установить на телефон">
       <div className="flex flex-col gap-5">
         {installed ? (
-          <p className="m-0 text-[15px] text-ink2">Уже установлено — вы открыли СлоноВет с иконки.</p>
+          <p className="m-0 text-[15px] text-ink2">Уже установлено — ты открыл СлоноВет с иконки.</p>
         ) : (
           <>
             <p className="m-0 text-[15px] leading-snug text-ink2">{WHY}</p>
@@ -147,7 +147,7 @@ export function InstallBanner() {
       <span className="flex gap-2.5">
         <Icon name="install" size={20} className="mt-0.5 shrink-0 text-teal-fg" />
         <span className="flex flex-col gap-0.5">
-          <span className="text-[14px] font-bold">Поставьте СлоноВет на экран телефона</span>
+          <span className="text-[14px] font-bold">Поставь СлоноВет на экран телефона</span>
           {os === 'ios' && !canPrompt ? (
             <span className="text-[13px] font-semibold leading-snug text-muted">
               В Safari: «Поделиться» <Icon name="share" size={14} className="inline align-[-2px] text-teal" /> внизу (или «⋯» → «Поделиться») → «На экран „Домой"». Данные не сотрутся, будут приходить уведомления.

@@ -39,7 +39,7 @@ export function DiscussionThread({ req, user }: { req: VetRequest; user: Current
 
   return (
     <div className="flex flex-col gap-3">
-      {list.length === 0 && <p className="m-0 text-[14px] font-semibold text-muted">Пока никто не писал. Спросите — ответ увидят все, кто откроет задачу.</p>}
+      {list.length === 0 && <p className="m-0 text-[14px] font-semibold text-muted">Пока никто не писал. Спроси — ответ увидят все, кто откроет задачу.</p>}
       {list.map((c) => {
         const mine = c.author_id === user.id;
         return (
@@ -47,7 +47,7 @@ export function DiscussionThread({ req, user }: { req: VetRequest; user: Current
               mine ? 'self-end border border-teal/30 bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)]' : `self-start ${TONE.glass}`
             }`}>
             <span className="text-[12px] font-bold text-muted">
-              {mine ? 'Вы' : c.author_name} · {relDate(localDay(c.created_at))} {timeOf(c.created_at)}
+              {mine ? 'Ты' : c.author_name} · {relDate(localDay(c.created_at))} {timeOf(c.created_at)}
             </span>
             <span className="whitespace-pre-wrap text-[15px] leading-snug">{c.text}</span>
           </div>

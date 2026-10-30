@@ -95,7 +95,7 @@ export function UsersScreen({ session, role }: { session: Session; role: Role })
                     <span className={`text-[15px] font-bold ${p.active ? '' : 'text-faint line-through'}`}>{p.full_name}</span>
                     {(seesLogins || !p.active || p.id === session.user.id) && (
                       <span className="text-[12px] font-semibold text-muted">
-                        {[seesLogins && p.login, !p.active && 'отключён', p.id === session.user.id && 'это вы'].filter(Boolean).join(' · ')}
+                        {[seesLogins && p.login, !p.active && 'отключён', p.id === session.user.id && 'это ты'].filter(Boolean).join(' · ')}
                       </span>
                     )}
                   </span>
@@ -108,7 +108,7 @@ export function UsersScreen({ session, role }: { session: Session; role: Role })
       })}
       {manages.length > 0 && (
         <p className="m-0 px-1 text-[13px] font-semibold leading-relaxed text-muted">
-          Почта не нужна: человек входит по логину и паролю, которые вы ему передадите. Забыл пароль — задайте новый здесь.
+          Почта не нужна: человек входит по логину и паролю, которые ты ему передашь. Забыл пароль — задай новый здесь.
         </p>
       )}
       <AddSheet open={adding} demo={demo} roles={roles} onClose={() => setAdding(false)} />
@@ -179,7 +179,7 @@ function AddSheet({ open, demo, roles, onClose }: { open: boolean; demo: boolean
     >
       {created ? (
         <div className="flex flex-col gap-3">
-          <p className="m-0 text-[15px] text-ink2">Передайте эти данные для входа:</p>
+          <p className="m-0 text-[15px] text-ink2">Передай эти данные для входа:</p>
           <Plate glow="teal" className="flex flex-col gap-1 p-4 text-[17px] font-bold">
             <span>
               Логин: <span className="text-teal-fg">{created.login}</span>
@@ -188,7 +188,7 @@ function AddSheet({ open, demo, roles, onClose }: { open: boolean; demo: boolean
               Пароль: <span className="text-teal-fg">{created.password}</span>
             </span>
           </Plate>
-          <p className="m-0 text-[13px] font-semibold text-muted">Пароль больше нигде не покажется — запишите.</p>
+          <p className="m-0 text-[13px] font-semibold text-muted">Пароль больше нигде не покажется — запиши.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -269,7 +269,7 @@ function EditSheet({
   const save = async () => {
     const fullName = name.trim().replace(/\s+/g, ' ');
     if (!fullName) {
-      setError('Впишите имя');
+      setError('Впиши имя');
       return;
     }
     const renamed = fullName !== profile.full_name;
@@ -347,7 +347,7 @@ function EditSheet({
           </Field>
         )}
         {!demo && (
-          <Field label="Новый пароль" hint="оставьте пустым, чтобы не менять">
+          <Field label="Новый пароль" hint="оставь пустым, чтобы не менять">
             <div className="flex gap-2">
               <input className={inputCls} value={password} onChange={(e) => setPassword(e.target.value)} autoCapitalize="none" />
               <Button icon="refresh" onClick={() => setPassword(genPassword())} className="shrink-0">

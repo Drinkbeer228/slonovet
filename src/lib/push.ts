@@ -35,7 +35,7 @@ const supported = () => {
 
 /** Обращения к service worker на iPhone иногда не отвечают вовсе — не ждём дольше 5 с. */
 function within<T>(p: Promise<T>, ms = 5000): Promise<T> {
-  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Телефон не ответил — попробуйте ещё раз')), ms))]);
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Телефон не ответил — попробуй ещё раз')), ms))]);
 }
 
 export async function pushState(): Promise<PushState> {

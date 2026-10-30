@@ -217,7 +217,7 @@ const BUILT_IN = new Set(['hay', 'veg', 'bags']);
 export function deleteBlocker(item: StockItem, diets: Diet[]): string | null {
   if (BUILT_IN.has(item.id)) return 'Списывается по счётчикам дежурства — удалить нельзя, можно переименовать.';
   if (diets.some((d) => d.meals.some((m) => m.items.some((mi) => mi.item === item.id))))
-    return 'Есть в рационе и списывается при кормлении. Сначала уберите её из рациона у врача.';
+    return 'Есть в рационе и списывается при кормлении. Сначала её убирают из рациона — это делает врач.';
   return null;
 }
 

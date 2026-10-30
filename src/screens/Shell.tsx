@@ -55,7 +55,7 @@ export function PreviewBanner({ role }: { role: Role }) {
     <Plate glow="teal" className="mb-4 flex items-center gap-3 p-3.5">
       <Icon name="users" size={20} className="shrink-0 text-teal-fg" />
       <span className="flex flex-1 flex-col">
-        <span className="text-[14px] font-bold">Вы смотрите как: {ROLE_LABEL[role]}</span>
+        <span className="text-[14px] font-bold">Смотришь как: {ROLE_LABEL[role]}</span>
         <span className="text-[12px] font-semibold text-muted">только просмотр, изменения не сохраняются</span>
       </span>
       <Button onClick={() => setPreviewRole(null)}>Выйти</Button>
@@ -294,7 +294,7 @@ export function MenuSheet({
               </span>
             ))}
             <span className="text-[13px] font-semibold text-muted">
-              На телефоне вернули, как на сервере, а то, что вы внесли, сохранено отдельно и не потеряно. Если права вернули — отправьте ещё раз.
+              На телефоне вернули, как на сервере, а то, что ты внёс, сохранено отдельно и не потеряно. Если права вернули — отправь ещё раз.
             </span>
             <Button
               icon="refresh"
@@ -413,7 +413,7 @@ export function MenuSheet({
         <Confirm
           open={confirmLogout}
           title="Не всё отправлено"
-          text={`Ждут отправки: ${s.pending}. Они сохранены на этом телефоне и уйдут, когда вы снова войдёте здесь и будет интернет. Под чужим входом они не отправятся.`}
+          text={`Ждут отправки: ${s.pending}. Они сохранены на этом телефоне и уйдут, когда ты снова войдёшь здесь и будет интернет. Под чужим входом они не отправятся.`}
           okLabel="Всё равно выйти"
           danger
           onOk={async () => {
@@ -444,7 +444,7 @@ function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
       <span className="text-[13px] font-semibold text-muted">Придут, даже когда приложение закрыто: {topics.join(', ')}.</span>
       {state === 'need-install' && (
         <>
-          <span className="text-[13px] font-semibold text-amber">На iPhone — только у приложения на экране «Домой». Сначала установите его.</span>
+          <span className="text-[13px] font-semibold text-amber">На iPhone — только у приложения на экране «Домой». Сначала установи его.</span>
           <Button
             icon="install"
             onClick={() => {
@@ -457,7 +457,7 @@ function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
         </>
       )}
       {state === 'denied' && (
-        <span className="text-[13px] font-semibold text-amber">Уведомления запрещены в настройках телефона для этого сайта — разрешите их там.</span>
+        <span className="text-[13px] font-semibold text-amber">Уведомления запрещены в настройках телефона для этого сайта — разреши их там.</span>
       )}
       {state === 'off' && (
         <Button
@@ -468,7 +468,7 @@ function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
               setState(next);
               if (next === 'on') toast('Уведомления включены');
             } catch {
-              toast('Не удалось включить — проверьте интернет', 'error');
+              toast('Не удалось включить — проверь интернет', 'error');
             }
           }}
         >

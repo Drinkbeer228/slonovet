@@ -41,7 +41,7 @@ export function Login() {
     try {
       await Promise.race([
         loginCloud(login, password),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Сервер не отвечает. Проверьте интернет — подойдёт любой Wi‑Fi — и попробуйте ещё раз.')), LOGIN_TIMEOUT)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Сервер не отвечает. Проверь интернет — подойдёт любой Wi‑Fi — и попробуй ещё раз.')), LOGIN_TIMEOUT)),
       ]);
       try {
         localStorage.setItem(LAST_LOGIN, login.trim().toLowerCase());
@@ -117,7 +117,7 @@ export function Login() {
           </Button>
           {!navigator.onLine && <p className="m-0 text-center text-[13px] font-semibold text-muted">Для первого входа нужен интернет</p>}
           <button type="button" onClick={() => setForgot(!forgot)} aria-expanded={forgot} className="mx-auto min-h-11 py-2 text-[14px] font-bold text-teal">
-            Забыли пароль?
+            Забыл пароль?
           </button>
           {forgot && (
             <p className="m-0 -mt-2 text-center text-[13px] font-semibold leading-snug text-muted">

@@ -79,7 +79,7 @@ export function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase
           </Field>
           {it.kind === 'sack' && /кг|килог/i.test(p.amount) && (
             <span className="text-[13px] font-semibold text-amber-fg">
-              В заявке «{p.amount}», а здесь считаем мешками — проверьте число.
+              В заявке «{p.amount}», а здесь считаем мешками — проверь число.
             </span>
           )}
         </div>

@@ -66,7 +66,7 @@ function Inventory({ user, canWrite }: { user: CurrentUser; canWrite: boolean })
   return (
     <>
       <div className="flex gap-2">
-        <input className={`${inputCls} min-w-0 flex-1`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Что ищем: синяя шляпа, №6, кофр…" aria-label="Поиск по контейнерам" />
+        <input className={`${inputCls} min-w-0 flex-1`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Найти: шляпа, №6…" aria-label="Поиск по контейнерам" />
         {canWrite && (
           <Button kind="accent" icon="plus" onClick={() => setEdit(blank(user, kind, purpose, place))}>
             Ящик
@@ -92,7 +92,7 @@ function Inventory({ user, canWrite }: { user: CurrentUser; canWrite: boolean })
         <ChipPick label="Что внутри" items={purposes} value={purpose} onChange={setPurpose} line />
       )}
       {found.length === 0 ? (
-        <Empty>{live.length ? 'Не нашли — проверьте опись' : 'Пока пусто. Заведите контейнер: номер, тару, габариты и что внутри — по строке на предмет.'}</Empty>
+        <Empty>{live.length ? 'Не нашли — проверь опись' : 'Пока пусто. Заведи контейнер: номер, тару, габариты и что внутри — по строке на предмет.'}</Empty>
       ) : (
         <div className="flex flex-col gap-2.5">
           {found.map(({ c, lines }) => (
