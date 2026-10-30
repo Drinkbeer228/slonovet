@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { LEVEL_LABEL, METRIC_LABEL, SAFETY_CHECKS } from '../../domain/elephants';
+import { SAFETY_CHECKS } from '../../domain/elephants';
 import { acceptShift, takeOverShift } from '../../domain/actions';
-import { acceptedBy, dutyTodos, lastHanded, shiftFlags } from '../../domain/shift';
+import { acceptedBy, lastHanded } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
-import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
-import { Button, CHIP, Card, Chip, KEY, Plate, Section, inputCls, toast } from '../../ui/kit';
+import { isoDate, longDate } from '../../lib/dates';
+import { Button, Card, Chip, KEY, Plate, Section, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
+import { PrevShiftSummary } from './PrevShiftSummary';
 
 /** Быстрые замечания при приёме — чтобы не набирать руками. */
 // частые косяки, которые оставляют сменщику (со слов слоноводов)
@@ -25,8 +26,6 @@ const REMARKS = [
 /** takeover — смена, которую не сдали (ушёл, нет связи): заступаем сразу, прежнюю закроет сервер. */
 export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: Shift }) {
   const shifts = useRows('shifts');
-  const requests = useRows('requests');
-  const marks = useRows('request_marks');
   const last = lastHanded(shifts);
   // смену, которую уже кто-то принял, второй раз не принимаем по её коду
   const prev = takeover ?? (last && !acceptedBy(shifts, last) ? last : undefined);
@@ -40,8 +39,6 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
       const parts = t.split('. ').map((x) => x.trim()).filter(Boolean);
       return (parts.includes(r) ? parts.filter((x) => x !== r) : [...parts, r]).join('. ');
     });
-  const flags = shiftFlags(prev);
-  const openReqs = prev ? dutyTodos(requests, marks, { ...prev, date: isoDate(), id: '__new__' }).filter((t) => !t.done) : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,36 +54,7 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
         </Plate>
       )}
 
-      {prev && (
-        <Section title="От прошлого дежурства" aside={`${prev.keeper_name} · ${relDate(prev.handed_at ? localDay(prev.handed_at) : prev.date)} ${timeOf(prev.handed_at)}`}>
-          <Card className="flex flex-col gap-3 p-4">
-            {prev.note ? (
-              <p className="m-0 text-[16px] leading-relaxed">{prev.note}</p>
-            ) : (
-              <p className="m-0 text-[15px] text-muted">Без заметок</p>
-            )}
-            {flags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {flags.map((f) => (
-                  <span
-                    key={`${f.elephant}-${f.metric}`}
-                    className={`${CHIP} !text-[13px] ${f.level === 2 ? '!border-coral/40 !bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] !text-coral-fg' : '!border-amber/40 !bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] !text-amber-fg'}`}
-                  >
-                    {f.elephant} · {METRIC_LABEL[f.metric].toLowerCase()} — {LEVEL_LABEL[f.level]}
-                    {f.symptoms.length > 0 && <span className="font-semibold">: {f.symptoms.join(', ')}</span>}
-                  </span>
-                ))}
-              </div>
-            )}
-            {openReqs.length > 0 && (
-              <div className="flex items-center gap-2 text-[14px] font-semibold text-amber">
-                <Icon name="message" size={18} />
-                Назначений и задач на сегодня: {openReqs.length}
-              </div>
-            )}
-          </Card>
-        </Section>
-      )}
+      {prev && <PrevShiftSummary prev={prev} />}
 
       <Section title="Проверка при приёме" aside={`${SAFETY_CHECKS.filter((c) => checks[c.key] !== undefined).length} из ${SAFETY_CHECKS.length}`}>
         <Card className="divide-y divide-edge overflow-hidden">

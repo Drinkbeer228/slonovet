@@ -15,6 +15,7 @@ import { carryFlags, durationText, feedStatus, noDutySince } from '../../domain/
 import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
+import { PrevShiftSummary } from './PrevShiftSummary';
 import { FeedingBlock } from './FeedingBlock';
 import { HandedShift, HandoverBanner, NotHandedHint } from './HandedShift';
 import { QuestsBlock } from './QuestsBlock';
@@ -106,41 +107,48 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
   const canMark = !readOnly || !keeper;
   const stale = needsRollover(shift); // вторые сутки: 24 часа от приёма
   const mine = shift.keeper_id === user.id && !readOnly;
+  // никто не дежурит: сверху приём и главное от прошлого дежурства, само дежурство целиком — по тапу
+  const [full, setFull] = useState(false);
+  const folded = Boolean(accept) && !full;
+  // компактный бар: кто дежурит, с какого часа и статус смены — в одну строку
+  const bar = (
+    <header className="flex flex-col gap-1.5">
+      <Card tone="glass" className="flex items-center gap-3 px-3.5 py-2.5">
+        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-[16px] font-extrabold text-teal-fg">
+          {shift.keeper_name.trim().charAt(0).toUpperCase()}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h1 className="m-0 truncate text-[17px] font-extrabold leading-tight">{shift.keeper_name}</h1>
+          <span className="truncate text-[13px] font-semibold text-muted">
+            {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
+            {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
+          </span>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold ${
+            stale
+              ? 'bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg'
+              : handed
+                ? 'bg-surface2 text-ink2'
+                : 'bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg'
+          }`}
+        >
+          {stale && <Icon name="alert" size={12} stroke={3} />}
+          {stale ? 'Больше суток' : handed ? 'Сдано' : 'На смене'}
+        </span>
+      </Card>
+      {readOnly && !accept && (
+        <span className="px-1 text-[13px] font-semibold text-muted">
+          {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
+        </span>
+      )}
+    </header>
+  );
 
   return (
     <div className="flex flex-col gap-6">
-      {/* компактный бар: кто дежурит, с какого часа и статус смены — в одну строку */}
-      <header className="flex flex-col gap-1.5">
-        <Card tone="glass" className="flex items-center gap-3 px-3.5 py-2.5">
-          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-[16px] font-extrabold text-teal-fg">
-            {shift.keeper_name.trim().charAt(0).toUpperCase()}
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h1 className="m-0 truncate text-[17px] font-extrabold leading-tight">{shift.keeper_name}</h1>
-            <span className="truncate text-[13px] font-semibold text-muted">
-              {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
-              {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
-            </span>
-          </div>
-          <span
-            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold ${
-              stale
-                ? 'bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg'
-                : handed
-                  ? 'bg-surface2 text-ink2'
-                  : 'bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg'
-            }`}
-          >
-            {stale && <Icon name="alert" size={12} stroke={3} />}
-            {stale ? 'Больше суток' : handed ? 'Сдано' : 'На смене'}
-          </span>
-        </Card>
-        {readOnly && !accept && (
-          <span className="px-1 text-[13px] font-semibold text-muted">
-            {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
-          </span>
-        )}
-      </header>
+      {/* никто не дежурит: бар прошлой смены — над ней самой, когда раскрыта; сверху его заменяет «От прошлого дежурства» */}
+      {!accept && bar}
       <RoadBanner />
 
       {stale && mine && (
@@ -155,55 +163,67 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       )}
 
       {accept && (
-        <div className="flex flex-col gap-2">
-          <NoDutyLine />
-          {accept}
-        </div>
+        <>
+          <div className="flex flex-col gap-2">
+            <NoDutyLine />
+            {accept}
+          </div>
+          <PrevShiftSummary prev={shift} />
+          <Button full onClick={() => setFull((v) => !v)}>
+            {full ? 'Свернуть прошлое дежурство' : 'Прошлое дежурство целиком'}
+            <Icon name="down" size={18} stroke={2.4} className={full ? 'rotate-180' : ''} />
+          </Button>
+        </>
       )}
 
-
       {someoneElses && !readOnly && <NotHandedHint shift={shift} user={user} />}
-      <HandoverBanner shift={shift} from={from} myId={user.id} />
+      {accept && full && bar}
+      {!folded && <HandoverBanner shift={shift} from={from} myId={user.id} />}
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        {/* inert — смотреть можно, нажимать нельзя */}
-        <div className="flex flex-col gap-6">
-          <div inert={!canMark}>
-            <RequestsBlock shift={shift} user={user} />
+      {!folded && (
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+          {/* inert — смотреть можно, нажимать нельзя */}
+          <div className="flex flex-col gap-6">
+            <div inert={!canMark}>
+              <RequestsBlock shift={shift} user={user} />
+            </div>
+            <div inert={readOnly}>
+              <StateMatrix shift={shift} onNote={setNoteDraft} />
+            </div>
           </div>
-          <div inert={readOnly}>
-            <StateMatrix shift={shift} onNote={setNoteDraft} />
-          </div>
-        </div>
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-6" inert={readOnly}>
-            <FeedingBlock shift={shift} user={user} />
-            <QuestsBlock shift={shift} user={user} />
-          </div>
-          <Section id="sec-notes" title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
-            {notes.length > 0 && <NotesList notes={[...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} />}
-            {/* запись может оставить любой; не кипер — и после сдачи (процедуру сделали, когда никто не дежурит) */}
-            {(!handed || !keeper) && (
-              <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}>
-                {keeper ? 'Запись или фото' : 'Запись о лечении или фото'}
-              </Button>
-            )}
-            {handed && !notes.length && <Card className="px-4 py-3 text-[15px] text-muted">Записей нет</Card>}
-          </Section>
-          {readOnly ? (
-            <Section id="sec-note" title="Следующему дежурному">
-              <Card className="px-4 py-3 text-[15px] leading-snug">{shift.note.trim() || <span className="text-muted">Без заметки</span>}</Card>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6" inert={readOnly}>
+              <FeedingBlock shift={shift} user={user} />
+              <QuestsBlock shift={shift} user={user} />
+            </div>
+            <Section id="sec-notes" title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
+              {notes.length > 0 && <NotesList notes={[...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} />}
+              {/* запись может оставить любой; не кипер — и после сдачи (процедуру сделали, когда никто не дежурит) */}
+              {(!handed || !keeper) && (
+                <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}>
+                  {keeper ? 'Запись или фото' : 'Запись о лечении или фото'}
+                </Button>
+              )}
+              {handed && !notes.length && <Card className="px-4 py-3 text-[15px] text-muted">Записей нет</Card>}
             </Section>
-          ) : (
-            <>
-              <HandoverNote shift={shift} />
-              <Button kind="primary" big full onClick={() => setHandoverOpen(true)}>
-                Сдать дежурство
-              </Button>
-            </>
-          )}
+            {/* при свёрнутом виде заметка уже стоит наверху, в «От прошлого дежурства» */}
+            {readOnly ? (
+              !accept && (
+                <Section id="sec-note" title="Следующему дежурному">
+                  <Card className="px-4 py-3 text-[15px] leading-snug">{shift.note.trim() || <span className="text-muted">Без заметки</span>}</Card>
+                </Section>
+              )
+            ) : (
+              <>
+                <HandoverNote shift={shift} />
+                <Button kind="primary" big full onClick={() => setHandoverOpen(true)}>
+                  Сдать дежурство
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <NoteSheet draft={noteDraft} shiftId={shift.id} user={user} onClose={() => setNoteDraft(null)} />
       <HandoverSheet open={handoverOpen} shift={shift} user={user} onClose={() => setHandoverOpen(false)} />
