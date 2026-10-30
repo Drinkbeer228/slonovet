@@ -68,7 +68,7 @@ export function DiscussionThread({ req, user }: { req: VetRequest; user: Current
           onClick={send}
           disabled={!text.trim() || busy}
           aria-label="Отправить"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-transparent bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/0.22),transparent_55%)] text-teal-ink shadow-(--shadow-glow-teal) transition-transform active:scale-[0.97] disabled:opacity-40"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-transparent bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)] text-teal-ink shadow-(--shadow-glow-teal) transition-transform active:scale-[0.97] disabled:opacity-40"
         >
           <Icon name="next" size={22} />
         </button>

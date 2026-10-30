@@ -49,6 +49,7 @@
   --glow: 55%;
   --wash: 26%;
   --tint: 15%;
+  --sheen-t: 0.22; /* блик на бирюзовых кнопках */
   --shadow-key: inset 0 1px 0 var(--color-hl), 0 2px 5px rgb(0 0 0 / 0.3);
   --shadow-key-on: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 0 16px -4px color-mix(in srgb, var(--color-teal) var(--glow), transparent);
   --shadow-glow-teal: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 6px 22px -4px color-mix(in srgb, var(--color-teal) calc(var(--glow) + 5%), transparent);
@@ -97,6 +98,7 @@
   --glow: 32%;
   --wash: 14%;
   --tint: 10%;
+  --sheen-t: 0.06;
   --shadow-key: inset 0 1px 0 var(--color-hl), 0 1px 3px rgb(15 27 34 / 0.18);
   --shadow-key-on: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 0 12px -4px color-mix(in srgb, var(--color-teal) var(--glow), transparent);
   --shadow-glow-teal: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 6px 18px -4px color-mix(in srgb, var(--color-teal) calc(var(--glow) + 5%), transparent);

@@ -183,7 +183,7 @@ function YesNo({ label, value, onChange }: { label: string; value: boolean | und
         aria-pressed={value === true}
         onClick={() => onChange(value === true ? undefined : true)}
         className={`${btn} ${
-          value === true ? 'border-transparent bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/0.22),transparent_55%)] text-teal-ink shadow-(--shadow-key-on)' : `${KEY} text-muted`
+          value === true ? 'border-transparent bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)] text-teal-ink shadow-(--shadow-key-on)' : `${KEY} text-muted`
         }`}
       >
         <Icon name="check" size={20} stroke={2.6} />
@@ -195,7 +195,7 @@ function YesNo({ label, value, onChange }: { label: string; value: boolean | und
         onClick={() => onChange(value === false ? undefined : false)}
         className={`${btn} ${
           value === false
-            ? 'border-transparent bg-coral bg-[linear-gradient(to_bottom,rgb(255_255_255/0.22),transparent_55%)] text-teal-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.3),0_0_16px_-4px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]'
+            ? 'border-transparent bg-coral bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)] text-teal-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.3),0_0_16px_-4px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]'
             : `${KEY} text-muted`
         }`}
       >

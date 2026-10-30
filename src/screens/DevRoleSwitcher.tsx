@@ -27,7 +27,7 @@ export function DevRoleSwitcher() {
           title={ROLE_LABEL[r]}
           onClick={() => (demo ? switchDemoRole(r) : setPreviewRole(r === 'admin' ? null : r))}
           className={`h-8 rounded-xl px-2 text-[12px] font-extrabold transition-transform active:scale-95 ${
-            current === r ? 'bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/0.22),transparent_55%)] text-teal-ink shadow-(--shadow-glow-teal)' : 'text-muted'
+            current === r ? 'bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)] text-teal-ink shadow-(--shadow-glow-teal)' : 'text-muted'
           }`}
         >
           {SHORT[r]}

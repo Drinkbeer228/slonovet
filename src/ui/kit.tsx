@@ -11,7 +11,7 @@ type BtnKind = 'primary' | 'light' | 'accent' | 'ghost' | 'danger';
 
 /* Физика: любая кнопка — выпуклая клавиша (блик по верхней фаске, мягкая тень, пружина при тапе). Цвета и свет — из токенов index.css. */
 const SHEEN = 'bg-[linear-gradient(to_bottom,var(--color-sheen),transparent_60%)]';
-const SHEEN_TEAL = 'bg-[linear-gradient(to_bottom,rgb(255_255_255/0.22),transparent_55%)]';
+const SHEEN_TEAL = 'bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)]';
 
 /** Нажимаемая клавиша: верхний блик, мягкая тень, пружина при тапе. */
 export const KEY = `border border-edge-hi bg-surface2 ${SHEEN} shadow-(--shadow-key) transition-transform active:scale-[0.97]`;
