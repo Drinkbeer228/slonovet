@@ -5,6 +5,7 @@ import { logEvent } from '../lib/log';
 import { reportLowStock } from '../lib/push';
 import { isoDate } from '../lib/dates';
 import { newShift } from './shift';
+import { canTakeShift } from './access';
 import { balances, feedUsage, toStockUnits, weighedItem } from './stock';
 import type { CurrentUser, ElephantName, Level, MetricKey, Note, NoteKind, Purchase, PurchaseStatus, Shift, StockItem, StockMove } from './types';
 
@@ -20,6 +21,8 @@ export async function updateShift(shift: Shift, fn: (s: Shift) => void) {
 }
 
 export async function acceptShift(user: CurrentUser, safety: Record<string, boolean>, from: { id: string; remarks: string } | null = null) {
+  // и takeOverShift, и rolloverShift идут через эту функцию: администратор цирка (manager) и врач не дежурят
+  if (!canTakeShift(user.role)) throw new Error('Дежурить могут только киперы и директор');
   logEvent('shift.accept', { remarks: from?.remarks?.slice(0, 200) ?? '' });
   const date = isoDate();
   // id — дата и случайный хвост: два телефона без связи в один день не создадут одну и ту же смену

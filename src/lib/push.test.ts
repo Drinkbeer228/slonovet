@@ -21,6 +21,12 @@ describe('push-уведомления: кому и что', () => {
     expect(recipients(urgent, many, null)).toEqual(['k1', 'a1', 'k3']); // смены нет — всем киперам, чтобы не потерялось
   });
 
+  it('дежурит директор — срочное назначение идёт ему, а не киперам', () => {
+    const urgent = { type: 'urgent' as const, id: 'r2', elephant: 'Претти', text: 'Смотреть ногу', author_id: 'v1' };
+    const d = people.find((x) => x.role === 'director')!;
+    expect(recipients(urgent, people, d.id)).toEqual([d.id, 'a1'].sort((x, y) => people.findIndex((p) => p.id === x) - people.findIndex((p) => p.id === y)));
+  });
+
   it('«плохо» у слонихи — врачу, директору и админу, не тому, кто отметил', () => {
     expect(recipients({ type: 'bad', shift_id: 's1', elephant: 'Одри', metric: 'legs', author_id: 'k1' }, people)).toEqual(['v1', 'd1', 'a1']);
     const m = message({ type: 'bad', shift_id: 's1', elephant: 'Одри', metric: 'legs', keeper_name: 'Дима' }, '2026-10-27');

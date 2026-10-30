@@ -46,7 +46,7 @@ declare
   s record; n int;
 begin
   select id into ka from public.profiles where role = 'keeper' and active limit 1;
-  select id into kb from public.profiles where id <> ka and active order by role = 'keeper' desc limit 1;
+  select id into kb from public.profiles where id <> ka and active and role in ('keeper', 'director', 'admin') order by role = 'keeper' desc limit 1;
   if ka is null or kb is null then raise exception 'FAIL: в копии нет двух активных профилей'; end if;
 
   -- 1. колонки, триггер, политика
@@ -85,30 +85,49 @@ begin
   if s.handover_to is distinct from '00000000-0000-0000-0000-000000000001' then raise exception 'FAIL: handover_to не записался'; end if;
   raise notice 'ok: патч новых полей работает';
 
-  -- 6. права: директор и администратор пишут только свою смену
+  -- 6. права: директор пишет только свою смену; администратор (manager) — не дежурит вообще
   select id into kd from public.profiles where role = 'director' and active limit 1;
   select id into km from public.profiles where role = 'manager' and active limit 1;
-  for s in select x.uid, x.who from (values (kd, 'директор'), (km, 'администратор')) as x(uid, who) loop
+  for s in select x.uid, x.who, x.ok from (values (kd, 'директор', true), (km, 'администратор', false)) as x(uid, who, ok) loop
     if s.uid is null then raise notice 'пропуск: в копии нет роли «%»', s.who; continue; end if;
     perform set_config('request.jwt.claim.sub', s.uid::text, true);
     perform set_config('request.jwt.claims', json_build_object('sub', s.uid, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     begin
       perform public.apply_shift_patch('T-R-' || s.who, jsonb_build_object('id', 'T-R-' || s.who, 'date', '2030-01-05', 'keeper_id', s.uid, 'keeper_name', 'X', 'status', 'open', 'accepted_at', '2030-01-05T08:00:00Z'), '[]');
-      raise notice 'ok: % записал свою смену', s.who;
-    exception when others then
       execute 'reset role';
-      raise exception 'FAIL: % не смог записать свою смену: %', s.who, sqlerrm;
+      if not s.ok then raise exception 'FAIL: % записал свою смену, а дежурить не вправе', s.who; end if;
+      raise notice 'ok: % записал свою смену', s.who;
+    exception when insufficient_privilege then
+      execute 'reset role';
+      if s.ok then raise exception 'FAIL: % не смог записать свою смену: %', s.who, sqlerrm; end if;
+      raise notice 'ok: % не может дежурить', s.who;
     end;
+    execute 'set local role authenticated';
     begin
       perform public.apply_shift_patch('T-X-' || s.who, jsonb_build_object('id', 'T-X-' || s.who, 'date', '2030-01-06', 'keeper_id', ka, 'keeper_name', 'чужая', 'status', 'open', 'accepted_at', '2030-01-06T08:00:00Z'), '[]');
       execute 'reset role';
       raise exception 'FAIL: % записал смену за другого', s.who;
     exception when insufficient_privilege then
+      execute 'reset role';
       raise notice 'ok: % не может писать чужую смену', s.who;
     end;
-    execute 'reset role';
   end loop;
+
+  -- 7. охранник: дежурным нельзя записать не кипера/директора, сдать смену можно только им, будущее время приёма подрезается
+  select id into s from public.profiles where role in ('vet', 'manager') and active limit 1;
+  if s.id is not null then
+    begin
+      perform public.apply_shift_patch('T-G1', jsonb_build_object('id', 'T-G1', 'date', '2030-01-07', 'keeper_id', s.id, 'keeper_name', 'врач', 'status', 'open', 'accepted_at', '2030-01-07T08:00:00Z'), '[]');
+      raise exception 'FAIL: дежурным записали врача или администратора';
+    exception when insufficient_privilege then
+      raise notice 'ok: дежурным нельзя записать врача или администратора';
+    end;
+  end if;
+  perform public.apply_shift_patch('T-G2', jsonb_build_object('id', 'T-G2', 'date', '2030-01-08', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2999-01-01T00:00:00Z'), '[]');
+  select accepted_at into s from public.shifts where id = 'T-G2';
+  if s.accepted_at > now() + interval '1 hour' then raise exception 'FAIL: время приёма из будущего не подрезано'; end if;
+  raise notice 'ok: время приёма из будущего подрезано';
 end $$;
 rollback;
 SQL

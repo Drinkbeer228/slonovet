@@ -26,8 +26,14 @@ export const canCloseRequest = (req: { author_id: string | null }, user: { id: s
 /** Ведёт дежурство (отметки, кормление, сдача) — только кипер. База пускает и системного админа, но экран строже. */
 export const canWorkShift = (role: Role) => role === 'keeper';
 
-/** Может заступить на дежурство (принять смену, в том числе не сданную): кипер, а также директор и администратор. */
-export const canTakeShift = (role: Role) => role === 'keeper' || role === 'director' || role === 'manager' || role === 'admin';
+/**
+ * Может заступить на дежурство (принять смену, в том числе не сданную): кипер и директор. Системный админ — аварийно
+ * (проверить или починить). Администратор цирка (manager) не дежурит и смену не перехватывает никогда.
+ */
+export const canTakeShift = (role: Role) => role === 'keeper' || role === 'director' || role === 'admin';
+
+/** Кому можно сдать смену: только тем, кто вправе дежурить по-настоящему — киперу и директору (не аварийному admin). */
+export const canReceiveHandover = (role: Role) => role === 'keeper' || role === 'director';
 
 /** С кем работает роль в «Персонале»: заводит, меняет пароль, отключает. Функция admin-users проверяет то же. */
 export const MANAGES: Partial<Record<Role, Role[]>> = {

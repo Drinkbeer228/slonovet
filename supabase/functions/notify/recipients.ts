@@ -9,7 +9,7 @@ export type Payload =
 
 /** Кто получает: срочное — дежурный кипер; «плохо» — врач и директор; закупки и «заканчивается» — те, кто заказывает. Системный админ — всё. */
 export const ROLES_FOR: Record<Payload['type'], string[]> = {
-  urgent: ['keeper', 'admin'],
+  urgent: ['keeper', 'director', 'admin'],
   bad: ['vet', 'director', 'admin'],
   purchase: ['director', 'manager', 'admin'],
   low: ['director', 'manager', 'admin'],
@@ -26,7 +26,9 @@ const short = (s: string, n = 120) => (s.length > n ? `${s.slice(0, n)}…` : s)
 export function recipients(p: Payload, profiles: { id: string; role: string; active: boolean }[], onDuty: string | null = null): string[] {
   return profiles
     .filter((x) => x.active && ROLES_FOR[p.type].includes(x.role) && x.id !== p.author_id)
-    .filter((x) => !(p.type === 'urgent' && x.role === 'keeper' && onDuty && x.id !== onDuty))
+    // дежурный может быть и директором: остальным киперам и директорам срочное не шлём; смены нет — только киперам
+    .filter((x) => !(p.type === 'urgent' && (x.role === 'keeper' || x.role === 'director') && onDuty && x.id !== onDuty))
+    .filter((x) => !(p.type === 'urgent' && x.role === 'director' && !onDuty))
     .map((x) => x.id);
 }
 
