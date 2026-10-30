@@ -4,9 +4,9 @@ import { MANAGES } from '../domain/access';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, KEY, Plate, Segmented, Sheet, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast } from '../ui/kit';
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
-import { THEME_LABEL, setTheme, useTheme, type Theme } from '../lib/theme';
+import { setTheme, useTheme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
 import { useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
@@ -474,18 +474,36 @@ function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
   );
 }
 
-/** Вид приложения: тёмная или светлая («Пиксель» убран из выбора). */
+/** Тема: компактный переключатель «луна / солнце». Круглая клавиша перекрывает выбранную иконку. */
 function ThemeCard() {
   const theme = useTheme();
+  const light = theme === 'light';
   return (
-    <div className="flex flex-col gap-2">
-      <span className="px-1 text-[14px] font-bold text-muted">Вид</span>
-      <Segmented
-        label="Вид приложения"
-        options={(['dark', 'light'] as Theme[]).map((t) => ({ value: t, label: THEME_LABEL[t] }))}
-        value={theme}
-        onChange={setTheme}
-      />
+    <div className="flex items-center justify-between gap-3 px-1">
+      <span className="text-[15px] font-bold">Тема</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={light}
+        aria-label={`Светлая тема: ${light ? 'включена' : 'выключена'}`}
+        onClick={() => setTheme(light ? 'dark' : 'light')}
+        className={`relative h-11 w-[92px] rounded-full ${TONE.sunken}`}
+      >
+        <span className="pointer-events-none absolute inset-y-0 left-0 flex w-1/2 items-center justify-center text-faint">
+          <Icon name="moon" size={18} />
+        </span>
+        <span className="pointer-events-none absolute inset-y-0 right-0 flex w-1/2 items-center justify-center text-faint">
+          <Icon name="sun" size={18} />
+        </span>
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute left-[3px] top-[3px] flex h-[calc(100%-6px)] w-[calc(50%-3px)] items-center justify-center rounded-full text-teal-fg shadow-(--shadow-key-on) transition-transform duration-200 ease-out ${KEY} ${
+            light ? 'translate-x-full' : ''
+          }`}
+        >
+          <Icon name={light ? 'sun' : 'moon'} size={18} stroke={2.4} />
+        </span>
+      </button>
     </div>
   );
 }
