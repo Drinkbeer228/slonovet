@@ -1,6 +1,6 @@
 import { EDITORS, canEdit } from '../domain/access';
 import { NewPurchaseSheet, PurchasesBlock } from './PurchasesView';
-import { DeliverySheet, RecountSheet, SackGauge } from './StockSheets';
+import { DeliverySheet, SackGauge } from './StockSheets';
 import { useMemo, useState } from 'react';
 import { countStock } from '../domain/actions';
 import { currentShift } from '../domain/shift';
@@ -68,7 +68,6 @@ export function StockScreen({ user }: { user: CurrentUser }) {
   const shiftId = currentShift(shifts)?.id ?? null;
   const [edit, setEdit] = useState<StockView | null>(null);
   const [incoming, setIncoming] = useState(false);
-  const [recount, setRecount] = useState(false);
   const [buy, setBuy] = useState<{ itemId: string; amount: string } | null>(null);
   const purchases = useRows('purchases').filter((p) => !p.deleted && (p.status === 'new' || p.status === 'ordered'));
   const counted = lastCount(moves);
@@ -89,21 +88,16 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
           <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Фураж</h1>
-        </div>
-        {canWrite && (
-          <div className="grid grid-cols-2 gap-2">
+          {canWrite && (
             <Button kind="light" icon="truck" onClick={() => setIncoming(true)}>
               Привезли
             </Button>
-            <Button icon="refresh" onClick={() => setRecount(true)}>
-              Пересчёт
-            </Button>
-          </div>
-        )}
-        {/* на гастролях расхождения копятся: напоминаем, если давно не пересчитывали */}
+          )}
+        </div>
+        {/* на гастролях расхождения копятся: напоминаем, если давно не сверяли (правка остатка по тапу на позицию) */}
         <span className={`px-1 text-[13px] font-semibold ${countAge == null || countAge > 7 ? 'text-amber-fg' : 'text-muted'}`}>
-          {counted ? `Пересчёт склада: ${relDate(localDay(counted.created_at))}, ${counted.author_name}` : 'Склад ещё ни разу не пересчитывали'}
-          {countAge != null && countAge > 7 ? ' — пора пройти заново' : ''}
+          {counted ? `Остатки сверяли: ${relDate(localDay(counted.created_at))}, ${counted.author_name}` : 'Остатки ещё ни разу не сверяли'}
+          {countAge == null || countAge > 7 ? ' — нажми на позицию и поправь, если на складе иначе' : ''}
         </span>
         {!canWrite && <ReadOnlyNote who={EDITORS.stock.who} />}
       </header>
@@ -198,7 +192,6 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       <AdjustSheet view={edit} user={user} shiftId={shiftId} onClose={() => setEdit(null)} />
       <AddItemSheet open={adding} items={items} user={user} shiftId={shiftId} onClose={() => setAdding(false)} />
       <DeliverySheet open={incoming} user={user} shiftId={shiftId} onClose={() => setIncoming(false)} />
-      <RecountSheet open={recount} user={user} shiftId={shiftId} onClose={() => setRecount(false)} />
       <NewPurchaseSheet open={buy !== null} preset={buy} user={user} onClose={() => setBuy(null)} />
     </div>
   );
