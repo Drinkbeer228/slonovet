@@ -1,23 +1,31 @@
 import { useState } from 'react';
 import { ELEPHANTS, LEVEL_LABEL, METRICS, METRIC_LABEL } from '../../domain/elephants';
-import { setCell, toggleSymptom } from '../../domain/actions';
-import { shiftFlags } from '../../domain/shift';
+import { repeatCell, setCell, toggleSymptom } from '../../domain/actions';
+import { carryFlags } from '../../domain/monitoring';
+import { shiftFlags, type Flag } from '../../domain/shift';
 import type { ElephantName, Level, MetricKey, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { Button, Card, Chip, LEVEL_CELL, LEVEL_DOT, Section, Segmented, Sheet, TONE } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import type { NoteDraft } from '../common/NoteSheet';
+import { ElephantHistorySheet } from '../common/ElephantHistory';
 
 export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?: (d: NoteDraft) => void; readOnly?: boolean }) {
   const notes = useRows('notes');
   const flags = shiftFlags(shift);
+  // не в норме в прошлую смену и ещё не проверено — не «норма» по умолчанию, а «проверь»
+  const shifts = useRows('shifts');
+  const carry = readOnly ? [] : carryFlags(shifts, shift);
+  const carried = (el: ElephantName, m: MetricKey) => carry.find((f) => f.elephant === el && f.metric === m);
+  const [history, setHistory] = useState<ElephantName | null>(null);
   // открытая ячейка: признаки, уровень и запись — в шторке, чтобы таблица 7×3 не разъезжалась
   const [open, setOpen] = useState<{ el: ElephantName; m: MetricKey } | null>(null);
 
   // по умолчанию всё — норма (как в бумажном журнале): тап по норме → сразу «внимание» и шторка с признаками
+  // «проверь» — только шторка: кипер сам отвечает «всё так же» или «сегодня норма»
   const tap = (el: ElephantName, m: MetricKey) => {
     const cur = shift.state?.[el]?.[m]?.level ?? 0;
-    if (cur === 0) setCell(shift, el, m, 1);
+    if (cur === 0 && !carried(el, m)) setCell(shift, el, m, 1);
     setOpen({ el, m });
   };
   const COLS = 'grid grid-cols-[76px_repeat(3,minmax(0,1fr))] gap-x-2';
@@ -36,9 +44,9 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
           <div className={`${COLS} pb-1 pt-1.5`}>
             <span />
             {ELEPHANTS.map((e) => (
-              <span key={e} className="text-center text-[15px] font-extrabold">
+              <button key={e} type="button" onClick={() => setHistory(e)} aria-label={`${e}: 14 дней`} className="min-h-11 text-center text-[15px] font-extrabold underline decoration-edge-hi decoration-2 underline-offset-4">
                 {e}
-              </span>
+              </button>
             ))}
           </div>
           {METRICS.map((m) => (
@@ -47,7 +55,8 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
               {ELEPHANTS.map((el) => {
                 const cell = shift.state?.[el]?.[m.key];
                 const level = cell?.level ?? 0;
-                const label = LEVEL_LABEL[level];
+                const check = !cell && carried(el, m.key);
+                const label = check ? 'проверь' : LEVEL_LABEL[level];
                 const n = cell?.symptoms?.length ?? 0;
                 return (
                   <div key={el} className="px-1">
@@ -56,7 +65,7 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
                       disabled={readOnly}
                       aria-label={`${el}, ${m.label}: ${label}${n ? `, признаков: ${n}` : ''}`}
                       onClick={() => tap(el, m.key)}
-                      className={`relative h-11 w-full rounded-[10px] border text-[13px] transition-transform active:scale-[0.97] ${LEVEL_CELL[level]}`}
+                      className={`relative h-11 w-full rounded-[10px] border text-[13px] transition-transform active:scale-[0.97] ${check ? 'border-2 border-dashed border-amber bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] font-extrabold text-amber-fg' : LEVEL_CELL[level]}`}
                     >
                       {label}
                       {/* сколько признаков отмечено — уголком, чтобы не теснить слово */}
@@ -100,9 +109,17 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
         </div>
       )}
 
+      {carry.length > 0 && (
+        <p className="m-0 px-1 text-[13px] font-semibold text-amber-fg">
+          «Проверь» — было не в норме в прошлую смену: {carry.map((f) => `${f.elephant} · ${METRIC_LABEL[f.metric].toLowerCase()}`).join(', ')}. Посмотри и ответь.
+        </p>
+      )}
+
+      <ElephantHistorySheet el={history} onClose={() => setHistory(null)} />
       {!readOnly && (
         <CellSheet
           shift={shift}
+          carry={open ? carried(open.el, open.m) : undefined}
           cell={open}
           onClose={() => setOpen(null)}
           onNote={
@@ -123,11 +140,14 @@ const LEVELS: { value: string; label: string }[] = [0, 1, 2].map((l) => ({ value
 /** Одна ячейка: уровень, признаки и запись с фото — в шторке поверх таблицы. */
 function CellSheet({
   shift,
+  carry,
   cell,
   onClose,
   onNote,
 }: {
   shift: Shift;
+  /** было не в норме в прошлую смену — сначала спросить, как сейчас */
+  carry?: Flag;
   cell: { el: ElephantName; m: MetricKey } | null;
   onClose: () => void;
   onNote?: (d: NoteDraft) => void;
@@ -150,6 +170,33 @@ function CellSheet({
       }
     >
       <div className="flex flex-col gap-4">
+        {carry && !cur && (
+          <Card tone="sunken" className="flex flex-col gap-3 p-3.5">
+            <span className="text-[15px] font-bold">
+              В прошлую смену: <span className={carry.level === 2 ? 'text-coral-fg' : 'text-amber-fg'}>{LEVEL_LABEL[carry.level]}</span>
+              {carry.symptoms.length > 0 && <span className="text-ink2"> — {carry.symptoms.join(', ')}</span>}
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={async () => {
+                  await repeatCell(shift, el, m, carry.level, carry.symptoms);
+                }}
+              >
+                Всё так же
+              </Button>
+              <Button
+                kind="primary"
+                onClick={async () => {
+                  await setCell(shift, el, m, 0);
+                  onClose();
+                }}
+              >
+                Сегодня норма
+              </Button>
+            </div>
+          </Card>
+        )}
+        {!(carry && !cur) && (
         <Segmented
           label="Состояние"
           value={String(level)}
@@ -159,6 +206,7 @@ function CellSheet({
           }}
           options={LEVELS}
         />
+        )}
         {level > 0 && (
           <>
             <div className="flex flex-wrap gap-2">

@@ -11,6 +11,8 @@ import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { RoadBanner } from '../common/RoadBanner';
 import { mealCancelled } from '../../domain/road';
+import { carryFlags } from '../../domain/monitoring';
+import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
 import { FeedingBlock } from './FeedingBlock';
@@ -244,7 +246,9 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   const feedsLeft = FEED_TIMES.filter((t) => !shift.feeds[t]?.done && !mealCancelled(baseDiets, roadDiets, t));
   const reqLeft = dutyTodos(requests, marks, shift, isoDate()).filter((t) => !t.done);
   const flags = shiftFlags(shift);
+  const carry = carryFlags(useRows('shifts'), shift);
   const warnings = [
+    carry.length ? `Не проверено с прошлой смены: ${carry.map((f) => `${f.elephant} · ${METRIC_LABEL[f.metric].toLowerCase()}`).join(', ')}` : null,
     feedsLeft.length ? `Не отмечено кормление: ${feedsLeft.join(', ')}` : null,
     reqLeft.length ? `Не выполнено назначений и задач: ${reqLeft.length}` : null,
   ].filter(Boolean) as string[];
