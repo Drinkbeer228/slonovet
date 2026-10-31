@@ -130,6 +130,9 @@ begin
       raise notice 'ok: % не может писать чужую смену', s.who;
     end;
   end loop;
+  -- дальше — снова как сервис, без пользователя
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claims', '', true);
 
   -- 7. охранник: дежурным нельзя записать не кипера/директора, сдать смену можно только им, будущее время приёма подрезается
   select id into s from public.profiles where role in ('vet', 'manager') and active limit 1;
@@ -145,6 +148,40 @@ begin
   select accepted_at into s from public.shifts where id = 'T-G2';
   if s.accepted_at > now() + interval '1 hour' then raise exception 'FAIL: время приёма из будущего не подрезано'; end if;
   raise notice 'ok: время приёма из будущего подрезано';
+
+  -- 8. (030) передача сменщику — причина handover; чужая смена — только просмотр
+  if position('только просмотр' in pg_get_functiondef('public.shifts_guard'::regproc)) > 0 then
+    update public.shifts set status = 'handed' where status = 'open' and id like 'T-%';
+    perform public.apply_shift_patch('T-H1', jsonb_build_object('id', 'T-H1', 'date', '2020-01-09', 'keeper_id', ka, 'keeper_name', 'А', 'status', 'open', 'accepted_at', '2020-01-09T08:00:00Z', 'handover_to', kb), '[]');
+    perform public.apply_shift_patch('T-H2', jsonb_build_object('id', 'T-H2', 'date', '2020-01-09', 'keeper_id', kb, 'keeper_name', 'Б', 'status', 'open', 'accepted_at', '2020-01-09T20:00:00Z', 'accepted_from', 'T-H1'), '[]');
+    select close_reason into s from public.shifts where id = 'T-H1';
+    if s.close_reason <> 'handover' then raise exception 'FAIL handover: %', s.close_reason; end if;
+    raise notice 'ok: принятая передача закрыта как handover';
+    perform set_config('request.jwt.claim.sub', kb::text, true);
+    perform set_config('request.jwt.claims', json_build_object('sub', kb, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      perform public.apply_shift_patch('T-H2', null, jsonb_build_array(jsonb_build_object('path', jsonb_build_array('note'), 'value', 'своя')));
+      execute 'reset role';
+    exception when insufficient_privilege then
+      execute 'reset role';
+      raise exception 'FAIL: дежурный не смог править свою смену: %', sqlerrm;
+    end;
+    raise notice 'ok: дежурный правит свою смену';
+    if (select role from public.profiles where id = kb) <> 'admin' then
+      execute 'set local role authenticated';
+      begin
+        perform public.apply_shift_patch('T-A', null, jsonb_build_array(jsonb_build_object('path', jsonb_build_array('note'), 'value', 'чужая')));
+        execute 'reset role';
+        raise exception 'FAIL: чужую смену поправили';
+      exception when insufficient_privilege then
+        execute 'reset role';
+        raise notice 'ok: чужая смена — только просмотр';
+      end;
+    end if;
+    perform set_config('request.jwt.claim.sub', '', true);
+    perform set_config('request.jwt.claims', '', true);
+  end if;
 end $$;
 rollback;
 SQL
