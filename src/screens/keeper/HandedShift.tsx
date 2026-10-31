@@ -31,8 +31,8 @@ export function DutyBar({ shift, from, user, stale, onHandover }: { shift: Shift
   // одна строка о главном для того, кто смотрит
   const line = mine
     ? to
-      ? { text: `передаёшь: ${to.full_name} · ждём, когда примет`, cls: 'text-teal-fg' }
-      : { text: `ты дежуришь · с ${timeOf(shift.accepted_at)}`, cls: 'text-muted' }
+      ? { text: `передаёт: ${to.full_name} · ждём, когда примет`, cls: 'text-teal-fg' }
+      : { text: `дежурит с ${timeOf(shift.accepted_at)}`, cls: 'text-muted' }
     : iHanded && takenOver
       ? { text: `сменил без передачи · ${timeOf(shift.accepted_at)}`, cls: 'text-amber-fg' }
       : iHanded && remarks
@@ -108,7 +108,7 @@ export function DutyBar({ shift, from, user, stale, onHandover }: { shift: Shift
       >
         <div className="flex flex-col gap-5">
           <Card className="flex flex-col gap-1 p-4">
-            <span className="text-[17px] font-extrabold">{mine ? 'Дежуришь ты' : `Дежурит ${shift.keeper_name}`}</span>
+            <span className="text-[17px] font-extrabold">Дежурит {shift.keeper_name}</span>
             <span className="text-[14px] font-semibold text-muted">принял {when(shift.accepted_at)}</span>
             {to && <span className="text-[14px] font-bold text-teal-fg">передаёт: {to.full_name} — дежурит, пока не примет</span>}
           </Card>
@@ -116,7 +116,7 @@ export function DutyBar({ shift, from, user, stale, onHandover }: { shift: Shift
             <Section title="Передача">
               <Card className="flex flex-col gap-1.5 p-4">
                 <span className="text-[15px]">
-                  {from.keeper_id === user.id ? 'Ты' : from.keeper_name} → {mine ? 'ты' : shift.keeper_name}, {when(shift.accepted_at)}
+                  {from.keeper_name} → {shift.keeper_name}, {when(shift.accepted_at)}
                 </span>
                 {takenOver && <span className="text-[14px] font-bold text-amber-fg">без передачи — дежурный не передал</span>}
                 {remarks ? (
@@ -162,7 +162,7 @@ export function DutyBar({ shift, from, user, stale, onHandover }: { shift: Shift
   );
 }
 
-/** Тебе передают дежурство — единственное, что требует действия, поэтому крупно и на виду. */
+/** Дежурство передают этому человеку — единственное, что требует действия, поэтому крупно и на виду. */
 export function HandoverInvite({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const [open, setOpen] = useState(false);
   return (
@@ -171,8 +171,8 @@ export function HandoverInvite({ shift, user }: { shift: Shift; user: CurrentUse
         <div className="flex items-center gap-3">
           <GlowIcon glow="teal" icon="shift" />
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-[17px] font-extrabold">Тебе передают дежурство</span>
-            <span className="text-[13px] font-semibold text-muted">{shift.keeper_name} дежурит, пока ты не примешь</span>
+            <span className="text-[17px] font-extrabold">Дежурство передают: {user.full_name}</span>
+            <span className="text-[13px] font-semibold text-muted">{shift.keeper_name} дежурит, пока {user.full_name} не примет</span>
           </span>
         </div>
         <Button kind="accent" big full icon="shield" onClick={() => setOpen(true)}>
