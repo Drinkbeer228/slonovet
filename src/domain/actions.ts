@@ -50,26 +50,6 @@ function closeOwn(s: Shift, reason: NonNullable<Shift['close_reason']>, by: stri
   s.closed_by = by ?? s.keeper_id;
 }
 
-/**
- * Закрыть смену сразу. В интерфейсе больше не используется: дежурство передают через offerHandover — смена
- * остаётся открытой, пока сменщик не примет (дежурный есть всегда). Оставлено для синхронизации старых данных и тестов.
- */
-export async function handOver(shift: Shift, note: string, toId: string | null = null) {
-  logEvent('shift.handover', { shift: shift.id, to: toId, note: note.slice(0, 200) });
-  await updateShift(shift, (s) => {
-    // что не трогали — норма: в журнале остаётся явная отметка
-    for (const el of ELEPHANTS) {
-      s.state[el] = s.state[el] ?? {};
-      for (const m of METRICS) if (!s.state[el]![m.key]) s.state[el]![m.key] = { level: 0 };
-    }
-    closeOwn(s, 'handover', s.keeper_id);
-    s.note = note;
-    s.handover_to = toId;
-    s.handover_code = null;
-    s.checked_at = s.handed_at; // сдаём только с галочкой «осмотрел всех» — она и делает нетронутое нормой
-  });
-}
-
 /** Новые сутки (остаюсь на смене): своя закрывается, на того же человека открывается новая — за одно нажатие. */
 export async function rolloverShift(shift: Shift, user: CurrentUser) {
   logEvent('shift.rollover', { shift: shift.id });

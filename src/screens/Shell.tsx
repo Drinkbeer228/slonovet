@@ -63,26 +63,6 @@ export function PreviewBanner({ role }: { role: Role }) {
   );
 }
 
-/** Записи копятся на телефоне, а связи давно нет — сказать прямо, чтобы поймали Wi‑Fi. */
-export function OfflineBanner() {
-  const s = useSyncStatus();
-  if (s.state === 'demo' || !s.pending) return null;
-  const stale = !s.lastSync || Date.now() - new Date(s.lastSync).getTime() > 60 * 60 * 1000;
-  if (s.state !== 'offline' && s.state !== 'error' && !stale) return null;
-  const when = s.lastSync ? `${relDate(localDay(s.lastSync), isoDate())} в ${timeOf(s.lastSync)}` : 'ещё не было';
-  return (
-    <Plate glow="amber" halo className="mb-4 flex gap-2.5 p-3.5">
-      <GlowIcon glow="amber" icon="cloudOff" />
-      <span className="flex flex-col gap-0.5">
-        <span className="text-[14px] font-bold text-amber-fg">
-          Не отправлено: {s.pending} · связь с сервером {s.lastSync ? `была ${when}` : when}
-        </span>
-        <span className="text-[13px] font-semibold text-muted">Всё сохранено на телефоне и отправится само, как появится интернет. Подойдёт любой Wi‑Fi.</span>
-      </span>
-    </Plate>
-  );
-}
-
 /** Скачать неотправленное и непринятое файлом: работа не пропадёт, даже если телефон придётся менять. */
 async function saveUnsentFile() {
   const text = await exportUnsent();
@@ -94,10 +74,15 @@ async function saveUnsentFile() {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** Значок в шапке — только когда есть что сказать: пример, нет сети, ошибка, сервер что-то не принял. В обычной работе его нет. */
-export function SyncChip({ onClick }: { onClick: () => void }) {
+/**
+ * Связь — один значок в шапке и одна шторка по тапу. В обычной работе значка нет; он появляется, когда есть что
+ * сказать: пример, нет сети, ошибка, сервер что-то не принял или записи давно лежат неотправленными.
+ */
+export function SyncChip() {
   const s = useSyncStatus();
-  if (s.state !== 'demo' && s.state !== 'offline' && s.state !== 'error' && !s.rejected.length) return null;
+  const [open, setOpen] = useState(false);
+  const stale = s.pending > 0 && (!s.lastSync || Date.now() - new Date(s.lastSync).getTime() > 60 * 60 * 1000);
+  if (s.state !== 'demo' && s.state !== 'offline' && s.state !== 'error' && !s.rejected.length && !stale) return null;
   let icon: IconName = 'cloud';
   let text = '';
   let cls = 'text-muted';
@@ -112,16 +97,93 @@ export function SyncChip({ onClick }: { onClick: () => void }) {
     icon = 'cloudOff';
     text = s.pending ? `без сети · ${s.pending}` : 'без сети';
     cls = 'text-amber-fg';
-  } else {
+  } else if (s.state === 'error') {
     icon = 'alert';
     text = 'ошибка';
     cls = 'text-coral-fg';
+  } else {
+    icon = 'cloudOff';
+    text = `не отправлено · ${s.pending}`;
+    cls = 'text-amber-fg';
   }
   return (
-    <button type="button" onClick={onClick} className={`inline-flex h-11 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold ${KEY} ${cls}`}>
+    <>
+    <button type="button" onClick={() => setOpen(true)} className={`inline-flex h-11 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold ${KEY} ${cls}`}>
       <Icon name={icon} size={15} stroke={2.2} />
       {text}
     </button>
+    <SyncSheet open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+/** Шторка связи: что не ушло, что сервер не принял, и что с этим сделать. */
+function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const s = useSyncStatus();
+  const [busy, setBusy] = useState(false);
+  const when = s.lastSync ? `${relDate(localDay(s.lastSync), isoDate())} в ${timeOf(s.lastSync)}` : 'ещё не было';
+  return (
+    <Sheet open={open} onClose={onClose} title="Связь">
+      <div className="flex flex-col gap-4">
+        {s.state === 'demo' ? (
+          <span className="text-[15px] font-semibold text-muted">Это пример без сервера: всё хранится только на этом телефоне.</span>
+        ) : (
+          <span className="text-[15px] font-semibold text-muted">
+            Связь с сервером: {when}. Всё внесённое сохранено на телефоне и уходит само, как появится интернет — подойдёт любой Wi‑Fi.
+          </span>
+        )}
+        {/* сервер окончательно что-то не принял: правку на телефоне уже вернули как на сервере — сказать, что именно */}
+        {s.state !== 'demo' && s.rejected.length > 0 && (
+          <Plate glow="coral" halo className="flex flex-col gap-2 p-4">
+            <span className="text-[15px] font-bold text-coral-fg">Сервер не принял: {s.rejected.length}</span>
+            {s.rejected.map((r, i) => (
+              <span key={i} className="text-[14px] leading-snug">
+                {r.what} — {r.reason}
+                <span className="text-muted"> · {relDate(localDay(r.at), isoDate())} в {timeOf(r.at)}</span>
+              </span>
+            ))}
+            <span className="text-[13px] font-semibold text-muted">
+              На телефоне вернули, как на сервере, а то, что ты внёс, сохранено отдельно и не потеряно. Если права вернули — отправь ещё раз.
+            </span>
+            <Button
+              icon="refresh"
+              onClick={async () => {
+                const n = await requeueQuarantine();
+                clearRejected();
+                toast(n ? `Отправляем ещё раз: ${n}` : 'Нечего отправлять');
+                syncNow();
+              }}
+            >
+              Отправить ещё раз
+            </Button>
+            <Button onClick={saveUnsentFile}>Сохранить в файл</Button>
+            <Button onClick={clearRejected}>Понятно</Button>
+          </Plate>
+        )}
+
+        {/* в обычной работе про отправку молчим; карточка — только если что-то не ушло */}
+        {s.state !== 'demo' && (s.state === 'offline' || s.state === 'error' || s.pending > 0) && (
+          <Card className="flex flex-col gap-2 p-4">
+            <span className="text-[15px] font-bold">
+              {s.state === 'offline' ? 'Нет сети — всё сохраняется на телефоне' : `Ждут отправки: ${s.pending}`}
+            </span>
+            {s.error && <span className="text-[13px] font-semibold text-coral">{s.error}</span>}
+            <Button
+              icon="refresh"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await syncNow();
+                setBusy(false);
+              }}
+            >
+              Отправить сейчас
+            </Button>
+            <Button onClick={saveUnsentFile}>Сохранить неотправленное в файл</Button>
+          </Card>
+        )}
+      </div>
+    </Sheet>
   );
 }
 
@@ -165,7 +227,7 @@ export function TopBar({
             <span className="text-[14px] font-bold">{user.full_name}</span>
             <span className="rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
           </span>
-          <SyncChip onClick={onMenu} />
+          <SyncChip />
           <button
             type="button"
             onClick={onMenu}
@@ -271,7 +333,6 @@ export function MenuSheet({
   onTab: (t: Tab) => void;
 }) {
   const s = useSyncStatus();
-  const [busy, setBusy] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const { installed } = useInstall();
   const extra = menuTabs(role);
@@ -284,56 +345,6 @@ export function MenuSheet({
           {session.mode === 'demo' ? ' · пример без сервера' : ` · ${session.user.login}`}
         </span>
 
-        {/* сервер окончательно что-то не принял: правку на телефоне уже вернули как на сервере — сказать, что именно */}
-        {session.mode === 'cloud' && s.rejected.length > 0 && (
-          <Plate glow="coral" halo className="flex flex-col gap-2 p-4">
-            <span className="text-[15px] font-bold text-coral-fg">Сервер не принял: {s.rejected.length}</span>
-            {s.rejected.map((r, i) => (
-              <span key={i} className="text-[14px] leading-snug">
-                {r.what} — {r.reason}
-                <span className="text-muted"> · {relDate(localDay(r.at), isoDate())} в {timeOf(r.at)}</span>
-              </span>
-            ))}
-            <span className="text-[13px] font-semibold text-muted">
-              На телефоне вернули, как на сервере, а то, что ты внёс, сохранено отдельно и не потеряно. Если права вернули — отправь ещё раз.
-            </span>
-            <Button
-              icon="refresh"
-              onClick={async () => {
-                const n = await requeueQuarantine();
-                clearRejected();
-                toast(n ? `Отправляем ещё раз: ${n}` : 'Нечего отправлять');
-                syncNow();
-              }}
-            >
-              Отправить ещё раз
-            </Button>
-            <Button onClick={saveUnsentFile}>Сохранить в файл</Button>
-            <Button onClick={clearRejected}>Понятно</Button>
-          </Plate>
-        )}
-
-        {/* в обычной работе про отправку молчим; карточка — только если что-то не ушло */}
-        {session.mode === 'cloud' && (s.state === 'offline' || s.state === 'error' || s.pending > 0) && (
-          <Card className="flex flex-col gap-2 p-4">
-            <span className="text-[15px] font-bold">
-              {s.state === 'offline' ? 'Нет сети — всё сохраняется на телефоне' : `Ждут отправки: ${s.pending}`}
-            </span>
-            {s.error && <span className="text-[13px] font-semibold text-coral">{s.error}</span>}
-            <Button
-              icon="refresh"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                await syncNow();
-                setBusy(false);
-              }}
-            >
-              Отправить сейчас
-            </Button>
-            <Button onClick={saveUnsentFile}>Сохранить неотправленное в файл</Button>
-          </Card>
-        )}
 
         {session.user.role === 'admin' && (
           // админу: посмотреть приложение глазами другой роли, не выходя из своего входа

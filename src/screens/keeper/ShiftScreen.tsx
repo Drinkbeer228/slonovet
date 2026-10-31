@@ -16,7 +16,7 @@ import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
 import { FeedingBlock } from './FeedingBlock';
-import { DutyBar, HandoverInvite } from './HandedShift';
+import { DutyBar, HandoverInvite } from './DutyBar';
 import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';

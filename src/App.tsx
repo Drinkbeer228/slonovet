@@ -4,7 +4,7 @@ import { initStore, setWriteBlock, useRows } from './lib/store';
 import { Toaster, toast } from './ui/kit';
 import { Login } from './screens/Login';
 import { InstallBanner, InstallSheet } from './screens/InstallHint';
-import { BottomNav, MenuSheet, OfflineBanner, PreviewBanner, TABS, TopBar, menuTabs, type Tab } from './screens/Shell';
+import { BottomNav, MenuSheet, PreviewBanner, TABS, TopBar, menuTabs, type Tab } from './screens/Shell';
 import { getPreviewRole, usePreviewRole } from './lib/preview';
 import { ShiftScreen } from './screens/keeper/ShiftScreen';
 import { DietScreen } from './screens/DietScreen';
@@ -131,7 +131,6 @@ function Main() {
     <div className="min-h-screen">
       <TopBar user={user} tabs={tabs} tab={current} onTab={setTab} onMenu={() => setMenu(true)} />
       <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:pb-16">
-        <OfflineBanner />
         {session.mode === 'cloud' && !previewRole && <InstallBanner />}
         {previewRole && <PreviewBanner role={previewRole} />}
         <div className={current === 'shift' ? '' : 'mx-auto max-w-2xl'}>

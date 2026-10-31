@@ -330,9 +330,11 @@ describe('смены без связи — находки аудита, испр
     await syncOnce(a);
     const b = await phone(); // телефон кипера Б
     await syncOnce(b);
-    // А нажал «Сдать» без связи — до сервера не дошло
+    // А написал заметку без связи — до сервера не дошло, а передать дежурство не успел
     net.online = false;
-    await a.actions.handOver(a.store.getRow('shifts', 'sA')!, 'Одри не доела вечером');
+    await a.actions.updateShift(a.store.getRow('shifts', 'sA')!, (s) => {
+      s.note = 'Одри не доела вечером';
+    });
     net.online = true;
     // Б не стал ждать и заступил сам
     const userB = { id: 'user-b', login: 'b', full_name: 'Кипер Б', role: 'keeper' as const };
@@ -374,7 +376,7 @@ describe('смены без связи — находки аудита, испр
     const b = await phone();
     await syncOnce(b);
     net.online = false;
-    await a.actions.handOver(a.store.getRow('shifts', 'sA')!, 'всё спокойно', 'user-b'); // А сдал Б, оба без связи
+    await a.actions.offerHandover(a.store.getRow('shifts', 'sA')!, 'всё спокойно', 'user-b'); // А передал Б, оба без связи
     vi.setSystemTime(new Date('2026-10-26T12:05:00Z'));
     await b.actions.acceptShift(userB, { elephants: true }, { id: 'sA', remarks: '' }); // Б принял, не зная, что сдано
     net.online = true;
@@ -390,6 +392,7 @@ describe('смены без связи — находки аудита, испр
     const sA = serverRow<Shift>('shifts', 'sA')!;
     expect(sA.status).toBe('handed');
     expect(sA.handover_to).toBe('user-b');
+    expect(sA.close_reason).toBe('handover');
     expect(openCount()).toBe(1);
     expect(server.rows('shifts').find((r) => r.status === 'open')?.accepted_from).toBe('sA');
   });
@@ -438,6 +441,71 @@ describe('смены без связи — находки аудита, испр
     expect(open).toHaveLength(1);
     expect(open[0].keeper_id).toBe('user-a');
     expect(open[0].accepted_from).toBe('sA');
+  });
+
+  it('П1: «Передать» — смена остаётся открытой, дежурный тот же; нетронутое — норма; «Отменить» снимает передачу', async () => {
+    server.write('shifts', shift('sA', { state: { Марго: { legs: { level: 1, symptoms: [] } } } }));
+    const a = await phone();
+    await syncOnce(a);
+    await a.actions.offerHandover(a.store.getRow('shifts', 'sA')!, 'Марго — ванночки', 'user-b');
+    await syncOnce(a);
+    let s = serverRow<Shift>('shifts', 'sA')!;
+    expect(s.status).toBe('open');
+    expect(s.keeper_id).toBe('user-a');
+    expect(s.handover_to).toBe('user-b');
+    expect(s.note).toBe('Марго — ванночки');
+    expect(s.state.Марго?.legs?.level).toBe(1);
+    expect(s.state.Претти?.water?.level).toBe(0);
+    expect(s.checked_at).toBeTruthy();
+    await a.actions.cancelOffer(a.store.getRow('shifts', 'sA')!);
+    await syncOnce(a);
+    s = serverRow<Shift>('shifts', 'sA')!;
+    expect(s.status).toBe('open');
+    expect(s.handover_to).toBeNull();
+  });
+
+  it('П2: сменщик «Принять» — сервер закрывает прежнюю причиной handover (не «без сдачи»), открыта одна — его', async () => {
+    server.write('shifts', shift('sA'));
+    const a = await phone();
+    await syncOnce(a);
+    await a.actions.offerHandover(a.store.getRow('shifts', 'sA')!, 'всё спокойно', 'user-b');
+    await syncOnce(a);
+    asB();
+    const b = await phone();
+    await syncOnce(b);
+    await b.actions.acceptShift(userB, { elephants: true }, { id: 'sA', remarks: '' });
+    await syncOnce(b);
+    const old = serverRow<Shift>('shifts', 'sA')!;
+    expect(old.status).toBe('handed');
+    expect(old.close_reason).toBe('handover');
+    expect(old.closed_by).toBe('user-b');
+    const open = server.rows('shifts').filter((r) => r.status === 'open');
+    expect(open.map((r) => r.keeper_id)).toEqual(['user-b']);
+    expect(open[0].accepted_from).toBe('sA');
+  });
+
+  it('П3: «Заступить самому», когда передали другому, — причина takeover', async () => {
+    server.write('shifts', shift('sA', { handover_to: 'user-c' }));
+    asB();
+    const b = await phone();
+    await syncOnce(b);
+    await b.actions.takeOverShift(b.store.getRow('shifts', 'sA')!, userB, { elephants: true }, '');
+    await syncOnce(b);
+    expect(serverRow<Shift>('shifts', 'sA')!.close_reason).toBe('takeover');
+  });
+
+  it('П4: чужое дежурство — только просмотр и на сервере: правка другого кипера не проходит и откатывается', async () => {
+    server.write('shifts', shift('sA'));
+    asB();
+    const b = await phone();
+    await syncOnce(b);
+    await b.actions.updateShift(b.store.getRow('shifts', 'sA')!, (s) => {
+      s.note = 'чужая заметка';
+    });
+    await syncOnce(b);
+    expect(serverRow<Shift>('shifts', 'sA')!.note).toBe('');
+    expect(b.store.pendingCount()).toBe(0);
+    expect(b.store.getRow('shifts', 'sA')!.note).toBe('');
   });
 });
 

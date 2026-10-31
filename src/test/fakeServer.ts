@@ -71,7 +71,7 @@ export class FakeServer {
       return { ...row, status: 'handed', handed_at: row.handed_at ?? row.accepted_at, close_reason: row.close_reason ?? 'superseded', closed_by: row.closed_by ?? row.keeper_id };
     }
     for (const r of open) {
-      const reason = r.id === row.accepted_from ? (r.keeper_id === row.keeper_id ? 'rollover' : 'takeover') : 'superseded';
+      const reason = r.id !== row.accepted_from ? 'superseded' : r.keeper_id === row.keeper_id ? 'rollover' : r.handover_to === row.keeper_id ? 'handover' : 'takeover';
       this.write('shifts', { ...r, status: 'handed', handed_at: row.accepted_at, close_reason: reason, closed_by: row.keeper_id });
     }
     return row;
@@ -206,6 +206,10 @@ export const fakeClient = {
     server.log.push({ kind: 'rpc', table: 'shifts', user: server.user.id, id: args.p_id, ok: !refused });
     if (refused) return { data: null, ...refused };
     const cur = server.get('shifts', args.p_id);
+    // shifts_guard (030): чужое дежурство — только просмотр (admin — аварийно)
+    if (cur && server.user.role !== 'admin' && cur.keeper_id !== server.user.id) {
+      return { data: null, error: { message: 'Чужое дежурство — только просмотр', code: '42501' }, status: 403 };
+    }
     if (!cur) {
       const defaults = { status: 'open', safety: {}, state: {}, feeds: {}, quests: {}, hay_bales: 0, note: '', accept_remarks: '', deleted: false };
       server.write('shifts', server.relayInsert({ ...defaults, ...args.p_row }));
