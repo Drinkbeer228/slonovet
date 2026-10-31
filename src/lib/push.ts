@@ -140,7 +140,7 @@ export async function reportLowStock() {
 export function pushTopics(role: string): string[] {
   const out: string[] = [];
   if (role === 'keeper' || role === 'director' || role === 'admin') out.push('срочные назначения');
-  if (role === 'vet' || role === 'director' || role === 'admin') out.push('«плохо» у слонихи');
+  if (role === 'vet' || role === 'director' || role === 'admin') out.push('«плохо» у слонихи', 'ЧП');
   if ((EDITORS.purchases.roles as string[]).includes(role)) out.push('просьбы купить', '«заканчивается» в фураже');
   return out;
 }

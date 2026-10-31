@@ -41,4 +41,6 @@ jobs:
             echo "::error::Ключ выкладки на сервере не ограничен rrsync — выкладка остановлена"
             exit 1
           fi
-          rsync -rlz --delete-after -e "ssh -i ~/.ssh/deploy" dist/ deploy@159.194.208.29:
+          # старые файлы assets/ НЕ удаляем: телефон без связи открывает страницу из памяти, а она ссылается на прошлые
+          # файлы — удалим их, и вместо приложения чёрный экран (iPhone с иконки). Имена с хешем, места занимают мало.
+          rsync -rlz --delete-after --filter='P assets/**' -e "ssh -i ~/.ssh/deploy" dist/ deploy@159.194.208.29:

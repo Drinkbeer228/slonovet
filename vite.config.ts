@@ -22,6 +22,12 @@ export default defineConfig({
         // Из памяти телефона — только если сети нет или она молчит дольше 4 с (манеж, «белые списки»).
         navigateFallback: null,
         runtimeCaching: [
+          // файлы сборки (имя с хешем, не меняются): страница из памяти найдёт свои, даже если сборка уже новая
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'assets', expiration: { maxEntries: 80, maxAgeSeconds: 30 * 24 * 60 * 60 } },
+          },
           {
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',

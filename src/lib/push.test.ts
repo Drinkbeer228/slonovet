@@ -59,3 +59,16 @@ describe('push-уведомления: кому и что', () => {
     expect(newlyLow(['oats'], { day: '2026-10-26', ids: ['oats'] }, '2026-10-27')).toEqual(['oats']);
   });
 });
+
+describe('ЧП', () => {
+  it('врачу, директору и админу, кроме автора; открывает «Журнал»', () => {
+    const list = [
+      { id: 'k1', role: 'keeper', active: true },
+      { id: 'v1', role: 'vet', active: true },
+      { id: 'd1', role: 'director', active: true },
+      { id: 'm1', role: 'manager', active: true },
+    ];
+    expect(recipients({ type: 'incident', id: 'n1', text: 'нет воды', author_id: 'd1' }, list)).toEqual(['v1']);
+    expect(message({ type: 'incident', id: 'n1', text: 'нет воды', author_name: 'Орлов' }, '2026-10-31')).toMatchObject({ title: 'ЧП в слоновнике', url: '/?tab=journal', key: 'incident:n1' });
+  });
+});

@@ -27,6 +27,37 @@
           } catch (x) {}
         }
         addEventListener('error', function (e) { d('early-error', e.message + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno); });
+        // файл приложения не загрузился (страница из памяти ссылается на старую сборку) — без этого чёрный экран.
+        // Один раз за запуск: забываем сохранённую страницу и берём свежую с сервера
+        function heal(why) {
+          d('heal', why);
+          try { if (sessionStorage.getItem('heal')) return showRestart(); sessionStorage.setItem('heal', '1'); } catch (x) {}
+          var done = function () { location.replace('/?r=' + Date.now()); };
+          try { caches.delete('pages').then(done, done); } catch (x) { done(); }
+        }
+        addEventListener('error', function (e) {
+          var t = e.target;
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) heal('asset ' + String(t.src || t.href || '').split('/').pop());
+        }, true);
+        // через 10 с пусто — не молчим чёрным экраном: кнопка, которая сбрасывает сохранённое и открывает заново
+        function showRestart() {
+          var r = document.getElementById('root');
+          if (!r || r.childNodes.length) return;
+          d('blank');
+          r.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;font:600 16px system-ui,sans-serif;color:#cfe3ea">' +
+            '<div>СлоноВет не открылся</div><div style="font-size:14px;color:#8aa3ad">Записи на телефоне не пропали.</div>' +
+            '<button id="restart" style="height:48px;padding:0 24px;border:0;border-radius:16px;background:#2dd4bf;color:#0b1217;font:800 16px system-ui,sans-serif">Перезапустить</button></div>';
+          document.getElementById('restart').onclick = function () {
+            var go = function () { try { sessionStorage.removeItem('heal'); } catch (x) {} location.replace('/?r=' + Date.now()); };
+            try {
+              Promise.all([
+                caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }),
+                navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (x) { return x.unregister(); })); }) : null,
+              ]).then(go, go);
+            } catch (x) { go(); }
+          };
+        }
+        setTimeout(showRestart, 10000);
         addEventListener('unhandledrejection', function (e) { d('early-rejection', (e.reason && e.reason.message) || e.reason); });
         d('html');
       })();

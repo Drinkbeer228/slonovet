@@ -5,7 +5,8 @@ export type Payload =
   | { type: 'urgent'; id: string; elephant: string; text: string; author_id?: string | null }
   | { type: 'bad'; shift_id: string; elephant: string; metric: string; keeper_name?: string; author_id?: string | null }
   | { type: 'purchase'; id: string; title: string; amount?: string; urgent?: boolean; author_id?: string | null }
-  | { type: 'low'; item_id: string; item_name: string; days?: number | null; author_id?: string | null };
+  | { type: 'low'; item_id: string; item_name: string; days?: number | null; author_id?: string | null }
+  | { type: 'incident'; id: string; text: string; author_name?: string; author_id?: string | null };
 
 /** Кто получает: срочное — дежурный кипер; «плохо» — врач и директор; закупки и «заканчивается» — те, кто заказывает. Системный админ — всё. */
 export const ROLES_FOR: Record<Payload['type'], string[]> = {
@@ -13,6 +14,8 @@ export const ROLES_FOR: Record<Payload['type'], string[]> = {
   bad: ['vet', 'director', 'admin'],
   purchase: ['director', 'manager', 'admin'],
   low: ['director', 'manager', 'admin'],
+  // ЧП (вода, свет, стресс, слоны тянули аппаратуру) — врачу и директору; «внимание» (плановые процедуры) не шлём
+  incident: ['vet', 'director', 'admin'],
 };
 
 const METRIC: Record<string, string> = { behavior: 'общее', sleep: 'сон', food: 'еда', water: 'вода', urine: 'моча', feces: 'кал', legs: 'ноги' };
@@ -52,6 +55,14 @@ export function message(p: Payload, today: string): { title: string; body: strin
         url: '/?tab=stock',
         tag: `purchase:${p.id}`,
         key: `purchase:${p.id}`,
+      };
+    case 'incident':
+      return {
+        title: 'ЧП в слоновнике',
+        body: short(p.text || 'Подробности — в журнале.') + (p.author_name ? ` (${p.author_name})` : ''),
+        url: '/?tab=journal',
+        tag: `incident:${p.id}`,
+        key: `incident:${p.id}`,
       };
     case 'low':
       return {
