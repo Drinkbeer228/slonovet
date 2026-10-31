@@ -5,9 +5,7 @@ import { HAY_THERE_ID, RESERVE_ID, ROAD_ID, roadMode } from '../domain/road';
 import type { CurrentUser, MoveItem } from '../domain/types';
 import { getRow, newId, put, remove, useRows } from '../lib/store';
 import { localDay, shortDate, timeOf } from '../lib/dates';
-import { Button, Card, Check, Chip, Confirm, DateInput, Field, Plate, Section, Sheet, Stepper, inputCls, toast } from '../ui/kit';
-import { currentStop, sortStops } from '../domain/stops';
-import { isoDate } from '../lib/dates';
+import { Button, Card, Check, Chip, Confirm, Section, Stepper, inputCls, toast } from '../ui/kit';
 
 /** Переезд: сколько всего нужно на дорогу и общий чек-лист сборов — кто что собрал. */
 export function MoveScreen({ user }: { user: CurrentUser }) {
@@ -53,7 +51,6 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
           Что подготовить киперам · собрано {done} из {allIds.length}
         </span>
       </header>
-      <StopCard user={user} />
 
       <Card className="overflow-hidden">
         <Check
@@ -182,69 +179,3 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
   );
 }
 
-/** Где стоит труппа: текущий город и кнопка «Приехали в новый город». По городу делится лента фуража. */
-function StopCard({ user }: { user: CurrentUser }) {
-  const stops = useRows('tour_stops');
-  const here = currentStop(stops);
-  const past = sortStops(stops).filter((s) => s.id !== here?.id).slice(0, 3);
-  const [open, setOpen] = useState(false);
-  const [city, setCity] = useState('');
-  const [day, setDay] = useState(isoDate());
-  const save = async () => {
-    const name = city.trim();
-    if (!name) return;
-    logEvent('tour.arrive', { city: name, day });
-    // прежний город закрываем днём приезда в новый
-    if (here && !here.depart_on) await put('tour_stops', { ...here, depart_on: day });
-    await put('tour_stops', { id: newId(), city: name, arrive_on: day, depart_on: null, note: '', created_by: user.full_name });
-    toast(`Приехали: ${name}`);
-    setOpen(false);
-  };
-  return (
-    <>
-      <Plate glow="teal" className="flex flex-col gap-2 p-4">
-        <span className="text-[13px] font-extrabold tracking-wide text-muted">ГДЕ СТОИМ</span>
-        <span className="text-[20px] font-extrabold">{here ? here.city : 'Город не отмечен'}</span>
-        {here && <span className="text-[13px] font-semibold text-muted">с {shortDate(here.arrive_on)} · отметил {here.created_by}</span>}
-        {past.length > 0 && <span className="text-[13px] font-semibold text-muted">До этого: {past.map((s) => s.city).join(' ← ')}</span>}
-        {user.role !== 'vet' && (
-          <Button
-            kind="accent"
-            icon="plus"
-            full
-            onClick={() => {
-              setCity('');
-              setDay(isoDate());
-              setOpen(true);
-            }}
-          >
-            Приехали в новый город
-          </Button>
-        )}
-      </Plate>
-      {/* шторка — вне плиты: у плиты свой слой (isolate), и нижняя навигация перекрыла бы кнопку «Отметить» */}
-        <Sheet
-          open={open}
-          onClose={() => setOpen(false)}
-          title="Приехали в новый город"
-          footer={
-            <Button kind="primary" big full disabled={!city.trim()} onClick={save}>
-              Отметить
-            </Button>
-          }
-        >
-          <div className="flex flex-col gap-4">
-            <Field label="Город">
-              <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Например: Казань" autoComplete="off" />
-            </Field>
-            <Field label="Когда приехали">
-              <DateInput value={day} onChange={setDay} label="Когда приехали" />
-            </Field>
-            <span className="text-[13px] font-semibold text-muted">
-              По городу «Контакты» покажут, кто возит и кому звонить здесь.
-            </span>
-          </div>
-        </Sheet>
-    </>
-  );
-}

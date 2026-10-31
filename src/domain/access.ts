@@ -14,6 +14,8 @@ export const EDITORS = {
   users: { roles: ['director', 'manager', 'admin'], who: 'директор и администратор' },
   // просить купить может любой; «заказано» и «привезли» отмечают они
   purchases: { roles: ['director', 'manager', 'admin'], who: 'администратор и директор' },
+  // «Где стоим» (город гастролей) — в меню профиля
+  tour: { roles: ['director', 'manager', 'admin'], who: 'администратор и директор' },
 } satisfies Record<string, { roles: Role[]; who: string }>;
 
 export type OwnedSection = keyof typeof EDITORS;

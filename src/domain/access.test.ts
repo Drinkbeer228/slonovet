@@ -50,6 +50,10 @@ describe('права: экран = база = сервер', () => {
     for (const p of ['insert', 'update']) expect(sql).toMatch(new RegExp(`create policy "${p}" on public\\.request_comments[\\s\\S]*?author_id = auth\\.uid\\(\\)`));
   });
 
+  it('«Где стоим»: город отмечают те же роли, что на экране (администратор, директор)', () => {
+    expect(db.get('tour_stops.write')).toEqual(sorted(EDITORS.tour.roles));
+  });
+
   it('закупки: «Заказано» и «Привезли» — те же роли, что на экране', () => {
     expect(db.get('purchases.update')).toEqual(sorted(EDITORS.purchases.roles));
   });

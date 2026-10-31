@@ -14,6 +14,7 @@ import { haptics } from '../lib/haptics';
 import { currentShift, dutyTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
 import { balances, stockPerDay, stockView } from '../domain/stock';
+import { StopCard } from './common/StopCard';
 import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
 import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
@@ -345,6 +346,7 @@ export function MenuSheet({
           {ROLE_LABEL[session.user.role]}
           {session.mode === 'demo' ? ' · пример без сервера' : ` · ${session.user.login}`}
         </span>
+        <StopCard user={{ ...session.user, role }} />
 
 
         {session.user.role === 'admin' && (
