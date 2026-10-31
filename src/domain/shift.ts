@@ -135,7 +135,7 @@ export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift
     .map((req) => {
       const allMarks = marks.filter((m) => m.request_id === req.id);
       const here = allMarks.filter((m) => m.shift_id === shift.id);
-      const needed = req.frequency === 'feeding' ? FEED_TIMES.length : 1;
+      const needed = perShift(req);
       // «не получилось» не закрывает разовую задачу: она остаётся и ждёт повторной попытки
       const done = req.frequency === 'once' ? closingMarks(allMarks, req).length > 0 : here.length >= needed;
       return { req, marks: here, allMarks, needed, done };
@@ -204,9 +204,15 @@ export function whoLabel(e: string): string {
 
 export const FREQ_LABEL: Record<VetRequest['frequency'], string> = {
   once: 'один раз',
-  shift: 'каждое дежурство',
+  shift: 'раз в сутки',
+  twice: 'утро и вечер',
   feeding: 'каждое кормление',
 };
+
+/** Сколько отметок нужно за одно дежурство (сутки). */
+export function perShift(req: Pick<VetRequest, 'frequency'>): number {
+  return req.frequency === 'feeding' ? FEED_TIMES.length : req.frequency === 'twice' ? 2 : 1;
+}
 
 /** Сколько смен должно было быть отмечено и сколько отмечено — для прогресса у врача. */
 export function requestProgress(req: VetRequest, marks: RequestMark[], shifts: Shift[]) {
@@ -214,7 +220,7 @@ export function requestProgress(req: VetRequest, marks: RequestMark[], shifts: S
   if (req.frequency === 'once') return { done: Math.min(1, closingMarks(mine, req).length), total: 1, last: lastMark(mine) };
   const created = localDay(req.created_at);
   const relevant = shifts.filter((s) => s.date >= created && (!req.due_date || s.date <= req.due_date));
-  const per = req.frequency === 'feeding' ? FEED_TIMES.length : 1;
+  const per = perShift(req);
   const doneShifts = relevant.filter((s) => mine.filter((m) => m.shift_id === s.id).length >= per).length;
   return { done: doneShifts, total: Math.max(relevant.length, 1), last: lastMark(mine) };
 }

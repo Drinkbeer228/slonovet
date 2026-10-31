@@ -279,6 +279,8 @@ export async function addNote(input: {
   text: string;
   photo?: File | null;
   user: CurrentUser;
+  /** «Показать врачу» */
+  for_vet?: boolean;
 }) {
   logEvent('note.add', { kind: input.kind, metric: input.metric, photo: Boolean(input.photo), text: input.text.trim().slice(0, 200) });
   const id = newId();
@@ -293,6 +295,7 @@ export async function addNote(input: {
     photo_path,
     author_name: input.user.full_name,
     author_id: input.user.id,
+    for_vet: Boolean(input.for_vet),
     created_at: new Date().toISOString(),
   };
   await put('notes', note);

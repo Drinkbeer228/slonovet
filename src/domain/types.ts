@@ -84,7 +84,8 @@ export interface Shift extends Base {
   checked_at?: string | null;
 }
 
-export type RequestFrequency = 'once' | 'shift' | 'feeding';
+/** twice — утро и вечер (две отметки за дежурство) */
+export type RequestFrequency = 'once' | 'shift' | 'feeding' | 'twice';
 
 export interface VetRequest extends Base {
   /** 'all' — всем слонам; 'work' — рабочая задача не про слонов (ставит директор) */
@@ -107,7 +108,43 @@ export interface VetRequest extends Base {
   at_time?: string | null;
   /** кому поручено (кипер или директор) — необязательно; задача по-прежнему про слона или «Работу» */
   assignee_id?: string | null;
+  /** как давать: в корм, наружно, укол, ванночка, в глаз… (назначения 2.0) */
+  route?: string;
+  /** доза словами: «2 таблетки», «15–20 мин» */
+  dose?: string;
+  /** правки назначения: что было до изменения — «Изменено. Было: …» */
+  history?: RequestChange[];
   created_at: string;
+}
+
+export interface RequestChange {
+  at: string;
+  by: string;
+  /** назначение словами до правки */
+  was: string;
+}
+
+/** Ответ на запись кипера: врач видел, назначит, позвонит — или словами. */
+export type NoteCommentKind = 'text' | 'seen' | 'assign' | 'call';
+export interface NoteComment extends Base {
+  note_id: string;
+  author_id: string;
+  author_name: string;
+  kind: NoteCommentKind;
+  text: string;
+  created_at: string;
+}
+
+/** Паспорт слонихи: постоянные сведения, которые новый врач читает первыми. id — имя слонихи. */
+export interface ElephantPassport extends Base {
+  birth_year: number | null;
+  weight: string;
+  character: string;
+  norm: string;
+  legs: string;
+  allergies: string;
+  forbidden: string;
+  updated_by_name: string;
 }
 
 /** Комментарий в обсуждении заявки — вместо общего чата разговор всегда про конкретную задачу. */
@@ -144,6 +181,8 @@ export interface Note extends Base {
   author_name: string;
   /** id автора — для статистики; у старых записей нет */
   author_id?: string | null;
+  /** «Показать врачу» — запись попадёт врачу в «Новое» */
+  for_vet?: boolean;
   created_at: string;
 }
 
@@ -316,6 +355,8 @@ export interface TableMap {
   request_marks: RequestMark;
   request_comments: RequestComment;
   notes: Note;
+  note_comments: NoteComment;
+  elephant_passports: ElephantPassport;
   stock_items: StockItem;
   stock_moves: StockMove;
   diets: Diet;
@@ -337,6 +378,8 @@ export const TABLES: TableName[] = [
   'request_marks',
   'request_comments',
   'notes',
+  'note_comments',
+  'elephant_passports',
   'stock_items',
   'stock_moves',
   'diets',

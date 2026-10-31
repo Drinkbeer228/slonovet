@@ -1,5 +1,5 @@
 import { METRICS } from './elephants';
-import { FEED_TIMES, closingMarks, shiftFlags, type Flag } from './shift';
+import { FEED_TIMES, closingMarks, perShift, shiftFlags, type Flag } from './shift';
 import { addDays, isoDate, localDay } from '../lib/dates';
 import type { Eaten, ElephantName, Level, MetricKey, RequestMark, Shift, VetRequest } from './types';
 
@@ -58,7 +58,7 @@ export function missedTasks(requests: VetRequest[], marks: RequestMark[], shift:
       if (!closed.some((m) => m.done_at <= end)) out.push({ req, why: day < shift.date ? 'просрочено' : 'не отмечено' });
     } else {
       if (localDay(req.created_at) > shift.date || (req.due_date && req.due_date < shift.date)) continue;
-      const needed = req.frequency === 'feeding' ? FEED_TIMES.length : 1;
+      const needed = perShift(req);
       const here = mine.filter((m) => m.shift_id === shift.id).length;
       if (here < needed) out.push({ req, why: here ? `отмечено ${here} из ${needed}` : 'не отмечено' });
     }
@@ -115,16 +115,28 @@ export function feedMoment(shift: Pick<Shift, 'date'>, time: string): Date {
 
 /**
  * Кормление в смене: done — отмечено; outside — было до приёма или после сдачи (не этого дежурного);
- * late — время прошло (больше часа), а не отмечено; soon — ещё впереди.
+ * due — его отрезок дня идёт (за полчаса до начала и до следующего кормления); late — отрезок прошёл, а не отмечено;
+ * soon — ещё впереди. Жёстких таймеров нет: из‑за репетиций и представлений каша плавает (13:30 вместо 13:00),
+ * поэтому «не отмечено» горит только когда начался следующий отрезок, а не через полчаса.
  */
-export type FeedStatus = 'done' | 'outside' | 'late' | 'soon';
-const LATE_MS = 60 * 60_000;
+export type FeedStatus = 'done' | 'outside' | 'late' | 'due' | 'soon';
+const EARLY_MS = 30 * 60_000;
+/** Конец отрезка: начало следующего кормления; утреннее (07:00, последнее в смене) — до 10:00. */
+export function slotEnd(shift: Pick<Shift, 'date'>, time: string): Date {
+  const i = FEED_TIMES.indexOf(time);
+  if (time < '08:00') return new Date(feedMoment(shift, time).getTime() + 3 * 60 * 60_000);
+  const next = FEED_TIMES[i + 1] ?? FEED_TIMES[0];
+  return feedMoment(shift, next);
+}
 export function feedStatus(shift: Shift, time: string, now = new Date()): FeedStatus {
   if (shift.feeds?.[time]?.done) return 'done';
   const at = feedMoment(shift, time).getTime();
-  if (shift.accepted_at && at < Date.parse(shift.accepted_at)) return 'outside';
-  if (shift.handed_at && at > Date.parse(shift.handed_at)) return 'outside';
-  if (shift.status === 'handed' || now.getTime() > at + LATE_MS) return 'late';
+  // чьё кормление — того, кто на смене через полчаса после его начала: приняли в 13:05 — каша (13:30) твоя
+  const pivot = at + EARLY_MS;
+  if (shift.accepted_at && pivot < Date.parse(shift.accepted_at)) return 'outside';
+  if (shift.handed_at && pivot > Date.parse(shift.handed_at)) return 'outside';
+  if (shift.status === 'handed' || now.getTime() >= slotEnd(shift, time).getTime()) return 'late';
+  if (now.getTime() >= at - EARLY_MS) return 'due';
   return 'soon';
 }
 

@@ -1,3 +1,4 @@
+import { ElephantFace } from '../../ui/ElephantFace';
 import { useState } from 'react';
 import { ELEPHANTS, LEVEL_LABEL, METRICS, METRIC_LABEL } from '../../domain/elephants';
 import { repeatCell, setCell, toggleSymptom } from '../../domain/actions';
@@ -45,7 +46,8 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
           <div className={`${COLS} pb-1 pt-1.5`}>
             <span />
             {ELEPHANTS.map((e) => (
-              <button key={e} type="button" onClick={() => setHistory(e)} aria-label={`${e}: 14 дней`} className="min-h-11 text-center text-[15px] font-extrabold underline decoration-edge-hi decoration-2 underline-offset-4">
+              <button key={e} type="button" onClick={() => setHistory(e)} aria-label={`${e}: 14 дней`} className="flex min-h-11 flex-col items-center gap-1 text-center text-[14px] font-extrabold">
+                <ElephantFace name={e} size={34} />
                 {e}
               </button>
             ))}

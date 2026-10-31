@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { ELEPHANTS, METRIC_LABEL } from '../../domain/elephants';
 import { addNote } from '../../domain/actions';
 import type { CurrentUser, ElephantName, MetricKey, NoteKind } from '../../domain/types';
-import { Button, Chip, FilePreview, PhotoPick, Segmented, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Check, Chip, FilePreview, PhotoPick, Plate, Sheet, inputCls, toast } from '../../ui/kit';
+import { ElephantFace } from '../../ui/ElephantFace';
+import { Icon } from '../../ui/Icon';
 
 export interface NoteDraft {
   elephant: ElephantName | 'none';
   metric: MetricKey | null;
   kind: NoteKind;
+  /** «Показать врачу» сразу включён (например, из клетки «плохо») */
+  forVet?: boolean;
 }
 
 const KINDS: { value: NoteKind; label: string }[] = [
@@ -15,6 +19,8 @@ const KINDS: { value: NoteKind; label: string }[] = [
   { value: 'procedure', label: 'Процедура' },
   { value: 'medication', label: 'Препарат' },
 ];
+
+const CHOICES: (ElephantName | 'none')[] = [...ELEPHANTS, 'none'];
 
 /** Запись словами и фото. Отметки «норма / внимание / плохо» ставятся в таблице состояния, не здесь. */
 export function NoteSheet({
@@ -33,6 +39,7 @@ export function NoteSheet({
   const [text, setText] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [forVet, setForVet] = useState(false);
 
   useEffect(() => {
     if (draft) {
@@ -40,6 +47,7 @@ export function NoteSheet({
       setKind(draft.kind);
       setText('');
       setPhoto(null);
+      setForVet(Boolean(draft.forVet));
     }
   }, [draft]);
 
@@ -48,8 +56,8 @@ export function NoteSheet({
     setBusy(true);
     try {
       // «ЧП» — запись не про слониху: вода, свет, инвентарь, манеж, стресс
-      await addNote({ shift_id: shiftId, elephant: el, kind: el === 'none' ? 'incident' : kind, metric: draft.metric, text, photo, user });
-      toast(el === 'none' ? 'ЧП записано — видно в журнале' : 'Записано — видно в журнале и у врача');
+      await addNote({ shift_id: shiftId, elephant: el, kind: el === 'none' ? 'incident' : kind, metric: draft.metric, text, photo, user, for_vet: forVet || el === 'none' });
+      toast(forVet ? 'Записано — врач увидит в «Новом»' : el === 'none' ? 'ЧП записано — врач увидит' : 'Записано — видно в журнале');
       onClose();
     } catch {
       toast('Не удалось сохранить', 'error');
@@ -77,12 +85,30 @@ export function NoteSheet({
       <div className="flex flex-col gap-4">
         {!draft?.metric && (
           <>
-            <Segmented
-              label="Слониха"
-              value={el}
-              onChange={setEl}
-              options={[...ELEPHANTS.map((e) => ({ value: e as ElephantName | 'none', label: e })), { value: 'none', label: 'ЧП' }]}
-            />
+            {/* слониха — лицом: крупно и под палец; ЧП — запись не про слониху */}
+            <div role="radiogroup" aria-label="Слониха" className="grid grid-cols-4 gap-2">
+              {CHOICES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={el === c}
+                  onClick={() => setEl(c)}
+                  className={`flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border text-[13px] font-bold transition ${
+                    el === c ? 'border-teal bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg' : 'border-edge bg-surface/60 text-ink2'
+                  }`}
+                >
+                  {c === 'none' ? (
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface2 text-amber-fg">
+                      <Icon name="alert" size={18} />
+                    </span>
+                  ) : (
+                    <ElephantFace name={c} size={36} />
+                  )}
+                  {c === 'none' ? 'ЧП' : c}
+                </button>
+              ))}
+            </div>
             <div className={`flex flex-wrap gap-2 ${el === 'none' ? 'hidden' : ''}`}>
               {KINDS.map((k) => (
                 <Chip key={k.value} on={kind === k.value} onClick={() => setKind(k.value)}>
@@ -101,8 +127,13 @@ export function NoteSheet({
           className={`${inputCls} resize-none`}
         />
         <div className="flex items-center gap-3">
-          {photo ? <FilePreview file={photo} onRemove={() => setPhoto(null)} /> : <PhotoPick onFile={setPhoto} label="Добавить фото" />}
+          {photo ? <FilePreview file={photo} onRemove={() => setPhoto(null)} /> : <PhotoPick onFile={setPhoto} label="Фото" />}
         </div>
+        {el !== 'none' && (
+          <Plate glow="sky" halo={forVet}>
+            <Check on={forVet} label="Показать врачу" sub="врач увидит запись первой, в «Новом»" onChange={setForVet} />
+          </Plate>
+        )}
       </div>
     </Sheet>
   );

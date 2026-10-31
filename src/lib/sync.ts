@@ -218,6 +218,8 @@ const RANK: Record<TableName, number> = {
   purchases: 4,
   request_marks: 5,
   request_comments: 5,
+  note_comments: 5,
+  elephant_passports: 1,
 };
 
 /** Сервер недоступен или перегружен: 5xx, 429, нет связи. Дальше очередь не молотим — ждём. */
@@ -236,6 +238,8 @@ const WHAT: Record<TableName, string> = {
   requests: 'Задача',
   request_marks: 'Отметка задачи',
   request_comments: 'Комментарий',
+  note_comments: 'Ответ на запись',
+  elephant_passports: 'Паспорт слонихи',
   notes: 'Запись',
   stock_items: 'Позиция фуража',
   stock_moves: 'Движение фуража',

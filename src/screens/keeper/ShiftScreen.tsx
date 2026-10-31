@@ -20,6 +20,9 @@ import { DutyBar, HandoverInvite } from './DutyBar';
 import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
+import { DayLine, NowPlate } from './NowPlate';
+import { ShiftSummaryCard } from './ShiftSummaryCard';
+import { daySlots } from '../../domain/day';
 
 /** Ведут дежурство только киперы (domain/access.ts). Остальные смотрят его как есть; назначения и лечение отмечают все. */
 const canWork = (u: CurrentUser) => canWorkShift(u.role);
@@ -117,6 +120,10 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         </Plate>
       )}
 
+      {/* одно ближайшее дело и лента дня — у дежурного; остальные видят ленту, как идёт день */}
+      {!accept && !handed && mine && <NowPlate shift={shift} user={user} stale={stale} onHandover={() => setHandoverOpen(true)} />}
+      {!accept && !handed && !mine && <ViewDayLine shift={shift} />}
+
       {accept && (
         <>
           <div className="flex flex-col gap-2">
@@ -157,12 +164,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
             <Section id="sec-notes" title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
               {notes.length > 0 && <NotesList notes={[...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} />}
               {/* запись может оставить любой; не кипер — и после сдачи (процедуру сделали, когда никто не дежурит) */}
-              {(!handed || !keeper) && (
-                <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}>
-                  {keeper ? 'Запись или фото' : 'Запись о лечении или фото'}
-                </Button>
-              )}
-              {handed && !notes.length && <Card className="px-4 py-3 text-[15px] text-muted">Записей нет</Card>}
+              {!notes.length && <Card className="px-4 py-3 text-[15px] text-muted">{handed ? 'Записей нет' : 'Пока нет — «＋ Запись» внизу справа'}</Card>}
             </Section>
             {/* при свёрнутом виде заметка уже стоит наверху, в «От прошлого дежурства» */}
             {readOnly ? (
@@ -183,6 +185,14 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         </div>
       )}
 
+      {/* быстрая запись — под большим пальцем, над нижней панелью: фото, слониха лицом, «Показать врачу» */}
+      {!folded && (!handed || !keeper) && (mine || !keeper) && (
+        <div className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20">
+          <Button kind="accent" big icon="plus" onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}>
+            Запись
+          </Button>
+        </div>
+      )}
       <NoteSheet draft={noteDraft} shiftId={shift.id} user={user} onClose={() => setNoteDraft(null)} />
       <HandoverSheet open={handoverOpen} shift={shift} user={user} onClose={() => setHandoverOpen(false)} />
     </div>
@@ -227,15 +237,15 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
 
   const { diets: roadDiets, base: baseDiets } = useEffectiveDiets();
   // только пропущенные в эту смену: до приёма и ещё не наступившие — не этого дежурного
-  const feedsLeft = FEED_TIMES.filter((t) => feedStatus(shift, t) === 'late' && !mealCancelled(baseDiets, roadDiets, t));
+  const feedsLeft = FEED_TIMES.filter((t) => ['late', 'due'].includes(feedStatus(shift, t)) && !mealCancelled(baseDiets, roadDiets, t));
   const reqLeft = dutyTodos(requests, marks, shift, isoDate()).filter((t) => !t.done);
   const flags = shiftFlags(shift);
   const carry = carryFlags(useRows('shifts'), shift);
   const warnings = [
     carry.length ? `Не проверено с прошлой смены: ${carry.map((f) => `${f.elephant} · ${METRIC_LABEL[f.metric].toLowerCase()}`).join(', ')}` : null,
-    feedsLeft.length ? `Не отмечено кормление: ${feedsLeft.join(', ')}` : null,
-    reqLeft.length ? `Не выполнено назначений и задач: ${reqLeft.length}` : null,
+    reqLeft.some((t) => t.req.elephant === 'work') ? `Не выполнено работы: ${reqLeft.filter((t) => t.req.elephant === 'work').length}` : null,
   ].filter(Boolean) as string[];
+  void feedsLeft; // кормления и назначения — в сводке «Сдаю» ниже
 
   return (
     <Sheet
@@ -257,7 +267,11 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
       }
     >
       <div className="flex flex-col gap-4">
-        {warnings.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <span className="px-1 text-[14px] font-bold text-muted">Сдаю — собрано само</span>
+          <ShiftSummaryCard shift={shift} today={isoDate()} />
+        </div>
+        {warnings.length > 0 && (
           <Plate glow="amber" halo className="flex flex-col gap-1.5 p-3.5">
             {warnings.map((w) => (
               <span key={w} className="flex items-start gap-2 text-[14px] font-semibold text-amber-fg">
@@ -266,17 +280,8 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
               </span>
             ))}
           </Plate>
-        ) : (
-          <Plate glow="teal" className="flex items-center gap-2 p-3.5 text-[14px] font-bold text-teal-fg">
-            <Icon name="check" size={18} stroke={2.6} />
-            Всё отмечено
-          </Plate>
         )}
-        {flags.length > 0 && (
-          <p className="m-0 text-[14px] font-semibold text-ink2">
-            Отклонения ({flags.length}) увидит следующий дежурный и врач.
-          </p>
-        )}
+        {flags.length > 0 && <p className="m-0 px-1 text-[13px] font-semibold text-muted">Это увидит следующий дежурный и врач.</p>}
         <div className="flex flex-col gap-2">
           <span className="px-1 text-[14px] font-bold text-muted">Кому передаёшь</span>
           {people.length > 0 ? (
@@ -325,5 +330,15 @@ function NoDutyLine() {
       Сейчас никто не дежурит — с {relDate(localDay(gap.from))} {timeOf(gap.from)}
       {long ? `, уже ${durationText(gap.minutes)}` : ''}.
     </p>
+  );
+}
+
+/** Лента дня для тех, кто смотрит чужое дежурство: как идёт день, без кнопок. */
+function ViewDayLine({ shift }: { shift: Shift }) {
+  const { diets, base } = useEffectiveDiets();
+  return (
+    <Plate flat glow="teal" className="p-3.5">
+      <DayLine slots={daySlots(shift, (t) => mealCancelled(base, diets, t))} />
+    </Plate>
   );
 }

@@ -84,15 +84,20 @@ describe('кормления по времени', () => {
 
   it('до приёма смены — не этого дежурного; отмечено — done; 07:00 — следующее утро', () => {
     expect(feedStatus(s, '13:00', new Date(local('2026-10-30', '20:00')))).toBe('outside');
+    const at1305 = shift('t', '2026-10-30', { status: 'open', accepted_at: local('2026-10-30', '13:05') });
+    expect(feedStatus(at1305, '13:00', new Date(local('2026-10-30', '13:20')))).toBe('due'); // приняли в 13:05 — каша твоя
     expect(feedStatus(s, '19:00', new Date(local('2026-10-30', '20:00')))).toBe('done');
     expect(feedStatus(s, '07:00', new Date(local('2026-10-30', '23:00')))).toBe('soon');
-    expect(feedStatus(s, '07:00', new Date(local('2026-10-31', '08:30')))).toBe('late');
+    expect(feedStatus(s, '07:00', new Date(local('2026-10-31', '08:30')))).toBe('due');
+    expect(feedStatus(s, '07:00', new Date(local('2026-10-31', '10:00')))).toBe('late');
   });
 
-  it('смена с утра: прошло больше часа — late, в пределах часа — ещё soon; сдана — late', () => {
+  it('без жёстких таймеров: каша сдвинулась на 13:30–15:00 — ещё идёт; late — только с началом следующего кормления; сдана — late', () => {
     const day = shift('d', '2026-10-30', { status: 'open', accepted_at: local('2026-10-30', '08:00') });
-    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '13:30')))).toBe('soon');
-    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '14:10')))).toBe('late');
+    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '11:00')))).toBe('soon');
+    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '12:40')))).toBe('due');
+    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '15:00')))).toBe('due');
+    expect(feedStatus(day, '13:00', new Date(local('2026-10-30', '17:00')))).toBe('late');
     expect(feedStatus({ ...day, status: 'handed', handed_at: local('2026-10-31', '08:00') }, '17:00')).toBe('late');
   });
 });
