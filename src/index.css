@@ -130,6 +130,12 @@ button:disabled {
   cursor: default;
 }
 
+/* «только просмотр» (чужая смена): всё, что нажимается, бледнеет — сразу видно, что не кликабельно; текст читается */
+[inert] :is(button, input, textarea, select, [role='checkbox']) {
+  opacity: 0.45;
+  filter: saturate(0.6);
+}
+
 :focus-visible {
   outline: 2px solid var(--color-teal);
   outline-offset: 2px;
