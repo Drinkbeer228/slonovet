@@ -320,13 +320,26 @@ export function Chip({ on, children, onClick, tone = 'ink' }: { on: boolean; chi
   );
 }
 
-export function Check({ on, label, sub, onChange }: { on: boolean; label: ReactNode; sub?: ReactNode; onChange: (v: boolean) => void }) {
+export function Check({
+  on,
+  label,
+  sub,
+  onChange,
+  disabled,
+}: {
+  on: boolean;
+  label: ReactNode;
+  sub?: ReactNode;
+  onChange: (v: boolean) => void;
+  /** менять нельзя (не твоя галочка): видно состояние, сама галочка бледная и не нажимается */
+  disabled?: boolean;
+}) {
   return (
-    <button type="button" role="checkbox" aria-checked={on} onClick={() => {
+    <button type="button" role="checkbox" aria-checked={on} disabled={disabled} onClick={() => {
         haptics.tap();
         onChange(!on);
       }}
-      className="flex w-full items-center gap-3 px-4 py-3 text-left">
+      className="flex w-full items-center gap-3 px-4 py-3 text-left [&:disabled>span:last-child]:opacity-40">
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={`text-[15px] font-bold ${on ? 'text-faint' : ''}`}>{label}</span>
         {sub && <span className="text-[12px] font-semibold text-muted">{sub}</span>}

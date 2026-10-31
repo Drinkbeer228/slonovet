@@ -60,7 +60,8 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
           on={road.on}
           label="В дороге"
           sub="каши и зерносмесь отменяются у всех, овощи вечером, сено и вода вволю"
-          onChange={(v) => canRoad && setRoad(v)}
+          disabled={!canRoad}
+          onChange={setRoad}
         />
       </Card>
 

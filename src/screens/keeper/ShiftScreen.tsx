@@ -110,6 +110,8 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
   // никто не дежурит: сверху приём и главное от прошлого дежурства, само дежурство целиком — по тапу
   const [full, setFull] = useState(false);
   const folded = Boolean(accept) && !full;
+  // директор отмечает назначения и без приёма смены — у него они наверху, а не в свёрнутом
+  const tasksUp = Boolean(accept) && !keeper;
   // компактный бар: кто дежурит, с какого часа и статус смены — в одну строку
   const bar = (
     <header className="flex flex-col gap-1.5">
@@ -169,6 +171,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
             {accept}
           </div>
           <PrevShiftSummary prev={shift} />
+          {tasksUp && <RequestsBlock shift={shift} user={user} />}
           <Button full onClick={() => setFull((v) => !v)}>
             {full ? 'Свернуть прошлое дежурство' : 'Прошлое дежурство целиком'}
             <Icon name="down" size={18} stroke={2.4} className={full ? 'rotate-180' : ''} />
@@ -184,9 +187,11 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           {/* inert — смотреть можно, нажимать нельзя */}
           <div className="flex flex-col gap-6">
-            <div inert={!canMark}>
-              <RequestsBlock shift={shift} user={user} />
-            </div>
+            {!tasksUp && (
+              <div inert={!canMark}>
+                <RequestsBlock shift={shift} user={user} />
+              </div>
+            )}
             <div inert={readOnly}>
               <StateMatrix shift={shift} onNote={setNoteDraft} />
             </div>

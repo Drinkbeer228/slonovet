@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { logEvent } from '../../lib/log';
 import { ELEPHANTS } from '../../domain/elephants';
-import { FREQ_LABEL, answerPresets, currentShift, onRestDay, overdue, requestProgress, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import { FEED_TIMES, FREQ_LABEL, answerPresets, currentShift, onRestDay, overdue, requestProgress, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import { addMark, setPurchaseStatus } from '../../domain/actions';
 import { GROUPS, GROUP_TITLE, boardAttention, boardGroups, type BoardFilter, type BoardItem, type BoardType } from '../../domain/board';
 import type { CurrentUser, ElephantName, Purchase, RequestFrequency, Shift, VetRequest } from '../../domain/types';
@@ -419,14 +419,15 @@ function TaskTypeSheet({ open, onClose, onPick }: { open: boolean; onClose: () =
           const t = TASK_TYPE[k.type];
           return (
             <button key={k.type} type="button" onClick={() => onPick(k.type)} className="text-left transition-transform active:scale-[0.98]">
-              <Card className={`flex items-center gap-3.5 border-l-4 p-4 ${t.stripe}`}>
+              {/* свечение цветом типа, как на доске, — без цветных полосок слева */}
+              <Plate glow={t.glow} className="flex items-center gap-3.5 p-4">
                 <Icon name={t.icon} size={26} className={t.text} />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-[18px] font-extrabold">{k.title}</span>
                   <span className="text-[13px] font-semibold text-muted">{k.sub}</span>
                 </span>
                 <Icon name="next" size={18} className="text-muted" />
-              </Card>
+              </Plate>
             </button>
           );
         })}
@@ -596,16 +597,26 @@ export function NewRequestSheet({
               </Field>
             </>
           ) : (
-            <div className={when === 'date' ? 'grid grid-cols-[1fr_auto] gap-3' : 'flex'}>
-              {when === 'date' && (
-                <Field label="В какой день">
-                  <DateInput value={onDate} onChange={setOnDate} min={isoDate()} label="В какой день" />
+            <>
+              <div className={when === 'date' ? 'grid grid-cols-[1fr_auto] gap-3' : 'flex'}>
+                {when === 'date' && (
+                  <Field label="В какой день">
+                    <DateInput value={onDate} onChange={setOnDate} min={isoDate()} label="В какой день" />
+                  </Field>
+                )}
+                <Field label="Ко времени">
+                  <input type="time" value={atTime} onChange={(e) => setAtTime(e.target.value)} aria-label="Ко времени, необязательно" className={`${inputCls} w-32`} />
                 </Field>
-              )}
-              <Field label="Ко времени">
-                <input type="time" value={atTime} onChange={(e) => setAtTime(e.target.value)} aria-label="Ко времени, необязательно" className={`${inputCls} w-32`} />
-              </Field>
-            </div>
+              </div>
+              {/* ко времени кормления — одним тапом (часы браузера у всех разные); своё время — в поле выше */}
+              <div className="grid grid-cols-4 gap-2">
+                {FEED_TIMES.map((t) => (
+                  <Chip key={t} on={atTime === t} onClick={() => setAtTime(atTime === t ? '' : t)}>
+                    {t}
+                  </Chip>
+                ))}
+              </div>
+            </>
           )}
         </div>
         <div className="flex flex-col gap-2">
