@@ -135,7 +135,7 @@ function Main() {
         {session.mode === 'cloud' && !previewRole && <InstallBanner />}
         {previewRole && <PreviewBanner role={previewRole} />}
         <div className={current === 'shift' ? '' : 'mx-auto max-w-2xl'}>
-          {current === 'shift' && <ShiftScreen user={user} onJournal={() => setTab('journal')} />}
+          {current === 'shift' && <ShiftScreen user={user} />}
           {current === 'requests' && <RequestsScreen user={user} />}
           {current === 'diet' && <DietScreen user={user} />}
           {current === 'stock' && <StockScreen user={user} />}

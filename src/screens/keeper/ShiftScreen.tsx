@@ -15,7 +15,6 @@ import { carryFlags, durationText, feedStatus, noDutySince } from '../../domain/
 import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
-import { PrevShiftSummary } from './PrevShiftSummary';
 import { FeedingBlock } from './FeedingBlock';
 import { HandedShift, HandoverBanner, NotHandedHint } from './HandedShift';
 import { QuestsBlock } from './QuestsBlock';
@@ -25,7 +24,7 @@ import { StateMatrix } from './StateMatrix';
 /** Ведут дежурство только киперы (domain/access.ts). Остальные смотрят его как есть; назначения и лечение отмечают все. */
 const canWork = (u: CurrentUser) => canWorkShift(u.role);
 
-export function ShiftScreen({ user, onJournal }: { user: CurrentUser; onJournal?: () => void }) {
+export function ShiftScreen({ user }: { user: CurrentUser }) {
   const shifts = useRows('shifts');
   const shift = currentShift(shifts);
   const [acceptOwn, setAcceptOwn] = useState(false);
@@ -92,10 +91,10 @@ export function ShiftScreen({ user, onJournal }: { user: CurrentUser; onJournal?
       </div>
     );
   }
-  return <OpenShift shift={last} user={user} readOnly accept={accept} onJournal={onJournal} />;
+  return <OpenShift shift={last} user={user} readOnly accept={accept} />;
 }
 
-function OpenShift({ shift, user, readOnly, accept, onJournal }: { shift: Shift; user: CurrentUser; readOnly: boolean; accept?: ReactNode; onJournal?: () => void }) {
+function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: CurrentUser; readOnly: boolean; accept?: ReactNode }) {
   const notes = useRows('notes').filter((n) => n.shift_id === shift.id);
   const from = useRows('shifts').find((s) => s.id === shift.accepted_from);
   const someoneElses = canTakeShift(user.role) && shift.keeper_id !== user.id && from?.keeper_id !== user.id;
@@ -107,7 +106,7 @@ function OpenShift({ shift, user, readOnly, accept, onJournal }: { shift: Shift;
   const canMark = !readOnly || !keeper;
   const stale = needsRollover(shift); // вторые сутки: 24 часа от приёма
   const mine = shift.keeper_id === user.id && !readOnly;
-  // никто не дежурит: приём и главное от прошлого дежурства; само дежурство целиком — в «Журнале», здесь не повторяем
+  // никто не дежурит: только приём; что было в прошлую смену — в шторке приёма и в «Журнале» по дате, здесь не повторяем
   const folded = Boolean(accept);
   // директор отмечает назначения и без приёма смены — у него они наверху, а не в свёрнутом
   const tasksUp = Boolean(accept) && !keeper;
@@ -169,19 +168,12 @@ function OpenShift({ shift, user, readOnly, accept, onJournal }: { shift: Shift;
             <NoDutyLine />
             {accept}
           </div>
-          <PrevShiftSummary prev={shift} />
           {tasksUp && <RequestsBlock shift={shift} user={user} />}
           {/* не кипер может записать процедуру и когда никто не дежурит */}
           {tasksUp && (
             <Button icon="plus" full onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: 'procedure' })}>
               Запись о лечении или фото
             </Button>
-          )}
-          {onJournal && (
-            <button type="button" onClick={onJournal} className="-my-2 inline-flex min-h-11 items-center gap-1.5 self-center px-2 text-[14px] font-bold text-teal-fg">
-              <Icon name="book" size={16} />
-              Всё дежурство — в «Журнале»
-            </button>
           )}
         </>
       )}
