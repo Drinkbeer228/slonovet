@@ -1,3 +1,5 @@
+import { useSession } from '../lib/auth';
+import { createPortal } from 'react-dom';
 import { useMemo, useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
 import { MANAGES, canEdit } from '../domain/access';
@@ -230,6 +232,7 @@ export function TopBar({
             <span className="rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
           </span>
           <SyncChip />
+          <PushBell role={user.role} />
           <button
             type="button"
             onClick={onMenu}
@@ -372,7 +375,6 @@ export function MenuSheet({
           </Card>
         )}
 
-        {session.mode === 'cloud' && !preview && <PushCard role={session.user.role} onClose={onClose} />}
 
         <ThemeCard />
 
@@ -444,63 +446,80 @@ export function MenuSheet({
   );
 }
 
-/** Уведомления на этот телефон: что приходит этой роли и кнопка включить или выключить. */
-function PushCard({ role, onClose }: { role: Role; onClose: () => void }) {
+/**
+ * Уведомления — колокольчик в шапке. Выключены — тап включает сразу; включены — тап открывает шторку «выключить».
+ * Нет сервера (пример), «Посмотреть как…» или нечего слать этой роли — колокольчика нет.
+ */
+function PushBell({ role }: { role: Role }) {
+  const session = useSession();
+  const preview = usePreviewRole();
   const [state, setState] = usePushState();
+  const [open, setOpen] = useState(false);
   const topics = pushTopics(role);
-  // на iPhone без установки — молчим, пока установка на экран не работает (INSTALL_HINTS)
-  if (!state || state === 'unsupported' || !topics.length || (state === 'need-install' && !INSTALL_HINTS)) return null;
+  if (session?.mode !== 'cloud' || preview || !state || state === 'unsupported' || !topics.length) return null;
+  // на iPhone без установки — молчим, пока подсказки установки выключены (INSTALL_HINTS)
+  if (state === 'need-install' && !INSTALL_HINTS) return null;
+  const on = state === 'on';
+  const tap = async () => {
+    if (state !== 'off') return setOpen(true);
+    try {
+      const next = await enablePush();
+      setState(next);
+      if (next === 'on') toast('Уведомления включены');
+      else setOpen(true);
+    } catch {
+      toast('Не удалось включить — проверь интернет', 'error');
+    }
+  };
   return (
-    <Card className="flex flex-col gap-2 p-4">
-      <span className="flex items-center gap-2 text-[15px] font-bold">
-        <Icon name="bell" size={18} />
-        Уведомления {state === 'on' && <span className="text-[13px] font-bold text-teal">включены</span>}
-      </span>
-      <span className="text-[13px] font-semibold text-muted">Придут, даже когда приложение закрыто: {topics.join(', ')}.</span>
-      {state === 'need-install' && (
-        <>
-          <span className="text-[13px] font-semibold text-amber">На iPhone — только у приложения на экране «Домой». Сначала установи его.</span>
-          <Button
-            icon="install"
-            onClick={() => {
-              onClose();
-              openInstallSheet();
-            }}
-          >
-            Как установить
-          </Button>
-        </>
+    <>
+      <button
+        type="button"
+        onClick={tap}
+        aria-label={on ? 'Уведомления включены' : 'Включить уведомления'}
+        className={`relative inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface2 active:scale-95 ${on ? 'text-teal-fg' : 'text-muted'}`}
+      >
+        <Icon name="bell" size={21} />
+        {on && <span aria-hidden="true" className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-teal" />}
+      </button>
+      {/* шторка — в корне страницы: в шапке со своим стеклом её обрезало бы */}
+      {createPortal(
+        <Sheet open={open} onClose={() => setOpen(false)} title="Уведомления">
+          <div className="flex flex-col gap-3">
+            <span className="text-[15px] font-semibold text-ink2">Придут, даже когда приложение закрыто: {topics.join(', ')}.</span>
+            {state === 'need-install' && (
+              <>
+                <span className="text-[14px] font-semibold text-amber-fg">На iPhone — только у приложения на экране «Домой». Сначала установи его.</span>
+                <Button
+                  icon="install"
+                  onClick={() => {
+                    setOpen(false);
+                    openInstallSheet();
+                  }}
+                >
+                  Как установить
+                </Button>
+              </>
+            )}
+            {state === 'denied' && <span className="text-[14px] font-semibold text-amber-fg">Уведомления запрещены в настройках телефона для этого сайта — разреши их там.</span>}
+            {on && (
+              <Button
+                full
+                onClick={async () => {
+                  await disablePush().catch(() => undefined);
+                  setState('off');
+                  setOpen(false);
+                  toast('Уведомления выключены');
+                }}
+              >
+                Выключить на этом телефоне
+              </Button>
+            )}
+          </div>
+        </Sheet>,
+        document.body,
       )}
-      {state === 'denied' && (
-        <span className="text-[13px] font-semibold text-amber">Уведомления запрещены в настройках телефона для этого сайта — разреши их там.</span>
-      )}
-      {state === 'off' && (
-        <Button
-          icon="bell"
-          onClick={async () => {
-            try {
-              const next = await enablePush();
-              setState(next);
-              if (next === 'on') toast('Уведомления включены');
-            } catch {
-              toast('Не удалось включить — проверь интернет', 'error');
-            }
-          }}
-        >
-          Включить уведомления
-        </Button>
-      )}
-      {state === 'on' && (
-        <Button
-          onClick={async () => {
-            await disablePush().catch(() => undefined);
-            setState('off');
-          }}
-        >
-          Выключить на этом телефоне
-        </Button>
-      )}
-    </Card>
+    </>
   );
 }
 

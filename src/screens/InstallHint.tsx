@@ -55,27 +55,21 @@ function Steps({ os }: { os: Platform }) {
         {step(4, <>Нажми «Добавить» и дальше открывай СлоноВет с иконки.</>)}
       </ol>
     );
-  if (os === 'android')
-    return (
-      <ol className="m-0 flex list-none flex-col gap-3 p-0">
-        {step(1, <>Открой slonovet.ru в <b>Chrome</b>.</>)}
-        {step(2, <>Нажми ⋮ справа вверху.</>)}
-        {step(3, <>Выбери «Установить приложение» (или «Добавить на главный экран»).</>)}
-      </ol>
-    );
   return (
     <ol className="m-0 flex list-none flex-col gap-3 p-0">
-      {step(1, <>В Chrome или Edge нажми значок установки справа в адресной строке.</>)}
-      {step(2, <>Или меню ⋮ → «Установить СлоноВет».</>)}
+      {step(1, <>Открой slonovet.ru в <b>Chrome</b>.</>)}
+      {step(2, <>Нажми ⋮ справа вверху.</>)}
+      {step(3, <>Выбери «Установить приложение» (или «Добавить на главный экран»).</>)}
     </ol>
   );
 }
 
-/** Как поставить на экран телефона — для iPhone, Android и компьютера. Одна на всё приложение (в App). */
+/** Как поставить на экран телефона — для iPhone и Android. Одна на всё приложение (в App). */
 export function InstallSheet() {
   const isOpen = useOpen();
   const { canPrompt, installed } = useInstall();
-  const [os, setOs] = useState<Platform>(() => platform());
+  // только телефоны: на компьютере приложение не ставят
+  const [os, setOs] = useState<Platform>(() => (platform() === 'ios' ? 'ios' : 'android'));
   return (
     <Sheet open={isOpen} onClose={close} title="Установить на устройство">
       <div className="flex flex-col gap-5">
@@ -105,7 +99,6 @@ export function InstallSheet() {
               options={[
                 { value: 'ios', label: 'iPhone' },
                 { value: 'android', label: 'Android' },
-                { value: 'other', label: 'Компьютер' },
               ]}
             />
             <Steps os={os} />

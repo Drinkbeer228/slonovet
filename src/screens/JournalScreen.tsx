@@ -15,6 +15,8 @@ import type { ElephantName } from '../domain/types';
 import { FeedingBlock, mealTitle } from './keeper/FeedingBlock';
 import { QuestsBlock, washText } from './keeper/QuestsBlock';
 import { StateMatrix } from './keeper/StateMatrix';
+import { RequestsBlock } from './keeper/RequestsBlock';
+import { NoteSheet, type NoteDraft } from './common/NoteSheet';
 import { sampleShift } from '../domain/demo';
 
 const EATEN: Record<string, string> = { all: 'всё', half: '½', none: 'отказ' };
@@ -75,6 +77,7 @@ export function JournalScreen({ user }: { user: CurrentUser }) {
 function DaysView({ initialDay, user }: { initialDay?: string | null; user: CurrentUser }) {
   // своё сданное дежурство можно дополнить потом: три дня без связи, забыл отметить — заполнил заочно
   const [editing, setEditing] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
   const all = useRows('shifts');
   const shifts = sortShifts(all);
   const [day, setDay] = useState<string | null>(initialDay ?? null);
@@ -196,9 +199,14 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
           {s.status !== 'open' && (s.keeper_id === user.id || user.role === 'admin') &&
             (editing === s.id ? (
               <div className="flex flex-col gap-6">
+                <RequestsBlock shift={s} user={user} day={s.date} />
                 <StateMatrix shift={s} />
                 <FeedingBlock shift={s} user={user} />
                 <QuestsBlock shift={s} user={user} />
+                <Button full icon="plus" onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: 'observation' })}>
+                  Запись в эту смену
+                </Button>
+                <NoteSheet draft={noteDraft} shiftId={s.id} user={user} onClose={() => setNoteDraft(null)} />
                 <Button kind="accent" big full icon="check" onClick={() => setEditing(null)}>
                   Готово
                 </Button>

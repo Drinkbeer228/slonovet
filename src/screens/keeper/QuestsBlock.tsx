@@ -2,13 +2,10 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { BRANCH_AMOUNT, BRANCH_KINDS, ELEPHANTS } from '../../domain/elephants';
 import { setBags, updateShift } from '../../domain/actions';
 import type { CurrentUser, ElephantName, Quests, Shift } from '../../domain/types';
-import { Button, Card, Chip, KEY, Section, Segmented, Stepper, TONE, inputCls } from '../../ui/kit';
+import { Card, Chip, KEY, Section, Segmented, Stepper, TONE } from '../../ui/kit';
 import { Icon, type IconName } from '../../ui/Icon';
-import { WhyLink } from '../common/Why';
-import { ExtraIssues } from './ExtraIssues';
 import { RowIcon } from './RowIcon';
 import { nowTime } from '../../lib/dates';
-import { logEvent } from '../../lib/log';
 
 /** Раскрывающаяся строка карточки: итог справа, подробности — по тапу. */
 function Quest({
@@ -115,13 +112,6 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
                 </Fragment>
               ))}
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-0 pt-1">
-              <WhyLink id="urine-tank" label="зачем в бак?" />
-              <WhyLink id="urine-miss" label="зачем отмечать «мимо»?" />
-              <WhyLink id="ammonia" label="почему убирать сразу?" />
-              <WhyLink id="dry-bedding" label="почему сухая подстилка?" />
-              <WhyLink id="floor-mold" label="почему не под пол?" />
-            </div>
           </div>
         </Quest>
 
@@ -198,69 +188,44 @@ export function QuestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }
           </div>
         </div>
 
-        <ExtraIssues shift={shift} user={user} />
-
         <WashRow shift={shift} />
       </Card>
     </Section>
   );
 }
 
-/** Мытьё: одно нажатие; комментарий — только если было что-то особенное. */
+/** Мытьё: кого мыли — чипами «Всех · Претти · Марго · Одри» (несколько сразу); снять — тап ещё раз. */
 function WashRow({ shift }: { shift: Shift }) {
   const w = shift.quests?.wash ?? (shift.quests?.shower ? { at: '' } : undefined);
-  const set = (patch: Partial<NonNullable<Quests['wash']>>) =>
+  // старые записи без «кого» — мыли всех
+  const who: ElephantName[] = w ? (w.who ?? [...ELEPHANTS]) : [];
+  const save = (next: ElephantName[]) =>
     updateShift(shift, (s) => {
-      s.quests.wash = { at: nowTime(), ...(s.quests.wash ?? {}), ...patch };
+      delete s.quests.shower;
+      if (!next.length) delete s.quests.wash;
+      else s.quests.wash = { at: s.quests.wash?.at || nowTime(), who: next };
     });
+  const all = who.length === ELEPHANTS.length;
   return (
-    <div className="flex flex-col gap-3 px-4 py-3">
+    <div className="flex flex-col gap-2.5 px-4 py-3">
       <div className="flex items-center gap-3">
-        <RowIcon icon="sparkle" done={Boolean(w)} />
+        <RowIcon icon="sparkle" done={who.length > 0} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-[15px] font-bold">{w ? 'Слоних мыли' : 'Мытьё'}</span>
-          {w?.at && <span className="text-[12px] font-semibold text-muted">в {w.at}</span>}
+          <span className="text-[15px] font-bold">Мытьё</span>
+          <span className="text-[12px] font-semibold text-muted">{who.length ? `мыли${w?.at ? ` в ${w.at}` : ''}` : 'кого мыли сегодня'}</span>
         </span>
-        {w ? (
-          <button
-            type="button"
-            onClick={() =>
-              updateShift(shift, (s) => {
-                delete s.quests.wash;
-                delete s.quests.shower;
-              })
-            }
-            className="-my-3 px-2 py-3 text-[14px] font-bold text-muted underline"
-          >
-            не мыли
-          </button>
-        ) : (
-          <Button onClick={() => set({})}>Мыли сегодня</Button>
-        )}
       </div>
-      {w && (
-        <div className="pl-12">
-          <WashNote value={w.note ?? ''} onCommit={(note) => set({ note })} />
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2 pl-12">
+        <Chip on={all} onClick={() => save(all ? [] : [...ELEPHANTS])}>
+          Всех
+        </Chip>
+        {ELEPHANTS.map((el) => (
+          <Chip key={el} on={who.includes(el)} onClick={() => save(who.includes(el) ? who.filter((x) => x !== el) : ELEPHANTS.filter((x) => x === el || who.includes(x)))}>
+            {el}
+          </Chip>
+        ))}
+      </div>
     </div>
-  );
-}
-
-function WashNote({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
-  const [text, setText] = useState(value);
-  return (
-    <input
-      className={inputCls}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => {
-        if (text === value) return;
-        onCommit(text.trim());
-        logEvent('wash.note', { text: text.trim().slice(0, 200) }); // частые фразы потом превратим в кнопки
-      }}
-      placeholder="Что-то особенное?"
-    />
   );
 }
 
@@ -269,5 +234,6 @@ export function washText(q: Quests | undefined): string {
   const w = q?.wash;
   if (!w) return q?.shower ? 'мыли' : '';
   const old = [w.place === 'outside' && 'на улице', w.air != null && `${w.air > 0 ? '+' : ''}${w.air}°`].filter(Boolean); // из старых записей
-  return ['мыли', ...old, w.note].filter(Boolean).join(', ');
+  const who = w.who && w.who.length < ELEPHANTS.length ? w.who.join(', ') : '';
+  return ['мыли', who, ...old, w.note].filter(Boolean).join(', ');
 }

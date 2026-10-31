@@ -23,7 +23,7 @@ export function vetInbox(d: { notes: Note[]; shifts: Shift[]; marks: RequestMark
       id: `n:${n.id}`,
       at: n.created_at,
       tone: n.kind === 'incident' ? 'warn' : 'info',
-      text: `${n.elephant === 'none' ? 'ЧП' : n.elephant}: ${n.text || 'фото'}`,
+      text: `${n.kind === 'incident' ? 'ЧП · ' : ''}${n.elephant === 'none' ? 'Общее' : n.elephant}: ${n.text || 'фото'}`,
       sub: n.author_name,
       note: n,
     });

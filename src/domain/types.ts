@@ -47,7 +47,7 @@ export interface Quests {
   /** слоних мыли (старое поле, только «да») */
   shower?: boolean;
   /** мытьё: когда и в каких условиях — чтобы связать с простудой, если что */
-  wash?: { at: string; place?: 'inside' | 'outside'; water?: 'warm' | 'cool' | 'cold'; air?: number | null; note?: string };
+  wash?: { at: string; who?: ElephantName[]; place?: 'inside' | 'outside'; water?: 'warm' | 'cool' | 'cold'; air?: number | null; note?: string };
   /** ветки никто не взвешивает: 1 — немного, 2 — как обычно, 3 — много (kg — из старых записей) */
   branches?: { amount?: number; kinds: string[]; kg?: number };
   /** уход не каждый день: мыли (обычно перед шоу) или оттирали щёткой после грязной ночи */

@@ -18,6 +18,7 @@ const KINDS: { value: NoteKind; label: string }[] = [
   { value: 'observation', label: 'Наблюдение' },
   { value: 'procedure', label: 'Процедура' },
   { value: 'medication', label: 'Препарат' },
+  { value: 'incident', label: 'ЧП' },
 ];
 
 const CHOICES: (ElephantName | 'none')[] = [...ELEPHANTS, 'none'];
@@ -56,8 +57,9 @@ export function NoteSheet({
     setBusy(true);
     try {
       // «ЧП» — запись не про слониху: вода, свет, инвентарь, манеж, стресс
-      await addNote({ shift_id: shiftId, elephant: el, kind: el === 'none' ? 'incident' : kind, metric: draft.metric, text, photo, user, for_vet: forVet || el === 'none' });
-      toast(forVet ? 'Записано — врач увидит в «Новом»' : el === 'none' ? 'ЧП записано — врач увидит' : 'Записано — видно в журнале');
+      // «Общее» — запись не про одну слониху (elephant 'none'); ЧП — тип, его можно и по слонихе. ЧП врач видит всегда
+      await addNote({ shift_id: shiftId, elephant: el, kind, metric: draft.metric, text, photo, user, for_vet: forVet || kind === 'incident' });
+      toast(kind === 'incident' ? 'ЧП записано — врач увидит' : forVet ? 'Записано — врач увидит в «Новом»' : 'Записано — видно в журнале');
       onClose();
     } catch {
       toast('Не удалось сохранить', 'error');
@@ -67,7 +69,7 @@ export function NoteSheet({
   };
 
   const placeholder =
-    el === 'none'
+    kind === 'incident'
       ? 'Что случилось: вода, свет, сломалось, слоны тянули аппаратуру, стресс…'
       : kind === 'medication' ? 'Препарат, доза, как давали' : kind === 'procedure' ? 'Что сделали: стопы, железа, бивни…' : 'Что видно';
 
@@ -75,7 +77,7 @@ export function NoteSheet({
     <Sheet
       open={draft !== null}
       onClose={onClose}
-      title={draft?.metric ? `${draft.elephant} · ${METRIC_LABEL[draft.metric].toLowerCase()} — что видно` : el === 'none' ? 'ЧП' : 'Запись'}
+      title={draft?.metric ? `${draft.elephant} · ${METRIC_LABEL[draft.metric].toLowerCase()} — что видно` : kind === 'incident' ? 'ЧП' : 'Запись'}
       footer={
         <Button kind="primary" big full onClick={save} disabled={busy || (!text.trim() && !photo)}>
           Сохранить
@@ -99,19 +101,19 @@ export function NoteSheet({
                   }`}
                 >
                   {c === 'none' ? (
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface2 text-amber-fg">
-                      <Icon name="alert" size={18} />
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface2 text-muted">
+                      <Icon name="users" size={18} />
                     </span>
                   ) : (
                     <ElephantFace name={c} size={36} />
                   )}
-                  {c === 'none' ? 'ЧП' : c}
+                  {c === 'none' ? 'Общее' : c}
                 </button>
               ))}
             </div>
-            <div className={`flex flex-wrap gap-2 ${el === 'none' ? 'hidden' : ''}`}>
+            <div className="flex flex-wrap gap-2">
               {KINDS.map((k) => (
-                <Chip key={k.value} on={kind === k.value} onClick={() => setKind(k.value)}>
+                <Chip key={k.value} on={kind === k.value} tone={k.value === 'incident' ? 'coral' : undefined} onClick={() => setKind(k.value)}>
                   {k.label}
                 </Chip>
               ))}
@@ -129,7 +131,7 @@ export function NoteSheet({
         <div className="flex items-center gap-3">
           {photo ? <FilePreview file={photo} onRemove={() => setPhoto(null)} /> : <PhotoPick onFile={setPhoto} label="Фото" />}
         </div>
-        {el !== 'none' && (
+        {kind !== 'incident' && (
           <Plate glow="sky" halo={forVet}>
             <Check on={forVet} label="Показать врачу" sub="врач увидит запись первой, в «Новом»" onChange={setForVet} />
           </Plate>

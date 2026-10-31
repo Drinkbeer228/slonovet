@@ -6,7 +6,7 @@ import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Plate, Section, Sheet, SwipeConfirm, toast } from '../../ui/kit';
+import { Button, Card, Chip, Plate, Section, Sheet, SwipeConfirm, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { carryFlags, durationText, noDutySince } from '../../domain/monitoring';
@@ -191,14 +191,12 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: Shift; user: CurrentUser; onClose: () => void }) {
   const requests = useRows('requests');
   const people = useRows('profiles').filter((p) => p.active && canReceiveHandover(p.role) && p.id !== user.id);
-  const [checked, setChecked] = useState(false);
   const [toId, setToId] = useState<string | null>(null);
   const to = people.find((p) => p.id === toId);
   // заметку пишут прямо здесь, не закрывая шторку; сохраняем при выходе из поля и при сдаче
   const [note, setNote] = useState(shift.note);
   useEffect(() => {
     if (open) {
-      setChecked(false);
       setToId(shift.handover_to ?? null);
       setNote(shift.note);
     }
@@ -219,11 +217,11 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
       onClose={onClose}
       title="Передать дежурство"
       footer={
-        // самое ответственное действие смены — свайпом; без сменщика и галочки «Осмотрел всех трёх» неактивно.
+        // самое ответственное действие смены — свайпом (это и есть подтверждение); без сменщика неактивно.
         // Смена остаётся за тобой, пока сменщик не примет: дежурный есть всегда.
         <SwipeConfirm
           label={to ? `Проведи — передать: ${to.full_name}` : 'Выбери, кому передаёшь'}
-          disabled={!checked || !to}
+          disabled={!to}
           onConfirm={async () => {
             await offerHandover(shift, note.trim(), to!.id);
             toast(`Передаёшь: ${to!.full_name}`);
@@ -262,14 +260,7 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
             <span className="px-1 text-[13px] font-semibold text-amber-fg">Передать некому: в «Персонале» нет других киперов</span>
           )}
         </div>
-        <Plate glow="teal" halo={checked}>
-          <Check
-            on={checked}
-            label="Осмотрел всех трёх и проверил тазы"
-            sub="всё, что не отмечено в таблице и в кормлении, — норма"
-            onChange={setChecked}
-          />
-        </Plate>
+        <p className="m-0 px-1 text-[14px] font-semibold text-ink2">Всё, что не отмечено в таблице и в кормлении, уйдёт как норма.</p>
         <p className="m-0 text-[13px] font-semibold text-muted">Сменщик увидит «Дежурство передают» и нажмёт «Принять». До этого дежурный — {user.full_name}.</p>
       </div>
     </Sheet>
