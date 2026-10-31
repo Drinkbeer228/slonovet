@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import { platform, promptInstall, useInstall, type Platform } from '../lib/install';
-import { Button, KEY, Plate, Segmented, Sheet, toast } from '../ui/kit';
+import { Button, KEY, Plate, Segmented, Sheet, toast, GlowIcon } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 /**
@@ -145,7 +145,7 @@ export function InstallBanner() {
   return (
     <Plate glow="teal" className="mb-4 flex flex-col gap-2.5 p-3.5">
       <span className="flex gap-2.5">
-        <Icon name="install" size={20} className="mt-0.5 shrink-0 text-teal-fg" />
+        <GlowIcon glow="teal" icon="install" />
         <span className="flex flex-col gap-0.5">
           <span className="text-[14px] font-bold">Поставь СлоноВет на экран телефона</span>
           {os === 'ios' && !canPrompt ? (

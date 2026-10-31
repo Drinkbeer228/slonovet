@@ -9,7 +9,7 @@ import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain
 import { ledger } from '../domain/stops';
 import { newId, put, useRows, useEffectiveDiets } from '../lib/store';
 import { localDay, plural, relDate, shortDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast, GlowIcon } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 import { RoadBanner } from './common/RoadBanner';
 
@@ -107,8 +107,13 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       {road && <RoadBanner />}
 
       {low.length > 0 && (
-        <Plate glow="amber" halo className="flex flex-col p-4">
-          <span className="pb-1 text-[12px] font-extrabold tracking-wide text-amber-fg">ЗАКАНЧИВАЕТСЯ</span>
+        // предупреждение, не тревога: тонированное стекло без halo, шапка — значок в медальоне и слово
+        <Plate glow="amber" className="flex flex-col p-4">
+          <div className="flex items-center gap-3 pb-1">
+            <GlowIcon glow="amber" icon="alert" />
+            <span className="flex-1 text-[15px] font-extrabold text-amber-fg">Заканчивается</span>
+            <span className="text-[13px] font-semibold text-muted">{low.length} {plural(low.length, 'позиция', 'позиции', 'позиций')}</span>
+          </div>
           {/* одна кнопка на всё незаказанное, вместо стопки одинаковых; у строки — лёгкая ссылка, чтобы поправить количество */}
           {toBuy.length > 1 && (
             <Button full icon="box" className="mb-2 mt-1" onClick={() => setBuyAll(true)}>

@@ -5,7 +5,7 @@ import { boardAttention } from '../domain/board';
 import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
-import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast } from '../ui/kit';
+import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast, GlowIcon } from '../ui/kit';
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { setTheme, useTheme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
@@ -53,7 +53,7 @@ export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'В
 export function PreviewBanner({ role }: { role: Role }) {
   return (
     <Plate glow="teal" className="mb-4 flex items-center gap-3 p-3.5">
-      <Icon name="users" size={20} className="shrink-0 text-teal-fg" />
+      <GlowIcon glow="teal" icon="users" />
       <span className="flex flex-1 flex-col">
         <span className="text-[14px] font-bold">Смотришь как: {ROLE_LABEL[role]}</span>
         <span className="text-[12px] font-semibold text-muted">только просмотр, изменения не сохраняются</span>
@@ -72,7 +72,7 @@ export function OfflineBanner() {
   const when = s.lastSync ? `${relDate(localDay(s.lastSync), isoDate())} в ${timeOf(s.lastSync)}` : 'ещё не было';
   return (
     <Plate glow="amber" halo className="mb-4 flex gap-2.5 p-3.5">
-      <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber-fg" />
+      <GlowIcon glow="amber" icon="cloudOff" />
       <span className="flex flex-col gap-0.5">
         <span className="text-[14px] font-bold text-amber-fg">
           Не отправлено: {s.pending} · связь с сервером {s.lastSync ? `была ${when}` : when}

@@ -5,7 +5,7 @@ import { acceptedBy, lastHanded } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { isoDate, longDate } from '../../lib/dates';
-import { Button, Card, Chip, KEY, Plate, Section, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Chip, KEY, Plate, Section, inputCls, toast, GlowIcon } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { PrevShiftSummary } from './PrevShiftSummary';
 
@@ -47,7 +47,7 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
 
       {takeover && (
         <Plate glow="amber" halo className="flex gap-2.5 p-3.5">
-          <Icon name="cloudOff" size={20} className="mt-0.5 shrink-0 text-amber-fg" />
+          <GlowIcon glow="amber" icon="cloudOff" />
           <span className="text-[14px] font-semibold leading-snug text-ink2">
             Смена не сдана: у {takeover.keeper_name} нет связи или он ушёл. Её закроем как «принята без сдачи» и запишем, кто и когда заступил. Его записи дойдут, когда его телефон выйдет на связь.
           </span>

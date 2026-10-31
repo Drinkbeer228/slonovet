@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 import { addDays, isoDate, longDate, parseIso } from '../lib/dates';
@@ -144,25 +144,15 @@ export function Card({
 
 export type Glow = 'teal' | 'amber' | 'coral' | 'sky' | 'violet';
 
-/** Тлеющее свечение по левому краю плиты; цвет — токен темы, сила --wash (в светлой теме слабее). */
-const WASH: Record<Glow, string> = {
-  teal: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-teal)_var(--wash),transparent),transparent)]',
-  amber: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-amber)_var(--wash),transparent),transparent)]',
-  coral: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-coral)_var(--wash),transparent),transparent)]',
-  sky: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-sky)_var(--wash),transparent),transparent)]',
-  violet: 'bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-violet)_var(--wash),transparent),transparent)]',
-};
-const HALO: Record<Glow, string> = {
-  teal: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent)]',
-  amber: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-amber)_var(--glow),transparent)]',
-  coral: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-coral)_var(--glow),transparent)]',
-  sky: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-sky)_var(--glow),transparent)]',
-  violet: 'shadow-[inset_0_1px_0_var(--color-hl-soft),0_0_26px_-8px_color-mix(in_srgb,var(--color-violet)_var(--glow),transparent)]',
-};
+/** Текст и иконка на тонировке цвета: в светлой теме -fg темнее, держит 4.5:1. */
+const FG: Record<Glow, string> = { teal: 'text-teal-fg', amber: 'text-amber-fg', coral: 'text-coral-fg', sky: 'text-sky-fg', violet: 'text-violet-fg' };
+/** Цвет плиты передаём переменной --pc — одни и те же классы для всех цветов. */
+const pc = (glow: Glow) => ({ '--pc': `var(--color-${glow})` }) as CSSProperties;
 
 /**
- * Стеклянная плита со свечением по левому краю — вместо цветных рамок и полосок (баннеры, срочные и просроченные задачи).
- * halo добавляет мягкое внешнее свечение: для срочного. Свечение — усиление, смысл несёт текст и иконка.
+ * Плита-баннер состояния — «тонированное стекло»: ровная тонировка цветом (без градиента), цветная кромка
+ * и подсвеченная верхняя фаска. halo — для тревоги: кромка плотнее, тонировка сильнее, без внешнего свечения.
+ * flat — обычное стекло без цвета (карточки задач: тип у них — плашкой, срочное — рамкой).
  */
 export function Plate({
   glow,
@@ -173,16 +163,40 @@ export function Plate({
 }: {
   glow: Glow;
   halo?: boolean;
-  /** без свечения: обычная стеклянная плита (для состояния «не срочно», чтобы разметка не прыгала) */
+  /** без цвета: обычная стеклянная плита */
   flat?: boolean;
   children: ReactNode;
   className?: string;
 }) {
+  if (flat) return <div className={`relative isolate overflow-hidden rounded-2xl border border-edge bg-surface/70 shadow-(--shadow-plate) ${className}`}>{children}</div>;
   return (
-    <div className={`relative isolate overflow-hidden rounded-2xl border border-edge bg-surface/70 ${halo ? HALO[glow] : 'shadow-(--shadow-plate)'} ${className}`}>
-      {!flat && <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 -z-10 w-28 ${WASH[glow]}`} />}
+    <div
+      style={pc(glow)}
+      className={`relative isolate overflow-hidden rounded-2xl border bg-surface/70 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--pc)_45%,transparent),var(--shadow-plate)] ${
+        halo ? 'border-[color-mix(in_srgb,var(--pc)_60%,transparent)]' : 'border-[color-mix(in_srgb,var(--pc)_35%,transparent)]'
+      } ${className}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 -z-10 ${
+          halo ? 'bg-[color-mix(in_srgb,var(--pc)_calc(var(--plate-tint)*1.5),transparent)]' : 'bg-[color-mix(in_srgb,var(--pc)_var(--plate-tint),transparent)]'
+        }`}
+      />
       {children}
     </div>
+  );
+}
+
+/** Значок баннера в медальоне: круг 36 px с тонировкой и кромкой цвета состояния, иконка цветом -fg. */
+export function GlowIcon({ glow, icon }: { glow: Glow; icon: IconName }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={pc(glow)}
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--pc)_35%,transparent)] bg-[color-mix(in_srgb,var(--pc)_var(--tint),transparent)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--pc)_40%,transparent)] ${FG[glow]}`}
+    >
+      <Icon name={icon} size={18} />
+    </span>
   );
 }
 
