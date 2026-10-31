@@ -786,7 +786,7 @@ export function Sheet({
       <div
         role="dialog"
         aria-modal="true"
-        className="animate-sheet flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-3xl border border-b-0 border-edge-hi bg-bg/90 bg-[linear-gradient(to_bottom,var(--color-hl-soft),transparent_90px)] shadow-(--shadow-sheet) backdrop-blur-xl md:rounded-3xl md:border-b"
+        className="animate-sheet flex max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-12px))] w-full max-w-lg flex-col rounded-t-3xl border border-b-0 border-edge-hi bg-bg/90 bg-[linear-gradient(to_bottom,var(--color-hl-soft),transparent_90px)] shadow-(--shadow-sheet) backdrop-blur-xl md:rounded-3xl md:border-b"
         style={drag.style}
         onClick={(e) => e.stopPropagation()}
       >

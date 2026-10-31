@@ -202,8 +202,9 @@ export function TopBar({
 }) {
   const badges = useBadges(user);
   return (
-    <header className="sticky top-0 z-30 border-b border-edge bg-bg/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
+    // с иконки на iPhone страница идёт под чёлку и часы (viewport-fit=cover): шапка начинается строго под ними
+    <header className="pt-safe sticky top-0 z-30 border-b border-edge bg-bg/85 backdrop-blur-xl">
+      <div className="px-safe mx-auto flex h-14 w-full max-w-6xl items-center gap-3">
         {/* надписью, как на логотипе: «Вет» бирюзой; картинка — только на входе и на иконке приложения */}
         <span className="text-[19px] font-extrabold tracking-tight">
           Слоно<span className="text-teal-fg">Вет</span>

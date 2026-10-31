@@ -145,6 +145,15 @@ button:disabled {
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
+/* чёлка и часы iPhone: шапка начинается под ними; в альбомной ориентации — и вырез сбоку */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.px-safe {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
 @keyframes sheet-up {
   from {
     transform: translateY(24px);
