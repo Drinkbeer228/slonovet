@@ -1,10 +1,11 @@
 import { Fragment, useState, type ReactNode } from 'react';
 import { BRANCH_AMOUNT, ELEPHANTS, LEVEL_LABEL, METRIC_LABEL, METRICS } from '../domain/elephants';
 import { FEED_TIMES, acceptedBy, shiftFlags, sortShifts } from '../domain/shift';
-import type { Shift } from '../domain/types';
+import type { CurrentUser, Shift } from '../domain/types';
+import { ElephantsView } from './journal/ElephantsView';
 import { useRows } from '../lib/store';
 import { addDays, isoDate, localDay, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
-import { CalendarSheet, Card, Empty, IconButton, KEY, PAD, Section } from '../ui/kit';
+import { CalendarSheet, Card, Empty, IconButton, KEY, PAD, Section, Segmented } from '../ui/kit';
 import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
@@ -35,22 +36,49 @@ function worst(shifts: Shift[]): number {
 }
 
 /** Журнал как бумажный: выбрал день — видишь отметки и всё, что было за дежурство. Тревоги — сверху, только если есть. */
-export function JournalScreen() {
+export function JournalScreen({ user }: { user: CurrentUser }) {
+  // врач начинает «По слонам»: сначала «Новое», потом три слонихи; кипер — «По дням», как бумажный журнал
+  const [view, setView] = useState<'days' | 'elephants'>(user.role === 'vet' ? 'elephants' : 'days');
+  const [jumpDay, setJumpDay] = useState<string | null>(null);
   return (
     <div className="flex flex-col gap-4">
       <h1 className="m-0 px-1 text-[26px] font-extrabold tracking-tight">Журнал</h1>
-      <AlertsCard />
-      <DaysView />
+      <Segmented
+        label="Как смотреть"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'days', label: 'По дням' },
+          { value: 'elephants', label: 'По слонам' },
+        ]}
+      />
+      {view === 'days' ? (
+        <>
+          <AlertsCard />
+          <DaysView key={jumpDay ?? ''} initialDay={jumpDay} />
+        </>
+      ) : (
+        <ElephantsView
+          user={user}
+          onDay={(d) => {
+            setJumpDay(d);
+            setView('days');
+          }}
+        />
+      )}
     </div>
   );
 }
 
 /** Дата, под ней календарь как активность на GitHub, ниже смена выбранного дня — таблицей, как на бумаге, и подробности. */
-function DaysView() {
+function DaysView({ initialDay }: { initialDay?: string | null }) {
   const all = useRows('shifts');
   const shifts = sortShifts(all);
-  const [day, setDay] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
+  const [day, setDay] = useState<string | null>(initialDay ?? null);
+  // открыли день из «По слонам» — календарь сразу на его странице
+  const [page, setPage] = useState(() =>
+    initialDay ? Math.max(0, Math.floor(Math.floor((parseIso(isoDate()).getTime() - parseIso(initialDay).getTime()) / 86400000 / 7) / WEEKS)) : 0,
+  );
 
   const byDay = new Map<string, Shift[]>();
   for (const s of shifts) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s]);

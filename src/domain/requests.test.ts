@@ -100,7 +100,7 @@ describe('вход: что сказать человеку', () => {
 describe('варианты ответа по адресату', () => {
   it('одни универсальные для слонов и «Работы», без «в работе» (отметка закрыла бы разовую задачу)', async () => {
     const { answerPresets, FAILED_ANSWERS } = await import('./shift');
-    expect(answerPresets().map((p) => p.label)).toEqual(['Сделано / не получилось', 'Сделано / частично / не вышло']);
+    expect(answerPresets().map((p) => p.label)).toEqual(['Сделано / не получилось', 'Сделано / частично / не вышло', 'Дал / частично / не дал']);
     expect(answerPresets().flatMap((p) => p.options)).not.toContain('в работе');
     expect(FAILED_ANSWERS).toContain('не вышло');
   });

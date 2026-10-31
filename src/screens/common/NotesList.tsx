@@ -1,11 +1,16 @@
 import { METRIC_LABEL } from '../../domain/elephants';
 import type { Note } from '../../domain/types';
 import { localDay, relDate, timeOf } from '../../lib/dates';
+import { useRows } from '../../lib/store';
 import { Card, PhotoThumb } from '../../ui/kit';
 
 const KIND: Record<Note['kind'], string> = { observation: '', procedure: '💉 процедура', medication: '💊 препарат', incident: '⚠ ЧП' };
 
+const REPLY: Record<string, string> = { seen: 'смотрит дальше', assign: 'назначит', call: 'позвонит' };
+
 export function NotesList({ notes, showElephant = true, showDate = false }: { notes: Note[]; showElephant?: boolean; showDate?: boolean }) {
+  // ответы врача — под записью: кипер видит, что врач её прочитал
+  const replies = useRows('note_comments');
   return (
     <div className="flex flex-col gap-2">
       {notes.map((n) => (
@@ -24,6 +29,14 @@ export function NotesList({ notes, showElephant = true, showDate = false }: { no
                 .join(' · ')}
             </span>
             {n.text && <span className="text-[15px] font-medium leading-snug">{n.text}</span>}
+            {n.for_vet && <span className="text-[12px] font-bold text-sky-fg">Показано врачу</span>}
+            {replies
+              .filter((c) => c.note_id === n.id && !c.deleted)
+              .map((c) => (
+                <span key={c.id} className="text-[13px] font-bold text-teal-fg">
+                  {c.author_name}: {c.kind === 'text' ? c.text : REPLY[c.kind]}
+                </span>
+              ))}
           </div>
         </Card>
       ))}

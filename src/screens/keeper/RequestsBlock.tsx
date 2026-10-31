@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { addMark } from '../../domain/actions';
-import { FREQ_LABEL, dutyTodos, isFailedMark, markAnswer, overdue, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import { FREQ_LABEL, courseDay, dutyTodos, isFailedMark, markAnswer, overdue, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import { canUndoMark } from '../../domain/access';
 import type { CurrentUser, RequestMark, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
@@ -131,7 +131,12 @@ export function RequestCard({
           {late && <Icon name="alert" size={12} stroke={3} />}
           {when || FREQ_LABEL[req.frequency]}
         </span>
-        {req.due_date && <span className={tag}>до {shortDate(req.due_date)}</span>}
+        {req.route && <span className={tag}>{req.route}</span>}
+        {req.dose && <span className={tag}>{req.dose}</span>}
+        {(() => {
+          const cd = courseDay(req, isoDate());
+          return cd?.total ? <span className={`${tag} !text-teal-fg`}>день {Math.min(cd.day, cd.total)} из {cd.total}</span> : req.due_date ? <span className={tag}>до {shortDate(req.due_date)}</span> : null;
+        })()}
         {req.needs_photo && !done && (
           <span className={tag}>
             <Icon name="camera" size={12} />с фото

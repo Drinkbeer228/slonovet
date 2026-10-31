@@ -100,6 +100,8 @@ function Main() {
       history.replaceState(null, '', location.pathname);
       return fromLink;
     }
+    // врач приходит смотреть слонов: всегда начинает с «Журнала» (там «Новое» и «По слонам»)
+    if (user.role === 'vet') return 'journal';
     try {
       const saved = localStorage.getItem(TAB_KEY) as Tab | null;
       if (saved && allowed.includes(saved)) return saved;
@@ -138,7 +140,7 @@ function Main() {
           {current === 'requests' && <RequestsScreen user={user} />}
           {current === 'diet' && <DietScreen user={user} />}
           {current === 'stock' && <StockScreen user={user} />}
-          {current === 'journal' && <JournalScreen />}
+          {current === 'journal' && <JournalScreen user={user} />}
           {current === 'users' && <UsersScreen session={session} role={user.role} />}
           {current === 'guide' && <GuideScreen />}
           {current === 'rating' && <RatingScreen user={user} />}

@@ -293,6 +293,7 @@ export async function seedDemo() {
       text: 'К воде подходила два раза за утро, выпила мало.',
       photo_path: null,
       author_name: 'Орлов',
+      for_vet: true,
       created_at: ts(addDays(today, -1), '11:20'),
       updated_at: now,
     },
@@ -334,6 +335,9 @@ export async function seedDemo() {
     { id: 'demo-c2', request_id: 'demo-r2', author_id: 'demo-vet', author_name: 'Иванова', text: 'По миске: рассыпанное не считаем. Если рассыпала больше трети — «половину».', created_at: ts(today, '13:35'), updated_at: now },
   ]);
   await seedRows('notes', notes);
+  await seedRows('elephant_passports', [
+    { id: 'Претти', birth_year: 1986, weight: '4,3 т', character: 'спокойная, главная в группе, едет отдельно', norm: 'всегда пьёт и мочится больше остальных — это её норма', legs: 'задняя левая подошва — хроническая трещина', allergies: '', forbidden: '', updated_by_name: 'Иванова', updated_at: now },
+  ]);
 
   // «Контейнеры»: опись и погрузка — около десятка ящиков разной тары; один на базе, один без габаритов
   const box = (id: string, number: string, kind: Container['kind'], l: number | null, w: number | null, h: number | null, contents: string, extra: Partial<Container> = {}): Container => ({

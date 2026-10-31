@@ -109,7 +109,7 @@ export interface RequestTodo {
 }
 
 /** Ответы-неудачи: отметка «не получилось» не закрывает разовую задачу — её надо сделать ещё раз. */
-export const FAILED_ANSWERS = ['не получилось', 'не вышло'];
+export const FAILED_ANSWERS = ['не получилось', 'не вышло', 'не дал'];
 
 /** Ответ отметки — вариант кнопки в начале заметки («ответ — комментарий»); без ответа — null. */
 export function markAnswer(m: RequestMark, req?: VetRequest): string | null {
@@ -193,6 +193,7 @@ export function whenLabel(req: VetRequest, today = isoDate()): string {
 export const ANSWER_PRESETS: { label: string; options: string[] }[] = [
   { label: 'Сделано / не получилось', options: ['сделано', 'не получилось'] },
   { label: 'Сделано / частично / не вышло', options: ['сделано', 'частично', 'не вышло'] },
+  { label: 'Дал / частично / не дал', options: ['дал', 'частично', 'не дал'] },
 ];
 
 export const answerPresets = () => ANSWER_PRESETS;
@@ -227,4 +228,24 @@ export function requestProgress(req: VetRequest, marks: RequestMark[], shifts: S
 
 function lastMark(marks: RequestMark[]) {
   return [...marks].sort((a, b) => (a.done_at < b.done_at ? 1 : -1))[0];
+}
+
+/** Начало курса: день, на который поставлен, или день, когда поставили. */
+export function courseStart(req: VetRequest): string {
+  return req.on_date ?? localDay(req.created_at);
+}
+
+/** «день 3 из 7» для курса с датой окончания; без даты — только номер дня. */
+export function courseDay(req: VetRequest, today: string): { day: number; total: number | null } | null {
+  if (req.frequency === 'once') return null;
+  const start = courseStart(req);
+  const diff = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00`) - Date.parse(`${a}T12:00:00`)) / 86_400_000);
+  const day = diff(start, today) + 1;
+  if (day < 1) return null;
+  return { day, total: req.due_date ? diff(start, req.due_date) + 1 : null };
+}
+
+/** Назначение одной строкой: что, как, доза, сколько раз — для истории правок и выписки. */
+export function describeRequest(req: Pick<VetRequest, 'text' | 'route' | 'dose' | 'frequency' | 'due_date'>): string {
+  return [req.text, req.route, req.dose, FREQ_LABEL[req.frequency], req.due_date ? `до ${req.due_date}` : ''].filter(Boolean).join(' · ');
 }

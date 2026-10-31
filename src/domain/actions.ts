@@ -7,7 +7,7 @@ import { isoDate } from '../lib/dates';
 import { newShift } from './shift';
 import { canTakeShift } from './access';
 import { balances, feedUsage, isBeforeCount, toStockUnits, weighedItem } from './stock';
-import type { CurrentUser, ElephantName, Level, MetricKey, Note, NoteKind, Purchase, PurchaseStatus, Shift, StockItem, StockMove } from './types';
+import type { CurrentUser, ElephantName, Level, MetricKey, Note, NoteCommentKind, NoteKind, Purchase, PurchaseStatus, Shift, StockItem, StockMove } from './types';
 
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
@@ -360,4 +360,10 @@ export async function arrivePurchase(p: Purchase, item: StockItem | undefined, n
   if (item && delta > 0) await addStockMove(item.id, delta, 'in', user, shiftId, `in:purchase:${p.id}:${delta}`);
   await setPurchaseStatus(p, 'done', user);
   return delta;
+}
+
+/** Ответ врача на запись кипера: «Смотрю дальше», «Назначу», «Позвоню» — или словами. */
+export async function addNoteComment(noteId: string, user: CurrentUser, kind: NoteCommentKind, text = '') {
+  logEvent('note.reply', { note: noteId, kind });
+  await put('note_comments', { id: newId(), note_id: noteId, author_id: user.id, author_name: user.full_name, kind, text: text.trim(), created_at: new Date().toISOString() });
 }

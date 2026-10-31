@@ -13,7 +13,9 @@ export function ShiftSummaryCard({ shift, today }: { shift: Shift; today?: strin
   const { diets, base } = useEffectiveDiets();
   const requests = useRows('requests');
   const marks = useRows('request_marks');
-  const todos = dutyTodos(requests, marks, shift, today ?? shift.date);
+  // только то, что уже было поставлено, пока шла смена: назначение после сдачи — не её «не сделано»
+  const until = shift.handed_at ?? new Date().toISOString();
+  const todos = dutyTodos(requests, marks, shift, today ?? shift.date).filter((t) => t.req.created_at <= until);
   const lines = shiftSummary(shift, todos, daySlots(shift, (t) => mealCancelled(base, diets, t)));
   return (
     <Card className="flex flex-col gap-2 p-4">
