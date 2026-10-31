@@ -309,7 +309,7 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
             onChange={setChecked}
           />
         </Plate>
-        <p className="m-0 text-[13px] font-semibold text-muted">Сменщик увидит «Тебе передают дежурство» и нажмёт «Принять». До этого дежурный — ты.</p>
+        <p className="m-0 text-[13px] font-semibold text-muted">Сменщик увидит «Дежурство передают» и нажмёт «Принять». До этого дежурный — {user.full_name}.</p>
       </div>
     </Sheet>
   );

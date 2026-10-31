@@ -71,7 +71,7 @@ export function DutyBar({ shift, from, user, stale, onHandover }: { shift: Shift
       <Sheet
         open={open === 'info'}
         onClose={() => setOpen(null)}
-        title="Дежурство"
+        title="Дежурный"
         footer={
           mine ? (
             <div className="flex flex-col gap-2">
@@ -108,7 +108,7 @@ export function DutyBar({ shift, from, user, stale, onHandover }: { shift: Shift
       >
         <div className="flex flex-col gap-5">
           <Card className="flex flex-col gap-1 p-4">
-            <span className="text-[17px] font-extrabold">Дежурит {shift.keeper_name}</span>
+            <span className="text-[17px] font-extrabold">{shift.keeper_name}</span>
             <span className="text-[14px] font-semibold text-muted">принял {when(shift.accepted_at)}</span>
             {to && <span className="text-[14px] font-bold text-teal-fg">передаёт: {to.full_name} — дежурит, пока не примет</span>}
           </Card>
