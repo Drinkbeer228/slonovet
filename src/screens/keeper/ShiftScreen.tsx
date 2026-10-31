@@ -6,7 +6,7 @@ import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows, useEffectiveDiets } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Field, Plate, Section, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Field, Plate, Section, Sheet, SwipeConfirm, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { RoadBanner } from '../common/RoadBanner';
@@ -287,19 +287,16 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
       onClose={onClose}
       title="Сдать дежурство"
       footer={
-        <Button
-          kind="accent"
-          big
-          full
+        // самое ответственное действие смены — свайпом; без галочки «Осмотрел всех трёх» неактивно
+        <SwipeConfirm
+          label="Проведи — сдать дежурство"
           disabled={!checked}
-          onClick={async () => {
+          onConfirm={async () => {
             await handOver(shift, note.trim(), toId);
             toast('Дежурство сдано');
             onClose();
           }}
-        >
-          Сдать
-        </Button>
+        />
       }
     >
       <div className="flex flex-col gap-4">

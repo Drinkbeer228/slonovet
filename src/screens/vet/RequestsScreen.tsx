@@ -8,7 +8,7 @@ import type { CurrentUser, ElephantName, Purchase, RequestFrequency, Shift, VetR
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, SwipeConfirm, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest, canEdit } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
@@ -349,17 +349,13 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
                 ))}
               </div>
             ) : (
-              <Button
-                kind="primary"
-                icon="check"
-                full
-                onClick={async () => {
+              <SwipeConfirm
+                label="Проведи — выполнено"
+                onConfirm={async () => {
                   await addMark(req.id, shift!, user);
                   toast('Отмечено');
                 }}
-              >
-                Отметить выполнение
-              </Button>
+              />
             )}
           </div>
         )}

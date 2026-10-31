@@ -9,7 +9,7 @@ import { TypePill } from '../TypePill';
 import { Icon } from '../../ui/Icon';
 import { remove, useRows } from '../../lib/store';
 import { isoDate, localDay, relDate, shortDate, timeOf } from '../../lib/dates';
-import { Button, CHIP, Card, Chip, Confirm, FilePreview, IconButton, KEY, LateBadge, PhotoPick, PhotoThumb, Plate, Section, Sheet, TONE, UrgentBadge, inputCls, toast } from '../../ui/kit';
+import { Button, CHIP, Card, Chip, Confirm, FilePreview, IconButton, KEY, LateBadge, PhotoPick, PhotoThumb, Plate, Section, Sheet, TONE, UrgentBadge, SwipeConfirm, inputCls, toast } from '../../ui/kit';
 
 export function RequestsBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const requests = useRows('requests');
@@ -163,9 +163,15 @@ export function RequestCard({
       ) : (
         !done && (
           <div className="flex gap-2">
-            <Button kind="accent" icon="check" full onClick={() => onQuick()}>
-              {multi ? `Отметить (${marks.length} из ${needed})` : req.needs_photo ? 'Выполнено — фото' : 'Выполнено'}
-            </Button>
+            {req.needs_photo ? (
+              // с фото — шторка, подтверждение там
+              <Button kind="accent" icon="camera" full onClick={() => onQuick()}>
+                {multi ? `Отметить с фото (${marks.length} из ${needed})` : 'Выполнено — фото'}
+              </Button>
+            ) : (
+              // свайпом, не тапом: случайно не отметится
+              <SwipeConfirm label={multi ? 'Проведи — отметить' : 'Проведи — выполнено'} onConfirm={() => onQuick()} />
+            )}
             {!req.needs_photo && <IconButton icon="camera" label="Отметить с фото или заметкой" onClick={onDetailed} />}
           </div>
         )

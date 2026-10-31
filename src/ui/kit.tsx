@@ -403,6 +403,103 @@ export function Stepper({ value, onChange, min = 0, label }: { value: number; on
   );
 }
 
+/* ---------- Свайп-подтверждение ---------- */
+
+const KNOB = 48; // клавиша
+const GAP = 4; // зазор клавиши от края дорожки
+
+/**
+ * «Проведи — выполнено»: тянешь клавишу вправо до конца — подтверждено. Случайный тап не срабатывает
+ * (только подсказка: клавиша вздрагивает). Для отметки о выполнении и сдачи смены.
+ * С клавиатуры и для экранного диктора — Enter или пробел на клавише подтверждают сразу.
+ */
+export function SwipeConfirm({ label, onConfirm, disabled }: { label: string; onConfirm: () => unknown; disabled?: boolean }) {
+  const track = useRef<HTMLDivElement>(null);
+  const start = useRef<{ x: number; id: number } | null>(null);
+  const [dx, setDx] = useState(0);
+  const [done, setDone] = useState(false);
+  const [nudge, setNudge] = useState(false);
+  const max = () => (track.current ? track.current.clientWidth - KNOB - GAP * 2 : 0);
+  const hint = () => {
+    haptics.tap();
+    setNudge(true);
+    window.setTimeout(() => setNudge(false), 300);
+  };
+  const confirm = async () => {
+    if (done || disabled) return;
+    setDone(true);
+    setDx(max());
+    haptics.success();
+    try {
+      await onConfirm();
+    } finally {
+      // карточка обычно исчезает сама; если нет (курс: «2 из 3») — возвращаемся в начало
+      window.setTimeout(() => {
+        setDone(false);
+        setDx(0);
+      }, 700);
+    }
+  };
+  const share = max() ? dx / max() : 0;
+  return (
+    <div
+      ref={track}
+      onClick={(e) => e.target === e.currentTarget && !disabled && hint()}
+      className={`relative h-14 w-full select-none overflow-hidden rounded-2xl ${TONE.sunken} ${disabled ? 'opacity-40' : ''}`}
+    >
+      {/* за клавишей дорожка заливается бирюзой */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 rounded-2xl bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)]"
+        style={{ width: dx + KNOB + GAP * 2, transition: start.current ? 'none' : 'width 0.25s ease-out' }}
+      />
+      <span
+        aria-hidden="true"
+        className="animate-shimmer pointer-events-none absolute inset-0 flex items-center justify-center bg-[linear-gradient(90deg,var(--color-muted)_0%,var(--color-muted)_35%,var(--color-ink)_50%,var(--color-muted)_65%,var(--color-muted)_100%)] bg-[length:200%_100%] bg-clip-text pl-12 text-[15px] font-extrabold text-transparent"
+        style={{ opacity: done ? 0 : Math.max(0, 1 - share * 1.6) }}
+      >
+        {label}
+      </span>
+      <button
+        type="button"
+        aria-label={label}
+        disabled={disabled}
+        onPointerDown={(e) => {
+          if (disabled || done) return;
+          start.current = { x: e.clientX, id: e.pointerId };
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (start.current?.id === e.pointerId) setDx(Math.min(max(), Math.max(0, e.clientX - start.current.x)));
+        }}
+        onPointerUp={() => {
+          if (!start.current) return;
+          start.current = null;
+          if (dx >= max() * 0.85) void confirm();
+          else {
+            if (dx < 6) hint();
+            setDx(0);
+          }
+        }}
+        onPointerCancel={() => {
+          start.current = null;
+          setDx(0);
+        }}
+        // клик от пальца уже обработан выше; detail === 0 — это Enter или пробел с клавиатуры
+        onClick={(e) => e.detail === 0 && void confirm()}
+        className="absolute top-1 flex h-12 w-12 touch-none items-center justify-center rounded-xl bg-teal bg-[linear-gradient(to_bottom,rgb(255_255_255/var(--sheen-t)),transparent_55%)] text-teal-ink shadow-(--shadow-glow-teal)"
+        style={{
+          left: GAP,
+          transform: `translateX(${dx + (nudge ? 14 : 0)}px)`,
+          transition: start.current ? 'none' : 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        }}
+      >
+        <Icon name={done ? 'check' : 'next'} size={22} stroke={2.6} />
+      </button>
+    </div>
+  );
+}
+
 /* ---------- Поля ---------- */
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {

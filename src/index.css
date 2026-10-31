@@ -150,6 +150,26 @@ button:disabled {
   }
 }
 
+.animate-shimmer {
+  animation: shimmer 2.4s linear infinite;
+}
+
+/* бегущий блик по подписи «Проведи — …», как «разблокировать» на старом iPhone */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer {
+    animation: none;
+  }
+}
+
 .animate-sheet {
   animation: sheet-up 0.18s ease-out;
 }
