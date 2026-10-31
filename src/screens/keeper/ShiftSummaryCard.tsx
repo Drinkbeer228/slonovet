@@ -8,13 +8,15 @@ import { Card } from '../../ui/kit';
 const DOT: Record<SummaryLine['tone'], string> = { ok: 'bg-teal', warn: 'bg-amber', bad: 'bg-coral' };
 
 /** «Сдаю» одной карточкой — собрана сама из смены; одна и та же у сдающего и у принимающего. */
-export function ShiftSummaryCard({ shift, today }: { shift: Shift; today?: string }) {
+/** draft — идущее дежурство в «Журнале»: только состояние слоних, без «не сделано» и «не отмечено» — смена ещё не кончилась. */
+export function ShiftSummaryCard({ shift, today, draft }: { shift: Shift; today?: string; draft?: boolean }) {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
   // только то, что уже было поставлено, пока шла смена: назначение после сдачи — не её «не сделано»
   const until = shift.handed_at ?? new Date().toISOString();
   const todos = dutyTodos(requests, marks, shift, today ?? shift.date).filter((t) => t.req.created_at <= until);
-  const lines = shiftSummary(shift, todos, daySlots(shift));
+  const all = shiftSummary(shift, todos, daySlots(shift));
+  const lines = draft ? all.filter((l) => !l.text.startsWith('Назначения') && !l.text.startsWith('Кормления')) : all;
   return (
     <Card className="flex flex-col gap-2 p-4">
       {lines.map((l) => (

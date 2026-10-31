@@ -152,10 +152,24 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
               <FeedingBlock shift={shift} user={user} />
               <QuestsBlock shift={shift} user={user} />
             </div>
-            <Section id="sec-notes" title="Записи за дежурство" aside={notes.length ? String(notes.length) : undefined}>
+            {/* записи — раздел с кнопкой в заголовке; пусто — только заголовок, без «пока нет» */}
+            <Section
+              id="sec-notes"
+              title={notes.length ? `Записи · ${notes.length}` : 'Записи'}
+              aside={
+                !folded && (!handed || !keeper) && (mine || !keeper) ? (
+                  <button
+                    type="button"
+                    onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}
+                    className="-my-3 inline-flex h-11 items-center gap-1 px-1 font-bold text-teal"
+                  >
+                    <Icon name="plus" size={16} stroke={2.6} />
+                    Запись
+                  </button>
+                ) : undefined
+              }
+            >
               {notes.length > 0 && <NotesList notes={[...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))} />}
-              {/* запись может оставить любой; не кипер — и после сдачи (процедуру сделали, когда никто не дежурит) */}
-              {!notes.length && <Card className="px-4 py-3 text-[15px] text-muted">{handed ? 'Записей нет' : 'Пока нет — «＋ Запись» внизу справа'}</Card>}
             </Section>
             {/* заметки следующему больше нет: сводка «Сдаю» собирается сама; старые заметки — только показать */}
             {readOnly
@@ -174,14 +188,6 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         </div>
       )}
 
-      {/* быстрая запись — под большим пальцем, над нижней панелью: фото, слониха лицом, «Показать врачу» */}
-      {!folded && (!handed || !keeper) && (mine || !keeper) && (
-        <div className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20">
-          <Button kind="accent" big icon="plus" onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}>
-            Запись
-          </Button>
-        </div>
-      )}
       <NoteSheet draft={noteDraft} shiftId={shift.id} user={user} onClose={() => setNoteDraft(null)} />
       <HandoverSheet open={handoverOpen} shift={shift} user={user} onClose={() => setHandoverOpen(false)} />
     </div>

@@ -1,5 +1,5 @@
 import { EDITORS, canEdit } from '../domain/access';
-import { NewPurchaseSheet, PurchasesBlock, requestPurchase } from './PurchasesView';
+import { NewPurchaseSheet, requestPurchase } from './PurchasesView';
 import { DeliverySheet, SackGauge } from './StockSheets';
 import { useMemo, useState } from 'react';
 import { countStock } from '../domain/actions';
@@ -69,6 +69,7 @@ export function StockScreen({ user }: { user: CurrentUser }) {
   const [incoming, setIncoming] = useState(false);
   const [buy, setBuy] = useState<{ itemId: string; amount: string } | null>(null);
   const purchases = useRows('purchases').filter((p) => !p.deleted && (p.status === 'new' || p.status === 'ordered'));
+  const activeBuys = purchases.length;
   const counted = lastCount(moves);
   const countAge = counted ? Math.floor((Date.now() - Date.parse(counted.created_at)) / 86_400_000) : null;
 
@@ -90,11 +91,6 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       <header className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-3 px-1">
           <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Фураж</h1>
-          {canWrite && (
-            <Button kind="light" icon="truck" onClick={() => setIncoming(true)}>
-              Привезли
-            </Button>
-          )}
         </div>
         {/* на гастролях расхождения копятся: напоминаем, если давно не сверяли (правка остатка по тапу на позицию) */}
         <span className={`px-1 text-[13px] font-semibold ${countAge == null || countAge > 7 ? 'text-amber-fg' : 'text-muted'}`}>
@@ -122,7 +118,14 @@ export function StockScreen({ user }: { user: CurrentUser }) {
             const p = purchases.find((x) => x.item_id === v.item.id);
             const hint = orderHint(v);
             return (
-              <div key={v.item.id} className="flex items-center gap-3 border-t border-edge py-2 first:border-t-0">
+              // строка целиком — «в закупку» (если ещё не просили); отдельной кнопки у каждой строки нет
+              <button
+                key={v.item.id}
+                type="button"
+                disabled={Boolean(p)}
+                onClick={() => setBuy({ itemId: v.item.id, amount: hint?.text ?? '' })}
+                className="flex w-full items-center gap-3 border-t border-edge py-2 text-left first:border-t-0 disabled:opacity-100"
+              >
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="text-[15px] font-bold">
                     {v.item.name} — {v.balance <= 0 ? amountText(v) : daysText(v, false)}
@@ -137,20 +140,21 @@ export function StockScreen({ user }: { user: CurrentUser }) {
                         : 'не заказано'}
                   </span>
                 </span>
-                {!p && (
-                  <button type="button" onClick={() => setBuy({ itemId: v.item.id, amount: hint?.text ?? '' })} aria-label={`${v.item.name} — в закупку`} className="-mr-2 inline-flex h-11 shrink-0 items-center gap-1 px-2 text-[14px] font-bold text-teal-fg">
-                    <Icon name="plus" size={16} stroke={2.6} />в закупку
-                  </button>
-                )}
-              </div>
+                {!p && <Icon name="next" size={18} className="shrink-0 text-teal-fg" />}
+              </button>
             );
           })}
         </Plate>
       )}
 
-      <div>
-        <PurchasesBlock user={user} />
-      </div>
+      {/* закупки: что в работе — в «Задачах»; здесь только «Привезли» — разгрузили машину, приход на склад */}
+      {canWrite && (
+        <Section title="Закупки" aside={activeBuys ? `в работе: ${activeBuys} · в «Задачах»` : undefined}>
+          <Button full icon="truck" onClick={() => setIncoming(true)}>
+            Привезли
+          </Button>
+        </Section>
+      )}
 
       {STOCK_CATEGORIES.map((g) => {
         const ids = items

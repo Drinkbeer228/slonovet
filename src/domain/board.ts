@@ -13,7 +13,7 @@ export type BoardGroup = 'overdue' | 'today' | 'courses' | 'planned' | 'closed';
 
 export type BoardItem = { kind: 'request'; type: 'elephants' | 'work'; req: VetRequest } | { kind: 'purchase'; type: 'purchases'; p: Purchase };
 
-export const GROUP_TITLE: Record<BoardGroup, string> = { overdue: 'Просрочено', today: 'Сегодня', courses: 'Курсы', planned: 'Запланировано', closed: 'Закрытые' };
+export const GROUP_TITLE: Record<BoardGroup, string> = { overdue: 'Просрочено', today: 'Сегодня', courses: 'Регулярные', planned: 'Запланировано', closed: 'Закрытые' };
 export const GROUPS: BoardGroup[] = ['overdue', 'today', 'courses', 'planned', 'closed'];
 /** Закрытых показываем последние — чтобы доска не росла бесконечно */
 export const CLOSED_LIMIT = 20;

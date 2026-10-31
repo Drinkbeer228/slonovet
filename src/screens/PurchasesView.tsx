@@ -9,7 +9,7 @@ import { currentShift } from '../domain/shift';
 import { currentStop } from '../domain/stops';
 import { QUALITY, suppliersFor } from '../domain/suppliers';
 import { STOCK_CATEGORIES, balances, categoryOf, countWords, fmtNum, orderHint, packWords, stockPerDay, stockView, toStockUnits } from '../domain/stock';
-import { Button, Card, Check, Chip, DateInput, Field, KEY, Section, Sheet, UrgentBadge, inputCls, toast } from '../ui/kit';
+import { Button, Card, Check, Chip, DateInput, Field, KEY, Sheet, UrgentBadge, inputCls, toast } from '../ui/kit';
 
 const STATUS: Record<PurchaseStatus, { label: string; cls: string }> = {
   new: { label: 'ждёт', cls: 'text-ink2' },
@@ -87,23 +87,6 @@ export function ArriveSheet({ purchase: p, user, onClose }: { purchase: Purchase
         <p className="m-0 text-[15px] text-ink2">Этой позиции уже нет в фураже — заявка просто закроется.</p>
       )}
     </Sheet>
-  );
-}
-
-/**
- * Для «Фуража»: кнопка «Нужно купить» — сразу форма в шторке. Сам список закупок с «Заказано» и «Привезли»
- * живёт на доске «Задачи» → «Закупки», здесь не дублируем — только сколько в работе.
- */
-export function PurchasesBlock({ user }: { user: CurrentUser }) {
-  const active = useRows('purchases').filter(isActive).length;
-  const [creating, setCreating] = useState(false);
-  return (
-    <Section title="Закупки" aside={active ? `в работе: ${active} · в «Задачах»` : undefined}>
-      <Button icon="plus" full onClick={() => setCreating(true)}>
-        Нужно купить
-      </Button>
-      <NewPurchaseSheet open={creating} user={user} onClose={() => setCreating(false)} />
-    </Section>
   );
 }
 

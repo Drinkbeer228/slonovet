@@ -5,7 +5,7 @@ import type { CurrentUser, Shift } from '../domain/types';
 import { ElephantsView } from './journal/ElephantsView';
 import { useRows } from '../lib/store';
 import { addDays, isoDate, localDay, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
-import { Button, CalendarSheet, Card, Empty, IconButton, KEY, PAD, Section, Segmented } from '../ui/kit';
+import { Button, CalendarSheet, GlowIcon, Plate, Card, Empty, IconButton, KEY, PAD, Section, Segmented } from '../ui/kit';
 import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
@@ -15,6 +15,7 @@ import type { ElephantName } from '../domain/types';
 import { FeedingBlock, mealTitle } from './keeper/FeedingBlock';
 import { QuestsBlock, washText } from './keeper/QuestsBlock';
 import { StateMatrix } from './keeper/StateMatrix';
+import { ShiftSummaryCard } from './keeper/ShiftSummaryCard';
 import { RequestsBlock } from './keeper/RequestsBlock';
 import { NoteSheet, type NoteDraft } from './common/NoteSheet';
 import { sampleShift } from '../domain/demo';
@@ -77,6 +78,8 @@ export function JournalScreen({ user }: { user: CurrentUser }) {
 function DaysView({ initialDay, user }: { initialDay?: string | null; user: CurrentUser }) {
   // своё сданное дежурство можно дополнить потом: три дня без связи, забыл отметить — заполнил заочно
   const [editing, setEditing] = useState<string | null>(null);
+  // итог дня словами сразу; таблица и подробности — по тапу (на телефоне без долгой прокрутки)
+  const [shown, setShown] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
   const all = useRows('shifts');
   const shifts = sortShifts(all);
@@ -154,8 +157,8 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
                         onClick={() => setDay(d)}
                         aria-label={`${shortDate(d)}${list ? `, дежурный ${list.map((x) => x.keeper_name).join(', ')}` : ', дежурства нет'}`}
                         className={`aspect-square w-full rounded-[3px] ${
-                          list ? DAY_CLS[worst(list)] : future ? 'bg-transparent' : PAD.empty
-                        } ${d === selected ? 'ring-2 ring-ink' : ''} ${list?.some((x) => x.status === 'open') ? 'opacity-60' : ''}`}
+                          list ? (list.every((x) => x.status === 'open') ? PAD.empty : DAY_CLS[worst(list.filter((x) => x.status !== 'open'))]) : future ? 'bg-transparent' : PAD.empty
+                        } ${d === selected ? 'ring-2 ring-ink' : ''}`}
                       />
                     );
                   })}
@@ -180,11 +183,6 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
               <span className={`h-2.5 w-2.5 rounded-[3px] ${PAD.coral}`} />
               плохо
             </span>
-            {/* открытая смена в календаре бледнее — объясняем здесь, а не загадкой */}
-            <span className="inline-flex items-center gap-1">
-              <span className={`h-2.5 w-2.5 rounded-[3px] opacity-60 ${PAD.teal}`} />
-              идёт
-            </span>
           </div>
         </Card>
       </div>
@@ -193,9 +191,29 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
       {(byDay.get(selected) ?? []).map((s) => (
         <Fragment key={s.id}>
           <GapLine gap={gapBefore(all, s)} />
-          <div>
-            <ShiftCard shift={s} />
-          </div>
+          {s.status === 'open' && (
+            <Plate glow="teal" className="flex items-center gap-2.5 p-3.5">
+              <GlowIcon glow="teal" icon="clock" />
+              <span className="text-[14px] font-semibold leading-snug text-ink2">
+                Идёт дежурство · {s.keeper_name} с {timeOf(s.accepted_at ?? s.updated_at)} — итог будет после сдачи. Пока видно только то, что уже отмечено.
+              </span>
+            </Plate>
+          )}
+          <ShiftSummaryCard shift={s} draft={s.status === 'open'} />
+          <button
+            type="button"
+            onClick={() => setShown(shown === s.id ? null : s.id)}
+            aria-expanded={shown === s.id}
+            className="-mt-2 flex min-h-11 items-center justify-center gap-1.5 text-[14px] font-bold text-teal"
+          >
+            {shown === s.id ? 'Скрыть таблицу' : 'Таблица и подробности дня'}
+            <Icon name="down" size={16} className={shown === s.id ? 'rotate-180' : ''} />
+          </button>
+          {shown === s.id && (
+            <div>
+              <ShiftCard shift={s} />
+            </div>
+          )}
           {s.status !== 'open' && (s.keeper_id === user.id || user.role === 'admin') &&
             (editing === s.id ? (
               <div className="flex flex-col gap-6">
@@ -216,7 +234,7 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
                 Дополнить дежурство
               </Button>
             ))}
-          {editing !== s.id && <ShiftDetails shift={s} />}
+          {shown === s.id && editing !== s.id && <ShiftDetails shift={s} />}
         </Fragment>
       ))}
       {!byDay.get(selected) && <Empty>{shifts.length ? 'В этот день дежурства нет' : 'Дежурств пока нет'}</Empty>}
@@ -336,11 +354,13 @@ function ShiftDetails({ shift, sample }: { shift: Shift; sample?: boolean }) {
   const branchesText = branches ? `${branches}${b?.kinds?.length ? ` · ${b.kinds.join(', ')}` : ''}` : '—';
 
   // у образца настоящие задачи не считаем — иначе он «не выполнил» назначения врача
-  const missed = sample ? [] : missedTasks(requests, marks, shift);
+  // идёт — черновик: смена не кончилась, «не выполнено» и «не отмечено» ещё не считаем
+  const live = shift.status === 'open';
+  const missed = sample || live ? [] : missedTasks(requests, marks, shift);
   // кормление и уборка одной строкой: что не так с кормлением — по имени, остальное числом
   const feedIssues = FEED_TIMES.flatMap((t) => {
     const f = shift.feeds[t];
-    if (!f?.done) return feedStatus(shift, t) === 'late' ? [`${t} не отмечено`] : [];
+    if (!f?.done) return !live && feedStatus(shift, t) === 'late' ? [`${t} не отмечено`] : [];
     return ELEPHANTS.filter((e) => (f.eaten?.[e] ?? 'all') !== 'all').map((e) => `${e} ${EATEN[f.eaten![e]!]} в ${t}`);
   });
   const total = (pick: (e: ElephantName) => number) => ELEPHANTS.reduce((n, e) => n + pick(e), 0);

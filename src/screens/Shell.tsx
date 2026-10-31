@@ -1,5 +1,4 @@
 import { useSession } from '../lib/auth';
-import { createPortal } from 'react-dom';
 import { useMemo, useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
 import { MANAGES, canEdit } from '../domain/access';
@@ -232,7 +231,6 @@ export function TopBar({
             <span className="rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
           </span>
           <SyncChip />
-          <PushBell role={user.role} />
           <button
             type="button"
             onClick={onMenu}
@@ -377,6 +375,7 @@ export function MenuSheet({
 
 
         <ThemeCard />
+        <PushRow role={role} />
 
         {extra.length > 0 && (
           <Card className="divide-y divide-edge overflow-hidden">
@@ -447,79 +446,75 @@ export function MenuSheet({
 }
 
 /**
- * Уведомления — колокольчик в шапке. Выключены — тап включает сразу; включены — тап открывает шторку «выключить».
- * Нет сервера (пример), «Посмотреть как…» или нечего слать этой роли — колокольчика нет.
+ * Уведомления — строка меню с переключателем, как «Тема». В примере без сервера видна, но не включается:
+ * отправлять уведомления некому и неоткуда. Ролям, которым нечего слать, строки нет.
  */
-function PushBell({ role }: { role: Role }) {
+function PushRow({ role }: { role: Role }) {
   const session = useSession();
   const preview = usePreviewRole();
   const [state, setState] = usePushState();
-  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const topics = pushTopics(role);
-  if (session?.mode !== 'cloud' || preview || !state || state === 'unsupported' || !topics.length) return null;
-  // на iPhone без установки — молчим, пока подсказки установки выключены (INSTALL_HINTS)
-  if (state === 'need-install' && !INSTALL_HINTS) return null;
+  if (!topics.length || preview) return null;
+  const demo = session?.mode !== 'cloud';
   const on = state === 'on';
-  const tap = async () => {
-    if (state !== 'off') return setOpen(true);
-    try {
-      const next = await enablePush();
-      setState(next);
-      if (next === 'on') toast('Уведомления включены');
-      else setOpen(true);
-    } catch {
-      toast('Не удалось включить — проверь интернет', 'error');
-    }
-  };
+  const can = !demo && (state === 'on' || state === 'off');
+  const note = demo
+    ? 'Работает только на сайте, в примере не включить.'
+    : state === 'need-install'
+      ? 'На iPhone — только у приложения на экране «Домой».'
+      : state === 'denied'
+        ? 'Запрещены в настройках телефона для этого сайта — разреши их там.'
+        : state === 'unsupported'
+          ? 'Этот браузер уведомления не поддерживает.'
+          : `Придут, даже когда приложение закрыто: ${topics.join(', ')}.`;
   return (
-    <>
-      <button
-        type="button"
-        onClick={tap}
-        aria-label={on ? 'Уведомления включены' : 'Включить уведомления'}
-        className={`relative inline-flex h-11 w-11 items-center justify-center rounded-xl bg-surface2 active:scale-95 ${on ? 'text-teal-fg' : 'text-muted'}`}
-      >
-        <Icon name="bell" size={21} />
-        {on && <span aria-hidden="true" className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-teal" />}
-      </button>
-      {/* шторка — в корне страницы: в шапке со своим стеклом её обрезало бы */}
-      {createPortal(
-        <Sheet open={open} onClose={() => setOpen(false)} title="Уведомления">
-          <div className="flex flex-col gap-3">
-            <span className="text-[15px] font-semibold text-ink2">Придут, даже когда приложение закрыто: {topics.join(', ')}.</span>
-            {state === 'need-install' && (
-              <>
-                <span className="text-[14px] font-semibold text-amber-fg">На iPhone — только у приложения на экране «Домой». Сначала установи его.</span>
-                <Button
-                  icon="install"
-                  onClick={() => {
-                    setOpen(false);
-                    openInstallSheet();
-                  }}
-                >
-                  Как установить
-                </Button>
-              </>
-            )}
-            {state === 'denied' && <span className="text-[14px] font-semibold text-amber-fg">Уведомления запрещены в настройках телефона для этого сайта — разреши их там.</span>}
-            {on && (
-              <Button
-                full
-                onClick={async () => {
-                  await disablePush().catch(() => undefined);
-                  setState('off');
-                  setOpen(false);
-                  toast('Уведомления выключены');
-                }}
-              >
-                Выключить на этом телефоне
-              </Button>
-            )}
-          </div>
-        </Sheet>,
-        document.body,
+    <div className="flex flex-col gap-1.5 px-1">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[15px] font-bold">Уведомления</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label={`Уведомления: ${on ? 'включены' : 'выключены'}`}
+          disabled={!can || busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              if (on) {
+                await disablePush().catch(() => undefined);
+                setState('off');
+                toast('Уведомления выключены');
+              } else {
+                const next = await enablePush();
+                setState(next);
+                if (next === 'on') toast('Уведомления включены');
+              }
+            } catch {
+              toast('Не удалось включить — проверь интернет', 'error');
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className={`relative h-11 w-[92px] rounded-full disabled:opacity-40 ${TONE.sunken}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`pointer-events-none absolute left-[3px] top-[3px] flex h-[calc(100%-6px)] w-[calc(50%-3px)] items-center justify-center rounded-full shadow-(--shadow-key-on) transition-transform duration-200 ease-out ${KEY} ${
+              on ? 'translate-x-full text-teal-fg' : 'text-faint'
+            }`}
+          >
+            <Icon name="bell" size={18} stroke={2.4} />
+          </span>
+        </button>
+      </div>
+      <span className="text-[12px] font-semibold text-muted">{note}</span>
+      {state === 'need-install' && !demo && (
+        <button type="button" onClick={() => openInstallSheet()} className="self-start text-[13px] font-bold text-teal underline">
+          Как установить
+        </button>
       )}
-    </>
+    </div>
   );
 }
 

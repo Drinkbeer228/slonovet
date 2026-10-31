@@ -1,83 +1,87 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { canEdit } from '../../domain/access';
-import { currentStop, sortStops } from '../../domain/stops';
+import { CIRCUS_CITIES, currentStop } from '../../domain/stops';
 import type { CurrentUser } from '../../domain/types';
 import { logEvent } from '../../lib/log';
-import { isoDate, shortDate } from '../../lib/dates';
+import { isoDate } from '../../lib/dates';
 import { newId, put, useRows } from '../../lib/store';
-import { Button, DateInput, Field, Plate, Sheet, inputCls, toast } from '../../ui/kit';
+import { Button, Sheet, inputCls, toast } from '../../ui/kit';
+import { Icon } from '../../ui/Icon';
 
 /**
- * Где стоит труппа — в меню профиля: город видят все, отмечают «Приехали в новый город» администратор и директор.
- * По городу «Контакты» показывают, кто возит и кому звонить здесь.
+ * «Город: Брянск» — одна строка в меню профиля. Город видят все; выбирают из списка цирков (или вписывают свой)
+ * администратор и директор. Дата приезда — сегодня, без лишних полей. По городу «Контакты» показывают, кому звонить.
  */
 export function StopCard({ user }: { user: CurrentUser }) {
   const canSet = canEdit('tour', user.role);
-  const stops = useRows('tour_stops');
-  const here = currentStop(stops);
-  const past = sortStops(stops).filter((s) => s.id !== here?.id).slice(0, 3);
+  const here = currentStop(useRows('tour_stops'));
   const [open, setOpen] = useState(false);
-  const [city, setCity] = useState('');
-  const [day, setDay] = useState(isoDate());
-  const save = async () => {
-    const name = city.trim();
-    if (!name) return;
-    logEvent('tour.arrive', { city: name, day });
+  const [q, setQ] = useState('');
+  const pick = async (name: string) => {
+    const city = name.trim();
+    if (!city || city === here?.city) return setOpen(false);
+    const day = isoDate();
+    logEvent('tour.arrive', { city, day });
     // прежний город закрываем днём приезда в новый
     if (here && !here.depart_on) await put('tour_stops', { ...here, depart_on: day });
-    await put('tour_stops', { id: newId(), city: name, arrive_on: day, depart_on: null, note: '', created_by: user.full_name });
-    toast(`Приехали: ${name}`);
+    await put('tour_stops', { id: newId(), city, arrive_on: day, depart_on: null, note: '', created_by: user.full_name });
+    toast(`Город: ${city}`);
     setOpen(false);
   };
+  const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
+  const list = CIRCUS_CITIES.filter((c) => norm(c).includes(norm(q.trim())));
+  const row = (
+    <>
+      <span className="text-[15px] font-bold">Город</span>
+      <span className="flex items-center gap-1 text-[15px] font-bold text-ink2">
+        {here ? here.city : 'не выбран'}
+        {canSet && <Icon name="next" size={16} className="text-muted" />}
+      </span>
+    </>
+  );
   return (
     <>
-      <Plate glow="teal" className="flex flex-col gap-1.5 p-3.5">
-        <span className="text-[12px] font-extrabold uppercase tracking-[0.12em] text-muted">Где стоим</span>
-        <span className="text-[18px] font-extrabold">{here ? here.city : 'Город не отмечен'}</span>
-        {here && <span className="text-[13px] font-semibold text-muted">с {shortDate(here.arrive_on)} · отметил {here.created_by}</span>}
-        {past.length > 0 && <span className="text-[13px] font-semibold text-muted">До этого: {past.map((s) => s.city).join(' ← ')}</span>}
-        {canSet && (
-          <Button
-            kind="accent"
-            icon="plus"
-            full
-            onClick={() => {
-              setCity('');
-              setDay(isoDate());
-              setOpen(true);
-            }}
-          >
-            Приехали в новый город
-          </Button>
-        )}
-      </Plate>
-      {/* шторка — в корне страницы: внутри плиты (isolate) и внутри меню (своё стекло) её обрезало бы */}
-        {createPortal(
-        <Sheet
-          open={open}
-          onClose={() => setOpen(false)}
-          title="Приехали в новый город"
-          footer={
-            <Button kind="primary" big full disabled={!city.trim()} onClick={save}>
-              Отметить
-            </Button>
-          }
+      {canSet ? (
+        <button
+          type="button"
+          onClick={() => {
+            setQ('');
+            setOpen(true);
+          }}
+          className="flex min-h-11 items-center justify-between gap-3 px-1 text-left"
         >
-          <div className="flex flex-col gap-4">
-            <Field label="Город">
-              <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Например: Казань" autoComplete="off" />
-            </Field>
-            <Field label="Когда приехали">
-              <DateInput value={day} onChange={setDay} label="Когда приехали" />
-            </Field>
-            <span className="text-[13px] font-semibold text-muted">
-              По городу «Контакты» покажут, кто возит и кому звонить здесь.
-            </span>
+          {row}
+        </button>
+      ) : (
+        <div className="flex min-h-11 items-center justify-between gap-3 px-1">{row}</div>
+      )}
+      {/* шторка — в корне страницы: внутри меню (своё стекло) её обрезало бы */}
+      {createPortal(
+        <Sheet open={open} onClose={() => setOpen(false)} title="Город">
+          <div className="flex flex-col gap-3">
+            <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Найти или вписать город" aria-label="Город" autoComplete="off" />
+            {q.trim() && !CIRCUS_CITIES.some((c) => norm(c) === norm(q.trim())) && (
+              <Button kind="accent" full icon="plus" onClick={() => pick(q)}>
+                {q.trim()}
+              </Button>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {list.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => pick(c)}
+                  className={`h-11 rounded-xl border px-3.5 text-[14px] font-bold ${c === here?.city ? 'border-teal bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg' : 'border-edge bg-well text-ink2'}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
         </Sheet>,
-          document.body,
-        )}
+        document.body,
+      )}
     </>
   );
 }
