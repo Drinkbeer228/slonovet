@@ -184,8 +184,9 @@ export function TopBar({
  * Цифры на разделах — чтобы не открывать вкладку проверять: на «Дежурстве» — сколько назначений ждёт
  * ответа в открытом дежурстве, на «Фураже» — сколько позиций заканчивается (как в плашке «Заканчивается»),
  * на «Задачах» — новое в обсуждении плюс просроченное и срочное без отметки.
+ * urgent — есть просроченное или срочное: тогда счётчик «Задач» коралловый, а одно новое в обсуждении — янтарь.
  */
-export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
+export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> & { urgent: boolean } {
   const requests = useRows('requests');
   const marks = useRows('request_marks');
   const shifts = useRows('shifts');
@@ -207,7 +208,7 @@ export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> {
   // на «Задачах»: новое в обсуждении + просроченное и срочное без отметки (у закупщиков — и срочные закупки)
   const att = boardAttention(requests, purchases, marks);
   const late = att.elephants + att.work + (canEdit('purchases', user.role) ? att.purchases : 0);
-  return { shift: left, stock: low, requests: talk + late };
+  return { shift: left, stock: low, requests: talk + late, urgent: late > 0 };
 }
 
 function Badge({ n, urgent }: { n?: number; urgent?: boolean }) {
@@ -245,7 +246,7 @@ export function BottomNav({ user, tabs, tab, onTab }: { user: CurrentUser; tabs:
           >
             <span className={`relative ${on ? '[filter:drop-shadow(0_0_6px_color-mix(in_srgb,var(--color-teal)_var(--glow),transparent))]' : ''}`}>
               <Icon name={TAB_META[t].icon} size={22} />
-              <Badge n={badges[t]} urgent={t === 'requests'} />
+              <Badge n={badges[t]} urgent={t === 'requests' && badges.urgent} />
             </span>
             {TAB_META[t].label}
           </button>

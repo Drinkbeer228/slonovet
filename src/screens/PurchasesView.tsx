@@ -243,6 +243,28 @@ export function OrderSheet({ purchase: p, user, onClose }: { purchase: Purchase 
   );
 }
 
+/** Попросить купить: новая позиция в закупках (из шторки «Нужно купить» и «Всё в закупку» на «Фураже»). */
+export async function requestPurchase(
+  user: CurrentUser,
+  p: { item_id: string | null; title: string; amount: string; note?: string; urgent?: boolean },
+) {
+  logEvent('purchase.create', { title: p.title.slice(0, 100), amount: p.amount.slice(0, 60), urgent: Boolean(p.urgent) });
+  await put('purchases', {
+    id: newId(),
+    item_id: p.item_id,
+    title: p.title,
+    amount: p.amount,
+    note: p.note ?? '',
+    urgent: Boolean(p.urgent),
+    status: 'new',
+    author_id: user.id,
+    author_name: user.full_name,
+    status_by: null,
+    status_at: null,
+    created_at: new Date().toISOString(),
+  });
+}
+
 export function NewPurchaseSheet({
   open,
   user,
@@ -294,21 +316,7 @@ export function NewPurchaseSheet({
           full
           disabled={!title}
           onClick={async () => {
-            logEvent('purchase.create', { title: title.slice(0, 100), amount: amount.trim().slice(0, 60), urgent });
-            await put('purchases', {
-              id: newId(),
-              item_id: item ? item.id : null,
-              title,
-              amount: amount.trim(),
-              note: note.trim(),
-              urgent,
-              status: 'new',
-              author_id: user.id,
-              author_name: user.full_name,
-              status_by: null,
-              status_at: null,
-              created_at: new Date().toISOString(),
-            });
+            await requestPurchase(user, { item_id: item ? item.id : null, title, amount: amount.trim(), note: note.trim(), urgent });
             toast('Попросили купить');
             onClose();
           }}

@@ -96,7 +96,7 @@ export function DiscussionSheet({ req, user, onClose }: { req: VetRequest | null
   );
 }
 
-/** Кнопка «Обсуждение · 3» с точкой, если есть новое от других. */
+/** Кнопка «Обсуждение · 3» с точкой, если есть новое от других. Новое — янтарём («внимание»), не кораллом: это не тревога. */
 export function DiscussionButton({ req, user, onOpen, compact }: { req: VetRequest; user: CurrentUser; onOpen: () => void; compact?: boolean }) {
   const all = useRows('request_comments');
   const read = useReadMarks(user.id);
@@ -108,11 +108,11 @@ export function DiscussionButton({ req, user, onOpen, compact }: { req: VetReque
         type="button"
         onClick={onOpen}
         aria-label={total ? `Обсуждение: ${total}${fresh ? `, новых ${fresh}` : ''}` : 'Спросить'}
-        className={`relative flex h-11 w-11 items-center justify-center rounded-xl ${fresh ? 'bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg' : 'text-muted'}`}
+        className={`relative flex h-11 w-11 items-center justify-center rounded-xl ${fresh ? 'bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg' : 'text-muted'}`}
       >
         <Icon name="message" size={20} />
         {total > 0 && (
-          <span className={`absolute right-0 top-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-extrabold leading-none ${fresh ? 'bg-coral text-teal-ink' : 'bg-surface2 text-ink2'}`}>
+          <span className={`absolute right-0 top-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] font-extrabold leading-none ${fresh ? 'bg-amber text-bg' : 'bg-surface2 text-ink2'}`}>
             {fresh || total}
           </span>
         )}
@@ -123,11 +123,11 @@ export function DiscussionButton({ req, user, onOpen, compact }: { req: VetReque
     <button
       type="button"
       onClick={onOpen}
-      className={`flex h-11 items-center gap-2 self-start rounded-xl px-3 text-[14px] font-bold ${fresh ? 'bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)] text-coral-fg' : 'text-muted'}`}
+      className={`flex h-11 items-center gap-2 self-start rounded-xl px-3 text-[14px] font-bold ${fresh ? 'bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg' : 'text-muted'}`}
     >
       <Icon name="message" size={18} />
       {total ? `Обсуждение · ${total}` : 'Спросить'}
-      {fresh > 0 && <span className="rounded-full bg-coral px-1.5 text-[11px] font-extrabold text-bg">+{fresh}</span>}
+      {fresh > 0 && <span className="rounded-full bg-amber px-1.5 text-[11px] font-extrabold text-bg">+{fresh}</span>}
     </button>
   );
 }

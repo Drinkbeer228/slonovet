@@ -238,7 +238,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
           </span>
         )}
         {talk > 0 && (
-          <span className={`text-[13px] font-bold ${fresh ? 'text-coral' : 'text-muted'}`}>
+          <span className={`text-[13px] font-bold ${fresh ? 'text-amber-fg' : 'text-muted'}`}>
             Обсуждение · {talk}
             {fresh ? ` · новых ${fresh}` : ''}
           </span>

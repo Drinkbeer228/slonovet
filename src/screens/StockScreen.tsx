@@ -1,5 +1,5 @@
 import { EDITORS, canEdit } from '../domain/access';
-import { NewPurchaseSheet, PurchasesBlock } from './PurchasesView';
+import { NewPurchaseSheet, PurchasesBlock, requestPurchase } from './PurchasesView';
 import { DeliverySheet, SackGauge } from './StockSheets';
 import { useMemo, useState } from 'react';
 import { countStock } from '../domain/actions';
@@ -80,6 +80,9 @@ export function StockScreen({ user }: { user: CurrentUser }) {
   }, [items, moves, diets]);
   const noQty = useMemo(() => itemsWithoutQty(diets), [diets]);
   const low = [...views.values()].filter((v) => v.low).sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
+  // ещё не в закупках — их можно попросить купить разом, «на неделю» по рациону
+  const toBuy = low.filter((v) => !purchases.some((x) => x.item_id === v.item.id));
+  const [buyAll, setBuyAll] = useState(false);
   const canWrite = canEdit('stock', user.role);
   const [adding, setAdding] = useState(false);
 
@@ -106,7 +109,12 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       {low.length > 0 && (
         <Plate glow="amber" halo className="flex flex-col p-4">
           <span className="pb-1 text-[12px] font-extrabold tracking-wide text-amber-fg">ЗАКАНЧИВАЕТСЯ</span>
-          {/* у каждой — заказано ли и сколько взять на неделю; не заказано — «В закупку» одним нажатием */}
+          {/* одна кнопка на всё незаказанное, вместо стопки одинаковых; у строки — лёгкая ссылка, чтобы поправить количество */}
+          {toBuy.length > 1 && (
+            <Button full icon="box" className="mb-2 mt-1" onClick={() => setBuyAll(true)}>
+              Всё в закупку · {toBuy.length}
+            </Button>
+          )}
           {low.map((v) => {
             const p = purchases.find((x) => x.item_id === v.item.id);
             const hint = orderHint(v);
@@ -127,8 +135,8 @@ export function StockScreen({ user }: { user: CurrentUser }) {
                   </span>
                 </span>
                 {!p && (
-                  <button type="button" onClick={() => setBuy({ itemId: v.item.id, amount: hint?.text ?? '' })} aria-label={`${v.item.name} — в закупку`} className={`h-11 shrink-0 rounded-xl px-3.5 text-[14px] font-bold text-ink ${KEY}`}>
-                    В закупку
+                  <button type="button" onClick={() => setBuy({ itemId: v.item.id, amount: hint?.text ?? '' })} aria-label={`${v.item.name} — в закупку`} className="-mr-2 inline-flex h-11 shrink-0 items-center gap-1 px-2 text-[14px] font-bold text-teal-fg">
+                    <Icon name="plus" size={16} stroke={2.6} />в закупку
                   </button>
                 )}
               </div>
@@ -193,6 +201,17 @@ export function StockScreen({ user }: { user: CurrentUser }) {
       <AddItemSheet open={adding} items={items} user={user} shiftId={shiftId} onClose={() => setAdding(false)} />
       <DeliverySheet open={incoming} user={user} shiftId={shiftId} onClose={() => setIncoming(false)} />
       <NewPurchaseSheet open={buy !== null} preset={buy} user={user} onClose={() => setBuy(null)} />
+      <Confirm
+        open={buyAll}
+        title={`В закупку: ${toBuy.length}`}
+        text={toBuy.map((v) => `${v.item.name}${orderHint(v) ? ` — ≈ ${orderHint(v)!.text}` : ''}`).join(' · ')}
+        okLabel="Попросить купить"
+        onOk={async () => {
+          for (const v of toBuy) await requestPurchase(user, { item_id: v.item.id, title: v.item.name, amount: orderHint(v)?.text ?? '' });
+          toast(`Попросили купить: ${toBuy.length}`);
+        }}
+        onClose={() => setBuyAll(false)}
+      />
     </div>
   );
 }
