@@ -13,7 +13,7 @@ export function PrevShiftSummary({ prev }: { prev: Shift }) {
   const flags = shiftFlags(prev);
   const openReqs = dutyTodos(requests, marks, { ...prev, date: isoDate(), id: '__new__' }).filter((t) => !t.done);
   return (
-    <Section title="От прошлого дежурства" aside={`${prev.keeper_name} · ${relDate(prev.handed_at ? localDay(prev.handed_at) : prev.date)} ${timeOf(prev.handed_at)}`}>
+    <Section title="От прошлого дежурства" aside={prev.handed_at ? `${prev.keeper_name} · ${relDate(localDay(prev.handed_at))} ${timeOf(prev.handed_at)}` : `${prev.keeper_name} · дежурит`}>
       <Card className="flex flex-col gap-3 p-4">
         {prev.note ? <p className="m-0 text-[16px] leading-relaxed">{prev.note}</p> : <p className="m-0 text-[15px] text-muted">Без заметок</p>}
         {flags.length > 0 && (

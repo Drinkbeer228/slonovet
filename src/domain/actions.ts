@@ -51,8 +51,8 @@ function closeOwn(s: Shift, reason: NonNullable<Shift['close_reason']>, by: stri
 }
 
 /**
- * Сдать дежурство конкретному сменщику (toId) или «кому-нибудь» (null). Кода нет: сменщик на своём телефоне
- * видит «Тебе сдали смену» и жмёт «Принять»; не увидел — принимает сам, смена сойдётся на сервере.
+ * Закрыть смену сразу. В интерфейсе больше не используется: дежурство передают через offerHandover — смена
+ * остаётся открытой, пока сменщик не примет (дежурный есть всегда). Оставлено для синхронизации старых данных и тестов.
  */
 export async function handOver(shift: Shift, note: string, toId: string | null = null) {
   logEvent('shift.handover', { shift: shift.id, to: toId, note: note.slice(0, 200) });
@@ -77,15 +77,28 @@ export async function rolloverShift(shift: Shift, user: CurrentUser) {
   await acceptShift(user, shift.safety ?? {}, { id: shift.id, remarks: '' });
 }
 
-/** Передумал сдавать, пока смену никто не принял. */
-export async function cancelHandOver(shift: Shift) {
+/**
+ * Передать дежурство сменщику: смена остаётся открытой — дежурный есть всегда, пока сменщик не нажмёт «Принять»
+ * (тогда сервер закроет эту смену). Нетронутое — норма: передают только с галочкой «осмотрел всех».
+ */
+export async function offerHandover(shift: Shift, note: string, toId: string) {
+  logEvent('shift.offer', { shift: shift.id, to: toId, note: note.slice(0, 200) });
   await updateShift(shift, (s) => {
-    s.status = 'open';
-    s.handed_at = null;
-    s.handover_code = null;
+    for (const el of ELEPHANTS) {
+      s.state[el] = s.state[el] ?? {};
+      for (const m of METRICS) if (!s.state[el]![m.key]) s.state[el]![m.key] = { level: 0 };
+    }
+    s.note = note;
+    s.handover_to = toId;
+    s.checked_at = new Date().toISOString();
+  });
+}
+
+/** Передумал передавать, пока сменщик не принял: дежурство и так за тобой. */
+export async function cancelOffer(shift: Shift) {
+  logEvent('shift.offer_cancel', { shift: shift.id });
+  await updateShift(shift, (s) => {
     s.handover_to = null;
-    s.closed_by = null;
-    s.close_reason = null;
   });
 }
 

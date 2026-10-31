@@ -1,7 +1,7 @@
 import { canReceiveHandover, canTakeShift, canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
-import { handOver, rolloverShift, updateShift } from '../../domain/actions';
-import { FEED_TIMES, acceptedBy, currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
+import { offerHandover, rolloverShift, updateShift } from '../../domain/actions';
+import { FEED_TIMES, currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows, useEffectiveDiets } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
@@ -16,7 +16,7 @@ import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
 import { FeedingBlock } from './FeedingBlock';
-import { HandedShift, HandoverBanner, NotHandedHint } from './HandedShift';
+import { DutyPlate, HandoverBanner, OfferBanner } from './HandedShift';
 import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
@@ -27,12 +27,12 @@ const canWork = (u: CurrentUser) => canWorkShift(u.role);
 export function ShiftScreen({ user }: { user: CurrentUser }) {
   const shifts = useRows('shifts');
   const shift = currentShift(shifts);
-  const [acceptOwn, setAcceptOwn] = useState(false);
   const [accepting, setAccepting] = useState(false);
   // «Посмотреть как»: принять нельзя (ничего не сохраняется) — показываем пример открытого дежурства в памяти
   const preview = usePreviewRole();
   const sample = usePreviewSample();
-  if (shift) return <OpenShift shift={shift} user={user} readOnly={!(canWork(user) || shift.keeper_id === user.id)} />;
+  // дежурный — один: свою смену ведёшь, чужую только смотришь (назначения не киперам — как раньше)
+  if (shift) return <OpenShift shift={shift} user={user} readOnly={shift.keeper_id !== user.id} />;
   if (sample && preview) {
     return (
       <div className="flex flex-col gap-4">
@@ -48,26 +48,12 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
   }
 
   const last = lastHanded(shifts);
-  // только что сдал сам — показываем код, пока сменщик не принял
-  if (!acceptOwn && last?.keeper_id === user.id && last.handed_at && !acceptedBy(shifts, last)) {
-    return <HandedShift shift={last} onAcceptOwn={() => setAcceptOwn(true)} />;
-  }
-  // никто не дежурит: видно последнее дежурство, проверка при приёме — в шторке
-  const toMe = Boolean(last && last.handover_to === user.id && !acceptedBy(shifts, last));
+  // никто не дежурит (самое начало или старые сданные смены): только «Принять дежурство»
   const accept = canTakeShift(user.role) && (
     <>
-      {toMe && last && (
-        <Plate glow="teal" halo className="flex flex-col gap-0.5 p-4">
-          <span className="text-[17px] font-extrabold">Тебе сдали смену</span>
-          <span className="text-[13px] font-semibold text-muted">
-            {last.keeper_name}, {relDate(last.handed_at ? localDay(last.handed_at) : last.date)} в {timeOf(last.handed_at)}
-            {last.note.trim() ? ` · «${last.note.trim()}»` : ''}
-          </span>
-        </Plate>
-      )}
       <div>
         <Button kind="accent" big full icon="shield" onClick={() => setAccepting(true)}>
-          {toMe ? 'Принять' : 'Принять дежурство'}
+          Принять дежурство
         </Button>
       </div>
       {preview && (
@@ -97,7 +83,6 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
 function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: CurrentUser; readOnly: boolean; accept?: ReactNode }) {
   const notes = useRows('notes').filter((n) => n.shift_id === shift.id);
   const from = useRows('shifts').find((s) => s.id === shift.accepted_from);
-  const someoneElses = canTakeShift(user.role) && shift.keeper_id !== user.id && from?.keeper_id !== user.id;
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const handed = shift.status !== 'open';
@@ -137,10 +122,8 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
           {stale ? 'Больше суток' : handed ? 'Сдано' : 'На смене'}
         </span>
       </Card>
-      {readOnly && !accept && (
-        <span className="px-1 text-[13px] font-semibold text-muted">
-          {keeper ? 'Только просмотр — отмечает дежурный кипер' : 'Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты'}
-        </span>
+      {readOnly && !accept && !keeper && (
+        <span className="px-1 text-[13px] font-semibold text-muted">Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты</span>
       )}
     </header>
   );
@@ -154,11 +137,11 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       {stale && mine && (
         <Plate glow="amber" className="flex flex-col gap-2 p-3.5">
           <span className="text-[14px] font-bold text-amber-fg">Смена идёт больше суток</span>
-          {/* сдать — одной кнопкой внизу экрана («Сдать дежурство»), здесь не дублируем */}
+          {/* передать — одной кнопкой внизу экрана («Передать дежурство»), здесь не дублируем */}
           <Button kind="accent" full onClick={() => rolloverShift(shift, user)}>
             Новые сутки (я остаюсь)
           </Button>
-          <span className="text-[13px] font-semibold text-muted">Уходишь — «Сдать дежурство» внизу экрана.</span>
+          <span className="text-[13px] font-semibold text-muted">Уходишь — «Передать дежурство» внизу экрана.</span>
         </Plate>
       )}
 
@@ -178,7 +161,10 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         </>
       )}
 
-      {someoneElses && !readOnly && <NotHandedHint shift={shift} user={user} />}
+      {/* дежурный передаёт смену — плашка у него; у остальных — кто дежурит, «Тебе передают» или «Заступить самому» */}
+      {!accept && mine && shift.handover_to && <OfferBanner shift={shift} />}
+      {/* сам только что передал — хватит шапки и «Ты сдал · … принял» */}
+      {!accept && shift.keeper_id !== user.id && canTakeShift(user.role) && from?.keeper_id !== user.id && <DutyPlate shift={shift} user={user} />}
       {!folded && <HandoverBanner shift={shift} from={from} myId={user.id} />}
 
       {!folded && (
@@ -220,7 +206,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
               <>
                 <HandoverNote shift={shift} />
                 <Button kind="primary" big full icon="check" onClick={() => setHandoverOpen(true)}>
-                  Сдать дежурство
+                  Передать дежурство
                 </Button>
               </>
             )}
@@ -236,7 +222,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
 function HandoverNote({ shift }: { shift: Shift }) {
   const [text, setText] = useState(shift.note);
-  // заметку могли поправить в шторке «Сдать дежурство» — подхватываем, иначе выход из поля вернул бы старый текст
+  // заметку могли поправить в шторке «Передать дежурство» — подхватываем, иначе выход из поля вернул бы старый текст
   useEffect(() => setText(shift.note), [shift.id, shift.note]);
   return (
     <Section id="sec-note" title="Передать следующему дежурному">
@@ -258,12 +244,13 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   const people = useRows('profiles').filter((p) => p.active && canReceiveHandover(p.role) && p.id !== user.id);
   const [checked, setChecked] = useState(false);
   const [toId, setToId] = useState<string | null>(null);
+  const to = people.find((p) => p.id === toId);
   // заметку пишут прямо здесь, не закрывая шторку; сохраняем при выходе из поля и при сдаче
   const [note, setNote] = useState(shift.note);
   useEffect(() => {
     if (open) {
       setChecked(false);
-      setToId(null);
+      setToId(shift.handover_to ?? null);
       setNote(shift.note);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -285,15 +272,16 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
     <Sheet
       open={open}
       onClose={onClose}
-      title="Сдать дежурство"
+      title="Передать дежурство"
       footer={
-        // самое ответственное действие смены — свайпом; без галочки «Осмотрел всех трёх» неактивно
+        // самое ответственное действие смены — свайпом; без сменщика и галочки «Осмотрел всех трёх» неактивно.
+        // Смена остаётся за тобой, пока сменщик не примет: дежурный есть всегда.
         <SwipeConfirm
-          label="Проведи — сдать дежурство"
-          disabled={!checked}
+          label={to ? `Проведи — передать: ${to.full_name}` : 'Выбери, кому передаёшь'}
+          disabled={!checked || !to}
           onConfirm={async () => {
-            await handOver(shift, note.trim(), toId);
-            toast('Дежурство сдано');
+            await offerHandover(shift, note.trim(), to!.id);
+            toast(`Передаёшь: ${to!.full_name}`);
             onClose();
           }}
         />
@@ -320,18 +308,20 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
             Отклонения ({flags.length}) увидит следующий дежурный и врач.
           </p>
         )}
-        {people.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <span className="px-1 text-[14px] font-bold text-muted">Кому сдаёшь</span>
+        <div className="flex flex-col gap-2">
+          <span className="px-1 text-[14px] font-bold text-muted">Кому передаёшь</span>
+          {people.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {people.map((p) => (
-                <Chip key={p.id} on={toId === p.id} onClick={() => setToId(toId === p.id ? null : p.id)}>
+                <Chip key={p.id} on={toId === p.id} onClick={() => setToId(p.id)}>
                   {p.full_name}
                 </Chip>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <span className="px-1 text-[13px] font-semibold text-amber-fg">Передать некому: в «Персонале» нет других киперов</span>
+          )}
+        </div>
         <Field label="Следующему дежурному" hint="Необязательно">
           <textarea
             rows={3}
@@ -350,7 +340,7 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
             onChange={setChecked}
           />
         </Plate>
-        <p className="m-0 text-[13px] font-semibold text-muted">Сменщик увидит у себя «Тебе сдали смену» и нажмёт «Принять». Не увидит (нет связи), заступит сам.</p>
+        <p className="m-0 text-[13px] font-semibold text-muted">Сменщик увидит «Тебе передают дежурство» и нажмёт «Принять». До этого дежурный — ты.</p>
       </div>
     </Sheet>
   );

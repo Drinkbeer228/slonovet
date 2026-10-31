@@ -23,12 +23,15 @@ const REMARKS = [
   'Нет воды',
 ];
 
-/** takeover — смена, которую не сдали (ушёл, нет связи): заступаем сразу, прежнюю закроет сервер. */
-export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: Shift }) {
+/**
+ * handover — смену передают тебе: принимаешь, и в тот же миг прежняя закрывается (сервер).
+ * takeover — дежурный не передал: заступаешь сам, прежняя закроется как «принята без сдачи».
+ */
+export function AcceptShift({ user, takeover, handover }: { user: CurrentUser; takeover?: Shift; handover?: Shift }) {
   const shifts = useRows('shifts');
   const last = lastHanded(shifts);
   // смену, которую уже кто-то принял, второй раз не принимаем по её коду
-  const prev = takeover ?? (last && !acceptedBy(shifts, last) ? last : undefined);
+  const prev = takeover ?? handover ?? (last && !acceptedBy(shifts, last) ? last : undefined);
   const [checks, setChecks] = useState<Record<string, boolean | undefined>>({});
   const [remarks, setRemarks] = useState('');
   // каждый пункт: true — в порядке, false — не в порядке (уйдёт в замечания), нет ответа — пусто
@@ -47,9 +50,9 @@ export function AcceptShift({ user, takeover }: { user: CurrentUser; takeover?: 
 
       {takeover && (
         <Plate glow="amber" halo className="flex gap-2.5 p-3.5">
-          <GlowIcon glow="amber" icon="cloudOff" />
+          <GlowIcon glow="amber" icon="alert" />
           <span className="text-[14px] font-semibold leading-snug text-ink2">
-            Смена не сдана: у {takeover.keeper_name} нет связи или он ушёл. Её закроем как «принята без сдачи» и запишем, кто и когда заступил. Его записи дойдут, когда его телефон выйдет на связь.
+            {takeover.keeper_name} не передал дежурство. Смена закроется как «принята без сдачи» — запишем, кто и когда заступил.
           </span>
         </Plate>
       )}
