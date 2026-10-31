@@ -403,7 +403,7 @@ export function MenuSheet({
               openInstallSheet();
             }}
           >
-            Установить на телефон
+            Установить на устройство
           </Button>
         )}
 

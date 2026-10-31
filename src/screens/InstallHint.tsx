@@ -77,7 +77,7 @@ export function InstallSheet() {
   const { canPrompt, installed } = useInstall();
   const [os, setOs] = useState<Platform>(() => platform());
   return (
-    <Sheet open={isOpen} onClose={close} title="Установить на телефон">
+    <Sheet open={isOpen} onClose={close} title="Установить на устройство">
       <div className="flex flex-col gap-5">
         {installed ? (
           <p className="m-0 text-[15px] text-ink2">Уже установлено — ты открыл СлоноВет с иконки.</p>
