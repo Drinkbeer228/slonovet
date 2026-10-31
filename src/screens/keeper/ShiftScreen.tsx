@@ -5,7 +5,7 @@ import { FEED_TIMES, currentShift, dutyTodos, lastHanded, needsRollover, newShif
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows, useEffectiveDiets } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
-import { isoDate, localDay, longDate, relDate, timeOf } from '../../lib/dates';
+import { isoDate, localDay, relDate, timeOf } from '../../lib/dates';
 import { Button, Card, Check, Chip, Field, Plate, Section, Sheet, SwipeConfirm, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
@@ -16,7 +16,7 @@ import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
 import { FeedingBlock } from './FeedingBlock';
-import { DutyPlate, HandoverBanner, OfferBanner } from './HandedShift';
+import { DutyBar, HandoverInvite } from './HandedShift';
 import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
@@ -95,43 +95,15 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
   const folded = Boolean(accept);
   // директор отмечает назначения и без приёма смены — у него они наверху, а не в свёрнутом
   const tasksUp = Boolean(accept) && !keeper;
-  // компактный бар: кто дежурит, с какого часа и статус смены — в одну строку
-  const bar = (
-    <header className="flex flex-col gap-1.5">
-      <Card tone="glass" className="flex items-center gap-3 px-3.5 py-2.5">
-        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-[16px] font-extrabold text-teal-fg">
-          {shift.keeper_name.trim().charAt(0).toUpperCase()}
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h1 className="m-0 truncate text-[17px] font-extrabold leading-tight">{shift.keeper_name}</h1>
-          <span className="truncate text-[13px] font-semibold text-muted">
-            {longDate(shift.date)} · с {timeOf(shift.accepted_at)}
-            {handed && ` · сдано ${relDate(shift.handed_at ? localDay(shift.handed_at) : shift.date)} в ${timeOf(shift.handed_at)}`}
-          </span>
-        </div>
-        <span
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-extrabold ${
-            stale
-              ? 'bg-[color-mix(in_srgb,var(--color-amber)_var(--tint),transparent)] text-amber-fg'
-              : handed
-                ? 'bg-surface2 text-ink2'
-                : 'bg-[color-mix(in_srgb,var(--color-teal)_var(--tint),transparent)] text-teal-fg'
-          }`}
-        >
-          {stale && <Icon name="alert" size={12} stroke={3} />}
-          {stale ? 'Больше суток' : handed ? 'Сдано' : 'На смене'}
-        </span>
-      </Card>
-      {readOnly && !accept && !keeper && (
-        <span className="px-1 text-[13px] font-semibold text-muted">Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты</span>
-      )}
-    </header>
-  );
-
   return (
     <div className="flex flex-col gap-6">
-      {/* никто не дежурит: бар прошлой смены — над ней самой, когда раскрыта; сверху его заменяет «От прошлого дежурства» */}
-      {!accept && bar}
+      {/* кто дежурит — одной строкой; тап — сводка и действия (передать, отменить, стать дежурным) */}
+      {!accept && (
+        <div className="flex flex-col gap-1.5">
+          <DutyBar shift={shift} from={from} user={user} stale={stale} onHandover={() => setHandoverOpen(true)} />
+          {readOnly && !keeper && <span className="px-1 text-[13px] font-semibold text-muted">Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты</span>}
+        </div>
+      )}
       <RoadBanner />
 
       {stale && mine && (
@@ -161,11 +133,8 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
         </>
       )}
 
-      {/* дежурный передаёт смену — плашка у него; у остальных — кто дежурит, «Тебе передают» или «Заступить самому» */}
-      {!accept && mine && shift.handover_to && <OfferBanner shift={shift} />}
-      {/* кто дежурит и как стать дежурным — видно всегда всем, кто может дежурить (киперы и директор) */}
-      {!accept && shift.keeper_id !== user.id && canTakeShift(user.role) && <DutyPlate shift={shift} user={user} />}
-      {!folded && <HandoverBanner shift={shift} from={from} myId={user.id} />}
+      {/* тебе передают — единственное, что требует действия: крупно и на виду */}
+      {!accept && shift.handover_to === user.id && !mine && <HandoverInvite shift={shift} user={user} />}
 
       {!folded && (
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
