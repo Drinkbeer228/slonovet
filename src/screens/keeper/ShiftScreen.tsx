@@ -163,8 +163,8 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
 
       {/* дежурный передаёт смену — плашка у него; у остальных — кто дежурит, «Тебе передают» или «Заступить самому» */}
       {!accept && mine && shift.handover_to && <OfferBanner shift={shift} />}
-      {/* сам только что передал — хватит шапки и «Ты сдал · … принял» */}
-      {!accept && shift.keeper_id !== user.id && canTakeShift(user.role) && from?.keeper_id !== user.id && <DutyPlate shift={shift} user={user} />}
+      {/* кто дежурит и как стать дежурным — видно всегда всем, кто может дежурить (киперы и директор) */}
+      {!accept && shift.keeper_id !== user.id && canTakeShift(user.role) && <DutyPlate shift={shift} user={user} />}
       {!folded && <HandoverBanner shift={shift} from={from} myId={user.id} />}
 
       {!folded && (

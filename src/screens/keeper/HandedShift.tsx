@@ -33,7 +33,7 @@ export function OfferBanner({ shift }: { shift: Shift }) {
 
 /**
  * Чужая открытая смена. Тебе передают — «Принять дежурство» (в этот миг дежурным становишься ты, прежняя смена
- * закрывается). Иначе — кто дежурит и, если дежурный забыл передать, «Заступить самому» с подтверждением.
+ * закрывается). Иначе — кто дежурит и «Стать дежурным» с подтверждением (если дежурный забыл передать).
  */
 export function DutyPlate({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const to = useRows('profiles').find((p) => p.id === shift.handover_to);
@@ -66,20 +66,20 @@ export function DutyPlate({ shift, user }: { shift: Shift; user: CurrentUser }) 
               </span>
             </span>
           </div>
-          <Button full onClick={() => setAsk(true)}>
-            Заступить самому
+          <Button full icon="shield" onClick={() => setAsk(true)}>
+            Стать дежурным
           </Button>
         </Plate>
       )}
       <Confirm
         open={ask}
-        title="Заступить без передачи?"
+        title="Стать дежурным без передачи?"
         text={`${shift.keeper_name} ещё на дежурстве. Если заступишь, смена закроется как «принята без сдачи» — это будет видно в журнале.`}
-        okLabel="Заступить"
+        okLabel="Стать дежурным"
         onOk={() => setSheet('takeover')}
         onClose={() => setAsk(false)}
       />
-      <Sheet open={sheet !== null} onClose={() => setSheet(null)} title={sheet === 'takeover' ? 'Заступить без передачи' : 'Принять дежурство'}>
+      <Sheet open={sheet !== null} onClose={() => setSheet(null)} title={sheet === 'takeover' ? 'Стать дежурным' : 'Принять дежурство'}>
         {sheet === 'takeover' ? <AcceptShift user={user} takeover={shift} /> : <AcceptShift user={user} handover={shift} />}
       </Sheet>
     </>
