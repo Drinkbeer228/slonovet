@@ -1,17 +1,15 @@
 import { canReceiveHandover, canTakeShift, canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
-import { offerHandover, rolloverShift, updateShift } from '../../domain/actions';
-import { FEED_TIMES, currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
+import { offerHandover, rolloverShift } from '../../domain/actions';
+import { currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
-import { useRows, useEffectiveDiets } from '../../lib/store';
+import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Field, Plate, Section, Sheet, SwipeConfirm, inputCls, toast } from '../../ui/kit';
+import { Button, Card, Check, Chip, Plate, Section, Sheet, SwipeConfirm, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
-import { RoadBanner } from '../common/RoadBanner';
-import { mealCancelled } from '../../domain/road';
-import { carryFlags, durationText, feedStatus, noDutySince } from '../../domain/monitoring';
+import { carryFlags, durationText, noDutySince } from '../../domain/monitoring';
 import { METRIC_LABEL } from '../../domain/elephants';
 import { NotesList } from '../common/NotesList';
 import { AcceptShift } from './AcceptShift';
@@ -20,9 +18,7 @@ import { DutyBar, HandoverInvite } from './DutyBar';
 import { QuestsBlock } from './QuestsBlock';
 import { RequestsBlock } from './RequestsBlock';
 import { StateMatrix } from './StateMatrix';
-import { DayLine, NowPlate } from './NowPlate';
 import { ShiftSummaryCard } from './ShiftSummaryCard';
-import { daySlots } from '../../domain/day';
 
 /** Ведут дежурство только киперы (domain/access.ts). Остальные смотрят его как есть; назначения и лечение отмечают все. */
 const canWork = (u: CurrentUser) => canWorkShift(u.role);
@@ -107,7 +103,6 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
           {readOnly && !keeper && <span className="px-1 text-[13px] font-semibold text-muted">Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты</span>}
         </div>
       )}
-      <RoadBanner />
 
       {stale && mine && (
         <Plate glow="amber" className="flex flex-col gap-2 p-3.5">
@@ -119,10 +114,6 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
           <span className="text-[13px] font-semibold text-muted">Уходишь — «Передать дежурство» внизу экрана.</span>
         </Plate>
       )}
-
-      {/* одно ближайшее дело и лента дня — у дежурного; остальные видят ленту, как идёт день */}
-      {!accept && !handed && mine && <NowPlate shift={shift} user={user} stale={stale} onHandover={() => setHandoverOpen(true)} />}
-      {!accept && !handed && !mine && <ViewDayLine shift={shift} />}
 
       {accept && (
         <>
@@ -166,21 +157,19 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
               {/* запись может оставить любой; не кипер — и после сдачи (процедуру сделали, когда никто не дежурит) */}
               {!notes.length && <Card className="px-4 py-3 text-[15px] text-muted">{handed ? 'Записей нет' : 'Пока нет — «＋ Запись» внизу справа'}</Card>}
             </Section>
-            {/* при свёрнутом виде заметка уже стоит наверху, в «От прошлого дежурства» */}
-            {readOnly ? (
-              !accept && (
-                <Section id="sec-note" title="Следующему дежурному">
-                  <Card className="px-4 py-3 text-[15px] leading-snug">{shift.note.trim() || <span className="text-muted">Без заметки</span>}</Card>
-                </Section>
-              )
-            ) : (
-              <>
-                <HandoverNote shift={shift} />
+            {/* заметки следующему больше нет: сводка «Сдаю» собирается сама; старые заметки — только показать */}
+            {readOnly
+              ? !accept &&
+                shift.note.trim() && (
+                  <Section id="sec-note" title="Заметка">
+                    <Card className="px-4 py-3 text-[15px] leading-snug">{shift.note}</Card>
+                  </Section>
+                )
+              : (
                 <Button kind="primary" big full icon="check" onClick={() => setHandoverOpen(true)}>
                   Передать дежурство
                 </Button>
-              </>
-            )}
+              )}
           </div>
         </div>
       )}
@@ -196,25 +185,6 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       <NoteSheet draft={noteDraft} shiftId={shift.id} user={user} onClose={() => setNoteDraft(null)} />
       <HandoverSheet open={handoverOpen} shift={shift} user={user} onClose={() => setHandoverOpen(false)} />
     </div>
-  );
-}
-
-function HandoverNote({ shift }: { shift: Shift }) {
-  const [text, setText] = useState(shift.note);
-  // заметку могли поправить в шторке «Передать дежурство» — подхватываем, иначе выход из поля вернул бы старый текст
-  useEffect(() => setText(shift.note), [shift.id, shift.note]);
-  return (
-    <Section id="sec-note" title="Передать следующему дежурному">
-      <textarea
-        rows={3}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => text !== shift.note && updateShift(shift, (s) => void (s.note = text))}
-        placeholder="Что важно знать следующему дежурному"
-        aria-label="Заметка следующему дежурному"
-        className={`${inputCls} resize-none`}
-      />
-    </Section>
   );
 }
 
@@ -235,9 +205,6 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const marks = useRows('request_marks');
 
-  const { diets: roadDiets, base: baseDiets } = useEffectiveDiets();
-  // только пропущенные в эту смену: до приёма и ещё не наступившие — не этого дежурного
-  const feedsLeft = FEED_TIMES.filter((t) => ['late', 'due'].includes(feedStatus(shift, t)) && !mealCancelled(baseDiets, roadDiets, t));
   const reqLeft = dutyTodos(requests, marks, shift, isoDate()).filter((t) => !t.done);
   const flags = shiftFlags(shift);
   const carry = carryFlags(useRows('shifts'), shift);
@@ -245,7 +212,6 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
     carry.length ? `Не проверено с прошлой смены: ${carry.map((f) => `${f.elephant} · ${METRIC_LABEL[f.metric].toLowerCase()}`).join(', ')}` : null,
     reqLeft.some((t) => t.req.elephant === 'work') ? `Не выполнено работы: ${reqLeft.filter((t) => t.req.elephant === 'work').length}` : null,
   ].filter(Boolean) as string[];
-  void feedsLeft; // кормления и назначения — в сводке «Сдаю» ниже
 
   return (
     <Sheet
@@ -296,16 +262,6 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
             <span className="px-1 text-[13px] font-semibold text-amber-fg">Передать некому: в «Персонале» нет других киперов</span>
           )}
         </div>
-        <Field label="Следующему дежурному" hint="Необязательно">
-          <textarea
-            rows={3}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onBlur={() => note !== shift.note && updateShift(shift, (s) => void (s.note = note))}
-            placeholder="Что важно знать следующему дежурному"
-            className={`${inputCls} resize-none`}
-          />
-        </Field>
         <Plate glow="teal" halo={checked}>
           <Check
             on={checked}
@@ -333,12 +289,3 @@ function NoDutyLine() {
   );
 }
 
-/** Лента дня для тех, кто смотрит чужое дежурство: как идёт день, без кнопок. */
-function ViewDayLine({ shift }: { shift: Shift }) {
-  const { diets, base } = useEffectiveDiets();
-  return (
-    <Plate flat glow="teal" className="p-3.5">
-      <DayLine slots={daySlots(shift, (t) => mealCancelled(base, diets, t))} />
-    </Plate>
-  );
-}

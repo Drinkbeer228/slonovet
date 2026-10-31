@@ -6,7 +6,7 @@ import { carryFlags } from '../../domain/monitoring';
 import { shiftFlags, type Flag } from '../../domain/shift';
 import type { ElephantName, Level, MetricKey, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
-import { Button, Card, Chip, LEVEL_CELL, LEVEL_DOT, Section, Segmented, Sheet, TONE } from '../../ui/kit';
+import { Button, Card, Chip, LEVEL_CELL, LEVEL_DOT, Section, Segmented, Sheet } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import type { NoteDraft } from '../common/NoteSheet';
 import { ElephantHistorySheet } from '../common/ElephantHistory';
@@ -14,7 +14,7 @@ import { CallVet } from '../common/Alerts';
 
 export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?: (d: NoteDraft) => void; readOnly?: boolean }) {
   const notes = useRows('notes');
-  const flags = shiftFlags(shift);
+  const bad = shiftFlags(shift).filter((f) => f.level === 2);
   // не в норме в прошлую смену и ещё не проверено — не «норма» по умолчанию, а «проверь»
   const shifts = useRows('shifts');
   const carry = readOnly ? [] : carryFlags(shifts, shift);
@@ -83,10 +83,10 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
         </div>
       </Card>
 
-      {/* отклонения — короткой строкой под таблицей: «Претти · общее — внимание: вялая, качается ✎» */}
-      {flags.length > 0 && (
-        <div className={`flex flex-col divide-y divide-edge overflow-hidden rounded-2xl ${TONE.glass}`}>
-          {flags.map((f) => {
+      {/* под таблицей — только «плохо» и звонок врачу; «внимание» живёт в жёлтой клетке и уходит в сводку «Сдаю» */}
+      {bad.length > 0 && (
+        <div className="flex flex-col divide-y divide-edge overflow-hidden rounded-2xl border border-coral/50 bg-[color-mix(in_srgb,var(--color-coral)_var(--tint),transparent)]">
+          {bad.map((f) => {
             const n = notes.filter((x) => x.shift_id === shift.id && x.elephant === f.elephant && x.metric === f.metric).length;
             return (
               <button
@@ -109,6 +109,11 @@ export function StateMatrix({ shift, onNote, readOnly }: { shift: Shift; onNote?
               </button>
             );
           })}
+          {!readOnly && (
+            <div className="px-3 py-2.5">
+              <CallVet />
+            </div>
+          )}
         </div>
       )}
 

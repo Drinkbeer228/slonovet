@@ -9,7 +9,7 @@ import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast, GlowIcon }
 import { setPreviewRole, usePreviewRole } from '../lib/preview';
 import { setTheme, useTheme } from '../lib/theme';
 import { Icon, type IconName } from '../ui/Icon';
-import { exportUnsent, requeueQuarantine, useRows, useEffectiveDiets } from '../lib/store';
+import { exportUnsent, requeueQuarantine, useRows } from '../lib/store';
 import { haptics } from '../lib/haptics';
 import { currentShift, dutyTodos } from '../domain/shift';
 import { unreadRequests, useReadMarks } from '../lib/comments';
@@ -256,7 +256,7 @@ export function useBadges(user: CurrentUser): Partial<Record<Tab, number>> & { u
   const shifts = useRows('shifts');
   const items = useRows('stock_items');
   const moves = useRows('stock_moves');
-  const { diets } = useEffectiveDiets();
+  const diets = useRows('diets');
   const comments = useRows('request_comments');
   const purchases = useRows('purchases');
   const read = useReadMarks(user.id);

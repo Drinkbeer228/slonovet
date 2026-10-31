@@ -7,11 +7,10 @@ import { currentShift } from '../domain/shift';
 import { LOW_DAYS, LOW_DAYS_OPTIONS, STOCK_CATEGORIES, balances, categoryOf, countText, deleteBlocker, deliveries, lastCount, lowDays, orderHint, packWords, countWords, fmtNum, itemsWithoutQty, stockPerDay, stockView, type StockView } from '../domain/stock';
 import type { CurrentUser, StockCategory, StockItem, StockMove } from '../domain/types';
 import { ledger } from '../domain/stops';
-import { newId, put, useRows, useEffectiveDiets } from '../lib/store';
+import { newId, put, useRows } from '../lib/store';
 import { localDay, plural, relDate, shortDate, timeOf } from '../lib/dates';
 import { Button, Card, Chip, Confirm, Empty, Field, KEY, PAD, Plate, ReadOnlyNote, Section, Sheet, Stepper, TONE, inputCls, toast, GlowIcon } from '../ui/kit';
 import { Icon } from '../ui/Icon';
-import { RoadBanner } from './common/RoadBanner';
 
 const MOVE_LABEL: Partial<Record<string, string>> = { in: 'приход', fix: 'поправка', waste: 'брак', extra: 'вне рациона' };
 
@@ -63,7 +62,7 @@ function Sacks({ v }: { v: StockView }) {
 export function StockScreen({ user }: { user: CurrentUser }) {
   const items = useRows('stock_items');
   const moves = useRows('stock_moves');
-  const { diets, road } = useEffectiveDiets(); // в дороге каши отменены — прогноз без них
+  const diets = useRows('diets');
   const shifts = useRows('shifts');
   const shiftId = currentShift(shifts)?.id ?? null;
   const [edit, setEdit] = useState<StockView | null>(null);
@@ -104,7 +103,6 @@ export function StockScreen({ user }: { user: CurrentUser }) {
         </span>
         {!canWrite && <ReadOnlyNote who={EDITORS.stock.who} />}
       </header>
-      {road && <RoadBanner />}
 
       {low.length > 0 && (
         // предупреждение, не тревога: тонированное стекло без halo, шапка — значок в медальоне и слово

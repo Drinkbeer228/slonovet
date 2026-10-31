@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { logEvent } from '../lib/log';
-import { DAYS_ID, MOVE_SECTIONS, moveNeeds } from '../domain/move';
-import { HAY_THERE_ID, RESERVE_ID, ROAD_ID, roadMode } from '../domain/road';
+import { DAYS_ID, HAY_THERE_ID, MOVE_SECTIONS, RESERVE_ID, moveNeeds } from '../domain/move';
 import type { CurrentUser, MoveItem } from '../domain/types';
 import { getRow, newId, put, remove, useRows } from '../lib/store';
 import { localDay, shortDate, timeOf } from '../lib/dates';
@@ -18,7 +17,6 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
   const days = rows.find((r) => r.id === DAYS_ID)?.qty ?? 3;
   const reserve = rows.find((r) => r.id === RESERVE_ID)?.qty ?? 3;
   const hayThere = rows.find((r) => r.id === HAY_THERE_ID)?.qty === 1;
-  const road = roadMode(rows);
   const needs = moveNeeds(days, moves, { reserve, hayThere });
   const byId = new Map(rows.map((r) => [r.id, r]));
   const custom = rows.filter((r) => r.id !== DAYS_ID && r.text && !MOVE_SECTIONS.some((s) => s.items.some((i) => i.id === r.id)));
@@ -35,14 +33,6 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
   const setDays = (v: number) => put('move_items', { ...row(DAYS_ID, '', ''), qty: Math.max(1, v) });
   const setReserve = (v: number) => put('move_items', { ...row(RESERVE_ID, '', ''), qty: Math.max(0, v) });
   const setHayThere = (on: boolean) => put('move_items', { ...row(HAY_THERE_ID, '', ''), qty: on ? 1 : 0 });
-  // режим «В дороге»: каши отменяются у всех сразу; включает директор, врач или администратор
-  const canRoad = user.role !== 'keeper';
-  const setRoad = async (on: boolean) => {
-    logEvent('road.toggle', { on });
-    await put('move_items', { ...row(ROAD_ID, '', ''), qty: on ? 1 : 0, done_by: on ? user.full_name : null, done_at: on ? new Date().toISOString() : null });
-    toast(on ? 'В дороге: каши и зерносмесь отменены' : 'Приехали: рацион обычный');
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-0.5 px-1">
@@ -51,16 +41,6 @@ export function MoveScreen({ user }: { user: CurrentUser }) {
           Что подготовить киперам · собрано {done} из {allIds.length}
         </span>
       </header>
-
-      <Card className="overflow-hidden">
-        <Check
-          on={road.on}
-          label="В дороге"
-          sub="каши и зерносмесь отменяются у всех, овощи вечером, сено и вода вволю"
-          disabled={!canRoad}
-          onChange={setRoad}
-        />
-      </Card>
 
       <Section title="На дорогу">
         <Card className="divide-y divide-edge overflow-hidden">

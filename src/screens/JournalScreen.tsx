@@ -5,15 +5,16 @@ import type { CurrentUser, Shift } from '../domain/types';
 import { ElephantsView } from './journal/ElephantsView';
 import { useRows } from '../lib/store';
 import { addDays, isoDate, localDay, longDate, parseIso, relDate, shortDate, timeOf } from '../lib/dates';
-import { CalendarSheet, Card, Empty, IconButton, KEY, PAD, Section, Segmented } from '../ui/kit';
+import { Button, CalendarSheet, Card, Empty, IconButton, KEY, PAD, Section, Segmented } from '../ui/kit';
 import { AlertsCard } from './common/Alerts';
 import { Icon } from '../ui/Icon';
 import { NotesList } from './common/NotesList';
 import { ElephantHistorySheet } from './common/ElephantHistory';
 import { durationText, feedStatus, gapBefore, missedTasks } from '../domain/monitoring';
 import type { ElephantName } from '../domain/types';
-import { mealTitle } from './keeper/FeedingBlock';
-import { washText } from './keeper/QuestsBlock';
+import { FeedingBlock, mealTitle } from './keeper/FeedingBlock';
+import { QuestsBlock, washText } from './keeper/QuestsBlock';
+import { StateMatrix } from './keeper/StateMatrix';
 import { sampleShift } from '../domain/demo';
 
 const EATEN: Record<string, string> = { all: 'всё', half: '½', none: 'отказ' };
@@ -55,7 +56,7 @@ export function JournalScreen({ user }: { user: CurrentUser }) {
       {view === 'days' ? (
         <>
           <AlertsCard />
-          <DaysView key={jumpDay ?? ''} initialDay={jumpDay} />
+          <DaysView key={jumpDay ?? ''} initialDay={jumpDay} user={user} />
         </>
       ) : (
         <ElephantsView
@@ -71,7 +72,9 @@ export function JournalScreen({ user }: { user: CurrentUser }) {
 }
 
 /** Дата, под ней календарь как активность на GitHub, ниже смена выбранного дня — таблицей, как на бумаге, и подробности. */
-function DaysView({ initialDay }: { initialDay?: string | null }) {
+function DaysView({ initialDay, user }: { initialDay?: string | null; user: CurrentUser }) {
+  // своё сданное дежурство можно дополнить потом: три дня без связи, забыл отметить — заполнил заочно
+  const [editing, setEditing] = useState<string | null>(null);
   const all = useRows('shifts');
   const shifts = sortShifts(all);
   const [day, setDay] = useState<string | null>(initialDay ?? null);
@@ -190,7 +193,22 @@ function DaysView({ initialDay }: { initialDay?: string | null }) {
           <div>
             <ShiftCard shift={s} />
           </div>
-          <ShiftDetails shift={s} />
+          {s.status !== 'open' && (s.keeper_id === user.id || user.role === 'admin') &&
+            (editing === s.id ? (
+              <div className="flex flex-col gap-6">
+                <StateMatrix shift={s} />
+                <FeedingBlock shift={s} user={user} />
+                <QuestsBlock shift={s} user={user} />
+                <Button kind="accent" big full icon="check" onClick={() => setEditing(null)}>
+                  Готово
+                </Button>
+              </div>
+            ) : (
+              <Button full icon="edit" onClick={() => setEditing(s.id)}>
+                Дополнить дежурство
+              </Button>
+            ))}
+          {editing !== s.id && <ShiftDetails shift={s} />}
         </Fragment>
       ))}
       {!byDay.get(selected) && <Empty>{shifts.length ? 'В этот день дежурства нет' : 'Дежурств пока нет'}</Empty>}

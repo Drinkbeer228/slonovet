@@ -217,14 +217,3 @@ describe('Фураж — приём смены без сдачи и приход
   });
 });
 
-describe('Фураж — в дороге (этап C2)', () => {
-  it('в дороге галочка кормления кашей ничего не списывает; приехали — списывает снова', async () => {
-    await p.store.seedRows('move_items', [{ id: '_road', section: '', text: '', qty: 1, done_by: 'Андрей', done_at: now, created_by: 'Андрей', updated_at: now }]);
-    await p.actions.setFeedDone(s1(), '13:00', true, keeperA);
-    expect(activeFeed()).toEqual([]);
-    await p.actions.setFeedDone(s1(), '13:00', false, keeperA);
-    await p.store.seedRows('move_items', [{ id: '_road', section: '', text: '', qty: 0, done_by: null, done_at: null, created_by: 'Андрей', updated_at: now }]);
-    await p.actions.setFeedDone(s1(), '13:00', true, keeperA);
-    expect(activeFeed()).toEqual([['formamax', -2]]);
-  });
-});

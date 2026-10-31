@@ -3,13 +3,13 @@ import { feedStatus } from '../../domain/monitoring';
 import { cycleEaten, setFeedDone, setFeedGiven, setFeedKg, setHay } from '../../domain/actions';
 import { categoryOf, feedUsage, weighedItem } from '../../domain/stock';
 import { FEED_TIMES } from '../../domain/shift';
+import { shiftFeedOrder } from '../../domain/day';
 import type { CurrentUser, Diet, Eaten, Shift } from '../../domain/types';
 import { useState } from 'react';
-import { useRows, useEffectiveDiets } from '../../lib/store';
-import { Card, DecimalInput, LEVEL_CELL, Section, Segmented, Sheet, Stepper, Tick } from '../../ui/kit';
+import { useRows } from '../../lib/store';
+import { Card, DecimalInput, LEVEL_CELL, Section, Segmented, Sheet, Stepper } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { qtyText } from '../DietScreen';
-import { mealCancelled } from '../../domain/road';
 
 const EATEN_LABEL: Record<Eaten, string> = { all: 'всё', half: '½', none: 'отказ' };
 const EATEN_CLS: Record<Eaten, string> = {
@@ -34,8 +34,7 @@ export function mealTitle(diets: Diet[], time: string) {
 }
 
 export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
-  // в дороге каши отменены: такое кормление помечено, списаний по кашам нет
-  const { diets, base } = useEffectiveDiets();
+  const diets = useRows('diets');
   const doneCount = FEED_TIMES.filter((t) => shift.feeds[t]?.done).length;
   const [recipe, setRecipe] = useState<string | null>(null);
   return (
@@ -49,51 +48,49 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
       }
     >
       <Card tone="glass" className="overflow-hidden">
-        {FEED_TIMES.map((t) => {
+        {/* в порядке смены: принимают утром, поэтому утренняя зерносмесь (07:00) — последняя, внизу */}
+        {shiftFeedOrder(shift).map((t) => {
           const f = shift.feeds[t];
           const done = Boolean(f?.done);
           const { title, prep } = mealTitle(diets, t);
-          const cancelled = mealCancelled(base, diets, t);
           // время прошло, а не отмечено — красным; было до приёма смены — бледно, не этого дежурного
           const st = feedStatus(shift, t);
-          const late = st === 'late' && !cancelled;
-          const outside = st === 'outside' && !cancelled;
+          const late = st === 'late';
+          const outside = st === 'outside';
           return (
             <div key={t} className="border-b border-edge">
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={done}
-                onClick={() => setFeedDone(shift, t, !done, user)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left"
-              >
-                <span className={`w-12 text-[15px] font-extrabold ${done || outside ? 'text-faint' : late ? 'text-coral-fg' : ''}`}>{t}</span>
+              {/* без галочки «покормили»: кипер сразу отмечает, как поели — эта отметка и списывает корм */}
+              <div className="flex items-center gap-3 px-4 pb-2 pt-3">
+                <span className={`w-12 text-[15px] font-extrabold ${outside ? 'text-faint' : late ? 'text-coral-fg' : ''}`}>{t}</span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className={`text-[15px] font-bold ${done || cancelled || outside ? 'text-faint' : ''}`}>{title}</span>
-                  <span className={`text-[12px] font-semibold ${cancelled && !done ? 'text-amber-fg' : late ? 'text-coral-fg' : 'text-muted'}`}>
-                    {done ? 'выдано' : cancelled ? 'в дороге — отменено' : late ? `не отмечено — время прошло${prep ? ` · ${prep}` : ''}` : outside ? 'было до приёма смены' : prep}
+                  <span className={`text-[15px] font-bold ${outside ? 'text-faint' : ''}`}>{title}</span>
+                  <span className={`text-[12px] font-semibold ${late ? 'text-coral-fg' : 'text-muted'}`}>
+                    {done ? 'как поели — тап меняет' : late ? 'не отмечено, как поели' : outside ? 'было до приёма смены' : prep}
                   </span>
                 </span>
-                <Tick on={done} />
-              </button>
-              {done && (
-                <div className="flex gap-2 px-4 pb-3">
-                  {ELEPHANTS.map((el) => {
-                    const e = f?.eaten?.[el] ?? 'all';
-                    return (
-                      <button
-                        key={el}
-                        type="button"
-                        onClick={() => cycleEaten(shift, t, el)}
-                        aria-label={`${el} съела: ${EATEN_LABEL[e]}. Нажми, чтобы изменить`}
-                        className={`h-11 flex-1 rounded-[10px] border px-1 text-[13px] font-bold transition-transform active:scale-[0.97] ${EATEN_CLS[e]}`}
-                      >
-                        {el} · {EATEN_LABEL[e]}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                {done && (
+                  <button type="button" onClick={() => setFeedDone(shift, t, false, user)} className="-my-2 h-11 px-1 text-[13px] font-bold text-muted underline">
+                    снять
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2 px-4 pb-3">
+                {ELEPHANTS.map((el) => {
+                  const e = f?.eaten?.[el] ?? 'all';
+                  return (
+                    <button
+                      key={el}
+                      type="button"
+                      // первый тап — «всё» у всех трёх (кормят всех вместе) и списание; дальше тап меняет ½ / отказ
+                      onClick={() => (done ? cycleEaten(shift, t, el) : setFeedDone(shift, t, true, user))}
+                      aria-label={done ? `${el} съела: ${EATEN_LABEL[e]}. Нажми, чтобы изменить` : `${el}: отметить, как поела`}
+                      className={`h-11 flex-1 rounded-[10px] border px-1 text-[13px] font-bold transition-transform active:scale-[0.97] ${done ? EATEN_CLS[e] : 'border-edge bg-well text-muted shadow-(--shadow-well)'}`}
+                    >
+                      {el} · {done ? EATEN_LABEL[e] : '—'}
+                    </button>
+                  );
+                })}
+              </div>
               {done && <GivenRows shift={shift} time={t} diets={diets} user={user} />}
               {done && weighedItem(diets, t) && <WeighRow kg={f?.kg ?? 0} onSave={(kg) => setFeedKg(shift, t, weighedItem(diets, t)!, kg, user)} />}
             </div>
@@ -108,7 +105,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
         </div>
       </Card>
       {/* про овощи сказано в самой строке («поправь, если дали иначе») — здесь только общее правило */}
-      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда ставишь галочку.</p>}
+      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда отмечаешь, как поели.</p>}
       <RecipeSheet time={recipe} onTime={setRecipe} diets={diets} />
     </Section>
   );

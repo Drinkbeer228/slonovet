@@ -2,6 +2,11 @@ import { ELEPHANTS } from './elephants';
 import { countPerDay } from './stock';
 import type { StockMove } from './types';
 
+/** Сколько дней запаса нужно на новом месте, пока не наладятся поставки (строка move_items, qty). */
+export const RESERVE_ID = '_reserve';
+/** Есть ли сено на новой точке (строка move_items, qty: 1 — есть, 0 — нет). */
+export const HAY_THERE_ID = '_hay_there';
+
 /**
  * Переезд (гастроли): что подготовить киперам. Шаблон — здесь, в коде;
  * в базе (move_items) хранятся только отметки «кто собрал» и свои пункты.
