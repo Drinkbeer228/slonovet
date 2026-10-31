@@ -467,7 +467,15 @@ const TEMPLATES: { label: string; text: string; route: string; dose: string; fre
 ];
 const ROUTES = ['в корм', 'наружно', 'ванночка', 'в глаз', 'укол'];
 const COURSE_DAYS = [5, 7, 10, 14];
-const GIVE = ['дал', 'частично', 'не дал'];
+/**
+ * Ответ кипера — по смыслу назначения: «дал» — про то, что дают в корм; ванночка, мазь, капли, укол — «сделано»;
+ * разовое «собрать и сфотографировать» — «сделано / не получилось». Врач может поменять сам.
+ */
+export function answersFor(route: string, oncePhoto: boolean): string[] {
+  if (route === 'в корм') return ['дал', 'частично', 'не дал'];
+  if (oncePhoto) return ['сделано', 'не получилось'];
+  return ['сделано', 'частично', 'не вышло'];
+}
 
 export function NewRequestSheet({
   initial,
@@ -498,6 +506,9 @@ export function NewRequestSheet({
   const [urgent, setUrgent] = useState(false);
   const [options, setOptions] = useState<string[]>([]);
   const [own, setOwn] = useState('');
+  // варианты ответа подстраиваются под «Как», пока врач не выбрал их сам; блок свёрнут в одну строку
+  const [answersTouched, setAnswersTouched] = useState(false);
+  const [answersOpen, setAnswersOpen] = useState(false);
   const [authorPhoto, setAuthorPhoto] = useState<File | null>(null);
   const [assignee, setAssignee] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
@@ -513,7 +524,7 @@ export function NewRequestSheet({
       setText('');
       setWhen('today');
       setCourseFreq('shift');
-      setUntil(addDays(isoDate(), 3));
+      setUntil(addDays(isoDate(), initial === 'work' ? 3 : 6)); // курс слону по умолчанию — неделя
       setOnDate(isoDate());
       setAtTime('');
       setPhoto(false);
@@ -524,8 +535,8 @@ export function NewRequestSheet({
       setChoosing(false);
       setRoute('');
       setDose('');
-      // назначение слону — сразу «Дал / частично / не дал»: слониха может выплюнуть таблетку или выдернуть ногу из ванночки
-      if (initial !== 'work') setOptions(GIVE);
+      setAnswersTouched(Boolean(editing));
+      setAnswersOpen(false);
       if (editing) {
         setText(editing.text);
         setRoute(editing.route ?? '');
@@ -542,12 +553,18 @@ export function NewRequestSheet({
     }
   }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ответ по смыслу: «в корм» — «дал», процедуры — «сделано», разовое с фото — «сделано / не получилось»
+  useEffect(() => {
+    if (initial === null || who === 'work' || answersTouched) return;
+    setOptions(answersFor(route, when !== 'course' && photo));
+  }, [initial, who, route, photo, when, answersTouched]);
+
   const applyTemplate = (t: (typeof TEMPLATES)[number]) => {
     setText(t.text);
     setRoute(t.route);
     setDose(t.dose);
     setPhoto(Boolean(t.photo));
-    setOptions(GIVE);
+    setAnswersTouched(false);
     if (t.freq === 'once') {
       setWhen('today');
       setAtTime(t.at ?? '');
@@ -598,11 +615,11 @@ export function NewRequestSheet({
               // поле шлём, только если выбрали человека: старый сервер без колонки примет остальные задачи как раньше
               ...(assignee && who === 'work' ? { assignee_id: assignee } : {}),
             });
-            toast(editing ? 'Назначение изменено' : 'Задача поставлена');
+            toast(editing ? 'Назначение изменено' : who === 'work' ? 'Задача поставлена' : 'Назначение добавлено');
             onClose();
           }}
         >
-          {editing ? 'Сохранить' : 'Поставить задачу'}
+          {editing ? 'Сохранить' : who === 'work' ? 'Поставить задачу' : 'Назначить'}
         </Button>
       }
     >
@@ -639,10 +656,17 @@ export function NewRequestSheet({
         )}
         <Field label="Что сделать">
           <textarea
-            rows={4}
+            rows={2}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className={`${inputCls} resize-none`}
+            // растёт по мере ввода: короткое назначение — две строки, длинное не прячется
+            ref={(el) => {
+              if (el) {
+                el.style.height = 'auto';
+                el.style.height = `${el.scrollHeight + 2}px`;
+              }
+            }}
+            className={`${inputCls} resize-none overflow-hidden`}
             placeholder={who === 'work' ? 'Например: перебрать сенник, сухие тюки ближе к выходу' : 'Например: марганцевые ванночки для ног, 15 мин'}
           />
         </Field>
@@ -683,10 +707,9 @@ export function NewRequestSheet({
                 ))}
               </div>
             </div>
-            <Field label="Доза" hint="Необязательно">
-              <input className={inputCls} value={dose} onChange={(e) => setDose(e.target.value)} placeholder="2 таблетки, 15–20 мин…" />
+            <Field label="Доза, уточнение" hint="Необязательно">
+              <input className={inputCls} value={dose} onChange={(e) => setDose(e.target.value)} placeholder="2 таблетки, по 15–20 мин, после чистки…" />
             </Field>
-            <p className="m-0 px-1 text-[14px] font-semibold text-muted">Сделает дежурный кипер — увидит на «Дежурстве».</p>
           </>
         )}
         <div className="flex flex-col gap-3">
@@ -708,19 +731,33 @@ export function NewRequestSheet({
                   </Chip>
                 )}
               </div>
-              {who !== 'work' && (
+              {who !== 'work' ? (
+                // курс слону — днями: 5 / 7 / 10 / 14 или своё число, рядом — до какого числа
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-1 text-[14px] font-bold text-muted">Дней:</span>
                   {COURSE_DAYS.map((d) => (
-                    <Chip key={d} on={until === addDays(courseStartDay(editing), d - 1)} onClick={() => setUntil(addDays(courseStartDay(editing), d - 1))}>
+                    <Chip key={d} on={courseDays(until, editing) === d} onClick={() => setUntil(addDays(courseStartDay(editing), d - 1))}>
                       {d}
                     </Chip>
                   ))}
+                  <input
+                    inputMode="numeric"
+                    aria-label="Своё число дней"
+                    placeholder="своё"
+                    value={COURSE_DAYS.includes(courseDays(until, editing)) ? '' : String(courseDays(until, editing))}
+                    onChange={(e) => {
+                      const n = Math.min(90, Number(e.target.value.replace(/\D/g, '')));
+                      if (n >= 1) setUntil(addDays(courseStartDay(editing), n - 1));
+                    }}
+                    className={`${inputCls} !h-11 !w-20 text-center`}
+                  />
+                  <span className="px-1 text-[14px] font-bold text-teal-fg">до {shortDate(until)}</span>
                 </div>
+              ) : (
+                <Field label="До какого числа">
+                  <DateInput value={until} onChange={setUntil} min={isoDate()} label="До какого числа" />
+                </Field>
               )}
-              <Field label="До какого числа">
-                <DateInput value={until} onChange={setUntil} min={isoDate()} label="До какого числа" />
-              </Field>
             </>
           ) : (
             <>
@@ -745,14 +782,19 @@ export function NewRequestSheet({
             </>
           )}
         </div>
-        <div className="flex flex-col gap-2">
-          <span className="px-1 text-[14px] font-bold text-muted">Варианты ответа</span>
+        {/* ответ кипера — одной строкой; поменять — «изменить» */}
+        <button type="button" onClick={() => setAnswersOpen(!answersOpen)} aria-expanded={answersOpen} className="flex min-h-11 items-center gap-2 px-1 text-left">
+          <span className="text-[14px] font-bold text-muted">Ответ:</span>
+          <span className="min-w-0 flex-1 text-[14px] font-bold leading-snug">{options.length ? options.join(' · ') : 'просто «выполнено»'}</span>
+          <span className="text-[14px] font-bold text-teal">{answersOpen ? 'готово' : 'изменить'}</span>
+        </button>
+        <div className={`flex flex-col gap-2 ${answersOpen ? '' : 'hidden'}`}>
           <div className="flex flex-wrap gap-2">
-            <Chip on={options.length === 0} onClick={() => setOptions([])}>
+            <Chip on={options.length === 0} onClick={() => (setAnswersTouched(true), setOptions([]))}>
               Просто «выполнено»
             </Chip>
             {answerPresets().map((p) => (
-              <Chip key={p.label} on={options.join('|') === p.options.join('|')} onClick={() => setOptions(p.options)}>
+              <Chip key={p.label} on={options.join('|') === p.options.join('|')} onClick={() => (setAnswersTouched(true), setOptions(p.options))}>
                 {p.label}
               </Chip>
             ))}
@@ -762,6 +804,7 @@ export function NewRequestSheet({
             value={own}
             onChange={(e) => {
               setOwn(e.target.value);
+              setAnswersTouched(true);
               setOptions(
                 e.target.value
                   .split(/[,/]/)
@@ -771,7 +814,6 @@ export function NewRequestSheet({
             }}
             placeholder="Свои: забрал, нет на месте"
           />
-          {options.length > 0 && <span className="px-1 text-[13px] font-semibold text-teal">Кнопки ответа: {options.join(' · ')}</span>}
         </div>
         {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
         <Card className="divide-y divide-edge overflow-hidden">
@@ -830,4 +872,9 @@ function CourseGrid({ req, marks, shifts }: { req: VetRequest; marks: RequestMar
       </Card>
     </Section>
   );
+}
+
+/** Сколько дней курса до «до какого числа», считая первый. */
+function courseDays(until: string, editing?: VetRequest): number {
+  return Math.round((Date.parse(`${until}T12:00:00`) - Date.parse(`${courseStartDay(editing)}T12:00:00`)) / 86_400_000) + 1;
 }

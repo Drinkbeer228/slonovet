@@ -152,3 +152,12 @@ describe('этап A: «не получилось», срочное на зав�
     expect(onRestDay('other', [day], at('2026-10-27T12:00:00Z'))).toBe(false);
   });
 });
+
+describe('ответ кипера по смыслу назначения', async () => {
+  const { answersFor } = await import('../screens/vet/RequestsScreen');
+  it('«в корм» — дал; ванночка, мазь, капли — сделано; разовое с фото — сделано / не получилось', () => {
+    expect(answersFor('в корм', false)).toEqual(['дал', 'частично', 'не дал']);
+    expect(answersFor('ванночка', false)).toEqual(['сделано', 'частично', 'не вышло']);
+    expect(answersFor('', true)).toEqual(['сделано', 'не получилось']);
+  });
+});
