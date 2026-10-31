@@ -8,10 +8,11 @@ import type { CurrentUser, ElephantName, Purchase, RequestFrequency, Shift, VetR
 import { newId, put, useRows } from '../../lib/store';
 import { savePhoto } from '../../lib/photos';
 import { addDays, isoDate, localDay, relDate, shortDate, stampOf } from '../../lib/dates';
-import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast, type Glow } from '../../ui/kit';
+import { Button, Card, Check, Chip, Confirm, DateInput, Empty, Field, FilePreview, KEY, LateBadge, Meter, PhotoPick, PhotoThumb, Plate, Section, Segmented, Sheet, UrgentBadge, inputCls, toast } from '../../ui/kit';
 import { canCloseRequest, canEdit } from '../../domain/access';
 import { Icon } from '../../ui/Icon';
 import { TASK_TYPE } from '../taskType';
+import { TypePill } from '../TypePill';
 import { ArriveSheet, NewPurchaseSheet, OrderSheet, PurchaseDetail, PurchaseRow } from '../PurchasesView';
 import { DiscussionThread } from '../Discussion';
 import { MarkLine, MarkSheet } from '../keeper/RequestsBlock';
@@ -161,18 +162,18 @@ function BoardCard({
   right?: ReactNode;
   urgent?: boolean;
   late?: boolean;
-  /** закрытая: плита без свечения — не спорит с тем, что ещё надо сделать */
+  /** закрытая: без коралловой рамки — не спорит с тем, что ещё надо сделать */
   quiet?: boolean;
   children: ReactNode;
 }) {
-  const t = TASK_TYPE[type];
-  const glow: Glow = urgent || late ? 'coral' : t.glow;
+  // без свечения слева: тип — словом в плашке, срочное и просроченное — коралловой рамкой и бейджем
+  const alarm = (urgent || late) && !quiet;
   return (
-    <Plate glow={glow} halo={urgent && !quiet} flat={quiet} className="flex flex-col gap-2 px-4 py-3">
+    <Plate glow="coral" flat className={`flex flex-col gap-2 px-4 py-3 ${alarm ? '!border-coral/60' : ''}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`flex items-center gap-1.5 text-[13px] font-extrabold ${t.text}`}>
-          <Icon name={t.icon} size={15} />
-          {label}
+        <span className="flex min-w-0 items-center gap-2">
+          <TypePill type={type} />
+          {label !== TASK_TYPE[type].label && <span className="truncate text-[14px] font-extrabold">{label}</span>}
         </span>
         {right}
       </div>
@@ -419,15 +420,15 @@ function TaskTypeSheet({ open, onClose, onPick }: { open: boolean; onClose: () =
           const t = TASK_TYPE[k.type];
           return (
             <button key={k.type} type="button" onClick={() => onPick(k.type)} className="text-left transition-transform active:scale-[0.98]">
-              {/* свечение цветом типа, как на доске, — без цветных полосок слева */}
-              <Plate glow={t.glow} className="flex items-center gap-3.5 p-4">
+              {/* обычная плита: тип говорит иконка и слово, без полосок и свечения */}
+              <Card className="flex items-center gap-3.5 p-4">
                 <Icon name={t.icon} size={26} className={t.text} />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-[18px] font-extrabold">{k.title}</span>
                   <span className="text-[13px] font-semibold text-muted">{k.sub}</span>
                 </span>
                 <Icon name="next" size={18} className="text-muted" />
-              </Plate>
+              </Card>
             </button>
           );
         })}

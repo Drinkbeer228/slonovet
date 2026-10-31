@@ -5,6 +5,7 @@ import { canUndoMark } from '../../domain/access';
 import type { CurrentUser, RequestMark, Shift, VetRequest } from '../../domain/types';
 import { DiscussionButton, DiscussionSheet } from '../Discussion';
 import { TASK_TYPE, taskType } from '../taskType';
+import { TypePill } from '../TypePill';
 import { Icon } from '../../ui/Icon';
 import { remove, useRows } from '../../lib/store';
 import { isoDate, localDay, relDate, shortDate, timeOf } from '../../lib/dates';
@@ -101,17 +102,19 @@ export function RequestCard({
 }) {
   const { req, marks, needed, done } = todo;
   const late = overdue(req, done);
-  const t = TASK_TYPE[taskType(req.elephant)];
+  const type = taskType(req.elephant);
+  const t = TASK_TYPE[type];
   const when = whenLabel(req);
   const multi = needed > 1;
   const who = whoLabel(req.elephant);
   const tag = CHIP;
   return (
-    <Plate glow="coral" halo={!done && req.urgent} flat={done || !req.urgent} className="flex flex-col gap-2.5 p-3.5">
+    // без свечения слева: тип — плашкой со словом, срочное и просроченное — коралловой рамкой и бейджем
+    <Plate glow="coral" flat className={`flex flex-col gap-2.5 p-3.5 ${!done && (req.urgent || late) ? '!border-coral/60' : ''}`}>
       <div className="flex items-start justify-between gap-2">
-        <h3 className={`m-0 flex min-w-0 items-center gap-2 text-[20px] font-extrabold leading-tight ${t.text}`}>
-          <Icon name={t.icon} size={18} />
-          <span className="truncate">{who}</span>
+        <h3 className="m-0 flex min-w-0 items-center gap-2">
+          <TypePill type={type} />
+          {who !== t.label && <span className="truncate text-[20px] font-extrabold leading-tight">{who}</span>}
         </h3>
         <span className="flex shrink-0 items-center gap-2">
           {req.urgent && !done && <UrgentBadge />}
