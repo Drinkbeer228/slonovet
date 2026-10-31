@@ -212,7 +212,7 @@ function WashRow({ shift }: { shift: Shift }) {
         <RowIcon icon="sparkle" done={who.length > 0} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[15px] font-bold">Мытьё</span>
-          <span className="text-[12px] font-semibold text-muted">{who.length ? `мыли${w?.at ? ` в ${w.at}` : ''}` : 'кого мыли сегодня'}</span>
+          <span className="text-[12px] font-semibold text-muted">{who.length ? `мыли${w?.at ? ` в ${w.at}` : ''}` : 'кого мыли'}</span>
         </span>
       </div>
       <div className="flex flex-wrap gap-2 pl-12">

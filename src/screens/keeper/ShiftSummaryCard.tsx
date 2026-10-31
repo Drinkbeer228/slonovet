@@ -15,8 +15,9 @@ export function ShiftSummaryCard({ shift, today, draft }: { shift: Shift; today?
   // только то, что уже было поставлено, пока шла смена: назначение после сдачи — не её «не сделано»
   const until = shift.handed_at ?? new Date().toISOString();
   const todos = dutyTodos(requests, marks, shift, today ?? shift.date).filter((t) => t.req.created_at <= until);
-  const all = shiftSummary(shift, todos, daySlots(shift));
-  const lines = draft ? all.filter((l) => !l.text.startsWith('Назначения') && !l.text.startsWith('Кормления')) : all;
+  const notes = useRows('notes');
+  const all = shiftSummary(shift, todos, daySlots(shift), notes);
+  const lines = draft ? all.filter((l) => !l.text.startsWith('Назначения') && !l.text.startsWith('Кормления') && !l.text.startsWith('При приёме')) : all;
   return (
     <Card className="flex flex-col gap-2 p-4">
       {lines.map((l) => (

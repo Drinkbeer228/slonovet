@@ -35,7 +35,6 @@ export function mealTitle(diets: Diet[], time: string) {
 
 export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser }) {
   const diets = useRows('diets');
-  const doneCount = FEED_TIMES.filter((t) => shift.feeds[t]?.done).length;
   const [recipe, setRecipe] = useState<string | null>(null);
   return (
     <Section
@@ -57,6 +56,8 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
           const st = feedStatus(shift, t);
           const late = st === 'late';
           const outside = st === 'outside';
+          // было до приёма смены и не отмечено — не этого дежурного, не показываем
+          if (outside && !done) return null;
           return (
             <div key={t} className="border-b border-edge">
               {/* без галочки «покормили»: кипер сразу отмечает, как поели — эта отметка и списывает корм */}
@@ -65,7 +66,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className={`text-[15px] font-bold ${outside ? 'text-faint' : ''}`}>{title}</span>
                   <span className={`text-[12px] font-semibold ${late ? 'text-coral-fg' : 'text-muted'}`}>
-                    {done ? 'как поели — тап меняет' : late ? 'не отмечено, как поели' : outside ? 'было до приёма смены' : prep}
+                    {done ? 'как поели' : late ? 'не отмечено, как поели' : prep}
                   </span>
                 </span>
                 {done && (
@@ -105,7 +106,7 @@ export function FeedingBlock({ shift, user }: { shift: Shift; user: CurrentUser 
         </div>
       </Card>
       {/* про овощи сказано в самой строке («поправь, если дали иначе») — здесь только общее правило */}
-      {doneCount > 0 && <p className="m-0 px-1 text-[12px] font-semibold text-muted">Корм списывается из запаса сам, по рациону, когда отмечаешь, как поели.</p>}
+      <p className="m-0 px-1 text-[12px] font-semibold text-muted">Первый тап — «всё» у всех трёх, корм списывается сам; дальше тап по слонихе меняет «½» и «отказ».</p>
       <RecipeSheet time={recipe} onTime={setRecipe} diets={diets} />
     </Section>
   );

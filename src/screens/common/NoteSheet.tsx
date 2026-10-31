@@ -35,7 +35,8 @@ export function NoteSheet({
   user: CurrentUser;
   onClose: () => void;
 }) {
-  const [el, setEl] = useState<ElephantName | 'none'>('Претти');
+  // про кого — выбирают каждый раз (кроме записи из клетки таблицы): не уйдёт по ошибке не той слонихе
+  const [el, setEl] = useState<ElephantName | 'none' | null>(null);
   const [kind, setKind] = useState<NoteKind>('observation');
   const [text, setText] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
@@ -44,7 +45,7 @@ export function NoteSheet({
 
   useEffect(() => {
     if (draft) {
-      setEl(draft.elephant);
+      setEl(draft.metric ? draft.elephant : null);
       setKind(draft.kind);
       setText('');
       setPhoto(null);
@@ -53,7 +54,7 @@ export function NoteSheet({
   }, [draft]);
 
   const save = async () => {
-    if (!draft || (!text.trim() && !photo)) return;
+    if (!draft || !el || (!text.trim() && !photo)) return;
     setBusy(true);
     try {
       // «ЧП» — запись не про слониху: вода, свет, инвентарь, манеж, стресс
@@ -79,7 +80,7 @@ export function NoteSheet({
       onClose={onClose}
       title={draft?.metric ? `${draft.elephant} · ${METRIC_LABEL[draft.metric].toLowerCase()} — что видно` : kind === 'incident' ? 'ЧП' : 'Запись'}
       footer={
-        <Button kind="primary" big full onClick={save} disabled={busy || (!text.trim() && !photo)}>
+        <Button kind="primary" big full onClick={save} disabled={busy || !el || (!text.trim() && !photo)}>
           Сохранить
         </Button>
       }
@@ -88,6 +89,7 @@ export function NoteSheet({
         {!draft?.metric && (
           <>
             {/* слониха — лицом: крупно и под палец; ЧП — запись не про слониху */}
+            <span className="-mb-2 px-1 text-[14px] font-bold text-muted">Про кого</span>
             <div role="radiogroup" aria-label="Слониха" className="grid grid-cols-4 gap-2">
               {CHOICES.map((c) => (
                 <button

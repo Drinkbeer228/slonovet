@@ -1,12 +1,12 @@
 import { canReceiveHandover, canTakeShift, canWorkShift } from '../../domain/access';
 import { useEffect, useState, type ReactNode } from 'react';
-import { offerHandover, rolloverShift } from '../../domain/actions';
+import { offerHandover, rolloverShift, updateShift } from '../../domain/actions';
 import { currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
 import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, relDate, timeOf } from '../../lib/dates';
-import { Button, Card, Chip, Plate, Section, Sheet, SwipeConfirm, toast } from '../../ui/kit';
+import { Button, Card, Chip, Plate, Section, Sheet, SwipeConfirm, inputCls, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import { NoteSheet, type NoteDraft } from '../common/NoteSheet';
 import { carryFlags, durationText, noDutySince } from '../../domain/monitoring';
@@ -175,7 +175,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
             {readOnly
               ? !accept &&
                 shift.note.trim() && (
-                  <Section id="sec-note" title="Заметка">
+                  <Section id="sec-note" title="Следующему дежурному">
                     <Card className="px-4 py-3 text-[15px] leading-snug">{shift.note}</Card>
                   </Section>
                 )
@@ -241,6 +241,16 @@ function HandoverSheet({ open, shift, user, onClose }: { open: boolean; shift: S
           <span className="px-1 text-[14px] font-bold text-muted">Сдаю — собрано само</span>
           <ShiftSummaryCard shift={shift} today={isoDate()} />
         </div>
+        {/* то, чего нет в таблице: «проверь бак, подогрей воду» — сменщик увидит при приёме, врач — в журнале */}
+        <textarea
+          rows={2}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onBlur={() => note !== shift.note && updateShift(shift, (s) => void (s.note = note))}
+          placeholder="Что передать следующему — необязательно"
+          aria-label="Что передать следующему дежурному"
+          className={`${inputCls} resize-none`}
+        />
         {warnings.length > 0 && (
           <Plate glow="amber" halo className="flex flex-col gap-1.5 p-3.5">
             {warnings.map((w) => (

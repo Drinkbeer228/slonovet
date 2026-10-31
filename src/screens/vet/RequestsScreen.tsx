@@ -81,6 +81,8 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         <Segmented label="Какие задачи" value={view} onChange={setView} options={FILTERS} dots={dots} />
       </div>
       {empty && <Empty>{view === 'purchases' ? 'Ничего не просили купить' : 'Задач нет'}</Empty>}
+      {/* место под плавающую «Новая»: последняя карточка не прячется под ней */}
+      <span aria-hidden="true" className="order-last h-16 md:hidden" />
       {GROUPS.map((g) => {
         const list = groups[g];
         if (!list.length) return null;
@@ -422,7 +424,7 @@ type When = 'today' | 'date' | 'course';
 const WHEN: { value: When; label: string }[] = [
   { value: 'today', label: 'Сегодня' },
   { value: 'date', label: 'На дату' },
-  { value: 'course', label: 'Курс' },
+  { value: 'course', label: 'Регулярно' },
 ];
 
 /** «+ Новая» на «Все»: сначала что за задача — слонам, работа или закупка. */
@@ -483,6 +485,7 @@ export function NewRequestSheet({
   onClose,
   prefill,
   editing,
+  onSaved,
 }: {
   /** слон или «Всем» — форма «Слонам»; 'work' — форма «Работа» */
   initial: ElephantName | 'all' | 'work' | null;
@@ -492,8 +495,11 @@ export function NewRequestSheet({
   prefill?: string;
   /** правка назначения: прежний вид уходит в историю — «Изменено. Было: …» */
   editing?: VetRequest;
+  /** назначение сохранено (например, чтобы записать ответ врача «назначу») */
+  onSaved?: () => void;
 }) {
   const [route, setRoute] = useState('');
+  const [showPhoto, setShowPhoto] = useState(false);
   const [dose, setDose] = useState('');
   const [who, setWho] = useState<ElephantName | 'all' | 'work'>('Претти');
   const [text, setText] = useState('');
@@ -535,6 +541,7 @@ export function NewRequestSheet({
       setChoosing(false);
       setRoute('');
       setDose('');
+      setShowPhoto(false);
       setAnswersTouched(Boolean(editing));
       setAnswersOpen(false);
       if (editing) {
@@ -616,6 +623,7 @@ export function NewRequestSheet({
               ...(assignee && who === 'work' ? { assignee_id: assignee } : {}),
             });
             toast(editing ? 'Назначение изменено' : who === 'work' ? 'Задача поставлена' : 'Назначение добавлено');
+            onSaved?.();
             onClose();
           }}
         >
@@ -713,7 +721,7 @@ export function NewRequestSheet({
           </>
         )}
         <div className="flex flex-col gap-3">
-          <Segmented label="Когда" value={when} onChange={setWhen} options={who === 'work' ? WHEN.map((w) => (w.value === 'course' ? { ...w, label: 'Регулярно' } : w)) : WHEN} />
+          <Segmented label="Когда" value={when} onChange={setWhen} options={WHEN} />
           {when === 'course' ? (
             <>
               <div className="flex flex-wrap gap-2">
@@ -815,7 +823,16 @@ export function NewRequestSheet({
             placeholder="Свои: забрал, нет на месте"
           />
         </div>
-        {authorPhoto ? <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} /> : <PhotoPick onFile={setAuthorPhoto} label="Приложить фото" />}
+        {/* фото от автора — редко нужно: под ссылкой, чтобы не путать с «Нужно фото в ответ» */}
+        {authorPhoto ? (
+          <FilePreview file={authorPhoto} onRemove={() => setAuthorPhoto(null)} />
+        ) : showPhoto ? (
+          <PhotoPick onFile={setAuthorPhoto} label="Фото, что не так" />
+        ) : (
+          <button type="button" onClick={() => setShowPhoto(true)} className="-my-2 self-start py-2 text-[14px] font-bold text-teal">
+            + показать фото, что не так
+          </button>
+        )}
         <Card className="divide-y divide-edge overflow-hidden">
           <Check on={photo} label="Нужно фото в ответ" sub="кипер отметит выполнение с фото" onChange={setPhoto} />
           <Check on={urgent} label="Срочно" sub="наверху экрана у кипера" onChange={setUrgent} />
@@ -847,7 +864,7 @@ function CourseGrid({ req, marks, shifts }: { req: VetRequest; marks: RequestMar
   for (let d = start; d <= end && days.length < 60; d = addDays(d, 1)) days.push(d);
   if (!days.length) return null;
   return (
-    <Section title="Курс по дням">
+    <Section title="По дням">
       <Card tone="sunken" className="flex flex-wrap gap-2 p-3">
         {days.map((d) => {
           const got = marks.filter((m) => !m.deleted && dateOf.get(m.shift_id) === d);

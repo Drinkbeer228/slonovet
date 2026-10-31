@@ -108,8 +108,8 @@ export function DeliverySheet({ open, user, shiftId, onClose }: { open: boolean;
 
   useEffect(() => {
     if (!open) return;
-    // сначала заказанное: позиция и количество из закупки
-    const ordered = getRows('purchases').filter((p) => !p.deleted && p.status === 'ordered' && p.item_id);
+    // сначала то, что ждём: заказанное и «попросили купить» — позиция и количество из закупки (часто привозят без отметки «заказано»)
+    const ordered = getRows('purchases').filter((p) => !p.deleted && (p.status === 'ordered' || p.status === 'new') && p.item_id);
     setQty(Object.fromEntries(ordered.map((p) => [p.item_id!, firstNumber(p.amount)])));
     setRows([...new Set(ordered.map((p) => p.item_id!))]);
     setFreeDone([]);
@@ -158,11 +158,11 @@ export function DeliverySheet({ open, user, shiftId, onClose }: { open: boolean;
           <Card className="divide-y divide-edge overflow-hidden">
             {shown.map((it) => {
               const p = byItem(it.id);
-              return <AmountRow key={it.id} it={it} value={qty[it.id] ?? ''} onChange={(v) => setQty({ ...qty, [it.id]: v })} hint={p ? `заказано: ${p.amount || 'без количества'}` : undefined} />;
+              return <AmountRow key={it.id} it={it} value={qty[it.id] ?? ''} onChange={(v) => setQty({ ...qty, [it.id]: v })} hint={p ? `${p.status === 'ordered' ? 'заказано' : 'просили'}: ${p.amount || 'без количества'}` : undefined} />;
             })}
           </Card>
         ) : (
-          <p className="m-0 px-1 text-[14px] font-semibold text-muted">Заказанного нет. Отметь, что привезли:</p>
+          <p className="m-0 px-1 text-[14px] font-semibold text-muted">Ничего не ждём — отметь, что привезли:</p>
         )}
         {free.length > 0 && closer && (
           <Card className="divide-y divide-edge overflow-hidden">
@@ -175,7 +175,16 @@ export function DeliverySheet({ open, user, shiftId, onClose }: { open: boolean;
           <span className="px-1 text-[14px] font-bold text-muted">Ещё привезли</span>
           <div className="flex flex-wrap gap-2">
             {rest.map((it) => (
-              <Chip key={it.id} on={false} onClick={() => setRows([...rows, it.id])}>
+              <Chip
+                key={it.id}
+                on={false}
+                onClick={() => {
+                  // количество — из закупки, если она есть
+                  const p = byItem(it.id);
+                  if (p && !qty[it.id]) setQty({ ...qty, [it.id]: firstNumber(p.amount) });
+                  setRows([...rows, it.id]);
+                }}
+              >
                 + {it.name}
               </Chip>
             ))}

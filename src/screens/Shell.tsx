@@ -454,20 +454,23 @@ function PushRow({ role }: { role: Role }) {
   const preview = usePreviewRole();
   const [state, setState] = usePushState();
   const [busy, setBusy] = useState(false);
+  // в примере — как на сайте: переключатель работает, но только на экране (сервера нет, слать некому)
+  const [demoOn, setDemoOn] = useState(false);
   const topics = pushTopics(role);
   if (!topics.length || preview) return null;
   const demo = session?.mode !== 'cloud';
-  const on = state === 'on';
-  const can = !demo && (state === 'on' || state === 'off');
+  const on = demo ? demoOn : state === 'on';
+  const can = demo || state === 'on' || state === 'off';
+  // подпись — только когда что-то мешает включить
   const note = demo
-    ? 'Работает только на сайте, в примере не включить.'
+    ? ''
     : state === 'need-install'
       ? 'На iPhone — только у приложения на экране «Домой».'
       : state === 'denied'
         ? 'Запрещены в настройках телефона для этого сайта — разреши их там.'
         : state === 'unsupported'
           ? 'Этот браузер уведомления не поддерживает.'
-          : `Придут, даже когда приложение закрыто: ${topics.join(', ')}.`;
+          : '';
   return (
     <div className="flex flex-col gap-1.5 px-1">
       <div className="flex items-center justify-between gap-3">
@@ -479,6 +482,11 @@ function PushRow({ role }: { role: Role }) {
           aria-label={`Уведомления: ${on ? 'включены' : 'выключены'}`}
           disabled={!can || busy}
           onClick={async () => {
+            if (demo) {
+              setDemoOn(!demoOn);
+              toast(demoOn ? 'Уведомления выключены' : 'Уведомления включены');
+              return;
+            }
             setBusy(true);
             try {
               if (on) {
@@ -508,7 +516,7 @@ function PushRow({ role }: { role: Role }) {
           </span>
         </button>
       </div>
-      <span className="text-[12px] font-semibold text-muted">{note}</span>
+      {note && <span className="text-[12px] font-semibold text-muted">{note}</span>}
       {state === 'need-install' && !demo && (
         <button type="button" onClick={() => openInstallSheet()} className="self-start text-[13px] font-bold text-teal underline">
           Как установить

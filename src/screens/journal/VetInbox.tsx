@@ -26,7 +26,7 @@ export function VetInbox({ user }: { user: CurrentUser }) {
   const marks = useRows('request_marks');
   const requests = useRows('requests');
   const items = vetInbox({ notes, shifts, marks, requests }, since);
-  const [assign, setAssign] = useState<{ el: ElephantName | 'all'; text: string } | null>(null);
+  const [assign, setAssign] = useState<{ el: ElephantName | 'all'; text: string; noteId: string } | null>(null);
   if (!items.length) {
     return <Plate glow="teal" className="px-4 py-3 text-[15px] font-bold text-teal-fg">Нового с прошлого визита нет</Plate>;
   }
@@ -44,7 +44,7 @@ export function VetInbox({ user }: { user: CurrentUser }) {
             </span>
             {i.note?.photo_path && <PhotoThumb path={i.note.photo_path} size={56} />}
           </span>
-          {i.note && i.note.elephant !== 'none' && <ReplyButtons note={i.note} user={user} onAssign={() => setAssign({ el: i.note!.elephant as ElephantName, text: i.note!.text })} />}
+          {i.note && i.note.elephant !== 'none' && <ReplyButtons note={i.note} user={user} onAssign={() => setAssign({ el: i.note!.elephant as ElephantName, text: i.note!.text, noteId: i.note!.id })} />}
         </Card>
       ))}
       <Button
@@ -63,28 +63,50 @@ export function VetInbox({ user }: { user: CurrentUser }) {
       >
         Всё прочитано
       </Button>
-      <NewRequestSheet initial={assign?.el ?? null} prefill={assign?.text} user={user} onClose={() => setAssign(null)} />
+      <NewRequestSheet
+        initial={assign?.el ?? null}
+        prefill={assign?.text}
+        user={user}
+        onClose={() => setAssign(null)}
+        // «назначу» — только когда назначение правда поставлено
+        onSaved={() => assign && addNoteComment(assign.noteId, user, 'assign')}
+      />
     </Section>
   );
 }
 
-/** Ответ врача на запись — одной кнопкой; кипер увидит его под записью. */
+/** Ответ врача на запись — одной кнопкой; кипер увидит его под записью. Передумал — «изменить», последний ответ главный. */
 export function ReplyButtons({ note, user, onAssign }: { note: Note; user: CurrentUser; onAssign: () => void }) {
-  const replies = useRows('note_comments').filter((c) => c.note_id === note.id && !c.deleted);
-  const mine = replies.find((c) => c.author_id === user.id);
-  if (mine) return <span className="text-[13px] font-bold text-teal-fg">Ответ: {REPLY_LABEL[mine.kind]}</span>;
+  const mine = useRows('note_comments')
+    .filter((c) => c.note_id === note.id && !c.deleted && c.author_id === user.id)
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+  const [changing, setChanging] = useState(false);
+  if (mine && !changing)
+    return (
+      <span className="flex items-center gap-3 text-[13px] font-bold text-teal-fg">
+        Ответ: {REPLY_LABEL[mine.kind]}
+        <button type="button" onClick={() => setChanging(true)} className="-my-3 py-3 text-muted underline">
+          изменить
+        </button>
+      </span>
+    );
+  const reply = async (kind: 'seen' | 'call', msg: string) => {
+    await addNoteComment(note.id, user, kind);
+    setChanging(false);
+    toast(msg);
+  };
   return (
     <div className="grid grid-cols-3 gap-2">
-      <Button onClick={() => addNoteComment(note.id, user, 'seen').then(() => toast('Кипер увидит: «врач смотрит»'))}>Смотрю</Button>
+      <Button onClick={() => reply('seen', 'Кипер увидит: «врач смотрит»')}>Смотрю</Button>
       <Button
-        onClick={async () => {
-          await addNoteComment(note.id, user, 'assign');
+        onClick={() => {
+          setChanging(false);
           onAssign();
         }}
       >
         Назначить
       </Button>
-      <Button onClick={() => addNoteComment(note.id, user, 'call').then(() => toast('Кипер увидит: «врач позвонит»'))}>Позвоню</Button>
+      <Button onClick={() => reply('call', 'Кипер увидит: «врач позвонит»')}>Позвоню</Button>
     </div>
   );
 }

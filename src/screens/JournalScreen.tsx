@@ -81,6 +81,7 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
   // итог дня словами сразу; таблица и подробности — по тапу (на телефоне без долгой прокрутки)
   const [shown, setShown] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
+  const [cal, setCal] = useState(false);
   const all = useRows('shifts');
   const shifts = sortShifts(all);
   const [day, setDay] = useState<string | null>(initialDay ?? null);
@@ -120,8 +121,10 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
           {longDate(selected)}
         </DateJump>
         <IconButton icon="next" label="День позже" onClick={() => step(-1)} className={selected >= isoDate() ? 'opacity-30' : ''} />
+        <IconButton icon="calendar" label={cal ? 'Скрыть календарь' : 'Календарь дней'} onClick={() => setCal(!cal)} className={cal ? 'text-teal' : ''} />
       </div>
-      <div>
+      {/* календарь дней по цвету — по кнопке: итог выбранного дня важнее и должен быть сразу под датой */}
+      <div className={cal ? '' : 'hidden'}>
         <Card className="flex flex-col gap-2 p-3">
           <div className="flex items-center justify-between px-1">
             <button type="button" disabled={!hasOlder} onClick={() => setPage(page + 1)} className="-my-1.5 h-11 pr-3 text-[14px] font-bold text-teal disabled:text-faint">
@@ -217,6 +220,9 @@ function DaysView({ initialDay, user }: { initialDay?: string | null; user: Curr
           {s.status !== 'open' && (s.keeper_id === user.id || user.role === 'admin') &&
             (editing === s.id ? (
               <div className="flex flex-col gap-6">
+                <Plate glow="sky" className="px-4 py-3 text-[15px] font-bold text-sky-fg">
+                  Дополняешь смену {shortDate(s.date)} — всё сохраняется сразу
+                </Plate>
                 <RequestsBlock shift={s} user={user} day={s.date} />
                 <StateMatrix shift={s} />
                 <FeedingBlock shift={s} user={user} />

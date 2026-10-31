@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ELEPHANTS, LEVEL_LABEL, METRICS } from '../../domain/elephants';
 import { healthAlerts } from '../../domain/health';
 import { elephantHistory } from '../../domain/monitoring';
@@ -103,6 +104,7 @@ function ElephantSheet({ el, user, onClose, onDay }: { el: ElephantName | null; 
   const passport = useRows('elephant_passports').find((p) => p.id === el && !p.deleted);
   const [mode, setMode] = useState<Mode>('all');
   const [editing, setEditing] = useState(false);
+  const [report, setReport] = useState<string | null>(null);
   if (!el) return <Sheet open={false} onClose={onClose} title="" children={null} />;
   const days = elephantHistory(shifts, el, DAYS);
   const rows = METRICS.filter((m) => mode === 'all' || days.some((d) => (d.levels[m.key] ?? 0) > 0));
@@ -124,7 +126,7 @@ function ElephantSheet({ el, user, onClose, onDay }: { el: ElephantName | null; 
               Паспорт
             </Button>
           )}
-          <Button icon="share" onClick={() => printReport(el, { passport, days, courses, notes: mine })}>
+          <Button icon="share" onClick={() => setReport(printReport(el, { passport, days, courses, notes: mine }))}>
             Выписка для врача
           </Button>
         </div>
@@ -156,9 +158,9 @@ function ElephantSheet({ el, user, onClose, onDay }: { el: ElephantName | null; 
           </Card>
         </Section>
 
-        <Section title="Идут курсы" aside={courses.length ? String(courses.length) : undefined}>
+        <Section title="Идёт лечение" aside={courses.length ? String(courses.length) : undefined}>
           {courses.length === 0 ? (
-            <Card className="px-4 py-3 text-[15px] text-muted">Курсов нет</Card>
+            <Card className="px-4 py-3 text-[15px] text-muted">Лечения нет</Card>
           ) : (
             courses.map((r) => {
               const cd = courseDay(r, today);
@@ -191,6 +193,7 @@ function ElephantSheet({ el, user, onClose, onDay }: { el: ElephantName | null; 
           {shown.length ? <NotesList notes={shown.slice(0, 40)} showElephant={false} showDate /> : <Card className="px-4 py-3 text-[15px] text-muted">Записей нет</Card>}
         </Section>
       </div>
+      <ReportView html={report} onClose={() => setReport(null)} />
       <PassportSheet open={editing} el={el} passport={passport} user={user} onClose={() => setEditing(false)} />
     </Sheet>
   );
@@ -310,14 +313,30 @@ function printReport(el: ElephantName, d: { passport?: ElephantPassport; days: R
     .join('');
   const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Выписка: ${el}</title>
 <style>body{font:14px/1.45 system-ui,sans-serif;margin:16px;color:#111}h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:18px 0 6px}table{border-collapse:collapse;font-size:11px}td,th{border:1px solid #ccc;padding:2px 3px;text-align:center}td:first-child{text-align:left;white-space:nowrap}.l1{background:#fde68a}.l2{background:#fca5a5}.l0{background:#d1fae5}.ln{background:#f3f4f6}button{font-size:16px;padding:10px 16px;margin:8px 0}@media print{button{display:none}}</style></head>
-<body><h1>${el} — выписка для врача</h1><div>СлоноВет · ${new Date().toLocaleDateString('ru-RU')}</div><button onclick="print()">Печать / сохранить PDF</button>
+<body><h1>${el} — выписка для врача</h1><div>СлоноВет · ${new Date().toLocaleDateString('ru-RU')}</div>
 <h2>Паспорт</h2><ul>${passport}</ul><h2>30 дней (+ норма, ! внимание, × плохо)</h2><div style="overflow-x:auto"><table><tr><th></th>${head}</tr>${body}</table></div>
-<h2>Идут курсы</h2><ul>${courses}</ul><h2>Записи</h2><ul>${notes || '<li>Нет</li>'}</ul></body></html>`;
-  const w = window.open('', '_blank');
-  if (!w) {
-    toast('Браузер не дал открыть выписку', 'error');
-    return;
-  }
-  w.document.write(html);
-  w.document.close();
+<h2>Идёт лечение</h2><ul>${courses}</ul><h2>Записи</h2><ul>${notes || '<li>Нет</li>'}</ul></body></html>`;
+  return html;
+}
+
+/**
+ * Выписка поверх приложения, в той же странице: новое окно на iPhone с иконки не открывается.
+ * «Печать / PDF» — печать самой выписки (на iPhone — «Сохранить в Файлы» как PDF).
+ */
+function ReportView({ html, onClose }: { html: string | null; onClose: () => void }) {
+  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
+  if (!html) return null;
+  return createPortal(
+    <div className="pt-safe fixed inset-0 z-[80] flex flex-col bg-bg">
+      <div className="px-safe flex items-center gap-2 py-2">
+        <Button kind="accent" icon="share" onClick={() => frame?.contentWindow?.print()}>
+          Печать / PDF
+        </Button>
+        <span className="flex-1" />
+        <Button onClick={onClose}>Закрыть</Button>
+      </div>
+      <iframe ref={setFrame} title="Выписка для врача" srcDoc={html} className="w-full flex-1 bg-white" />
+    </div>,
+    document.body,
+  );
 }

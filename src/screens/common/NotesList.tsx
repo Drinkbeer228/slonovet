@@ -32,6 +32,8 @@ export function NotesList({ notes, showElephant = true, showDate = false }: { no
             {n.for_vet && <span className="text-[12px] font-bold text-sky-fg">Показано врачу</span>}
             {replies
               .filter((c) => c.note_id === n.id && !c.deleted)
+              // у каждого — только последний ответ (врач мог передумать)
+              .filter((c, _, all) => !all.some((x) => x.author_id === c.author_id && x.note_id === c.note_id && !x.deleted && x.created_at > c.created_at))
               .map((c) => (
                 <span key={c.id} className="text-[13px] font-bold text-teal-fg">
                   {c.author_name}: {c.kind === 'text' ? c.text : REPLY[c.kind]}

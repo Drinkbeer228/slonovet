@@ -38,3 +38,17 @@ describe('сводка «Сдаю»', async () => {
     ]);
   });
 });
+
+describe('сводка видит, как поела', async () => {
+  const { shiftSummary } = await import('./summary');
+  it('«½» в кормлении — не норма, даже если в таблице «Еда» пусто; ЧП и замечания при приёме — тоже в сводке', () => {
+    const s = shift({ feeds: { '07:00': { done: true, eaten: { Претти: 'all', Марго: 'all', Одри: 'half' } } }, accept_remarks: 'Не так: вода есть — Нет воды' });
+    const lines = shiftSummary(s, [], daySlots(s, local('2026-10-31', '09:00')), [
+      { id: 'n', shift_id: 's', elephant: 'Марго', kind: 'incident', metric: null, text: 'хромает', photo_path: null, author_name: 'А', created_at: '', updated_at: '' },
+    ]).map((l) => l.text);
+    expect(lines).toContain('Претти, Марго — норма');
+    expect(lines).toContain('Одри — внимание: не доела в 07:00');
+    expect(lines).toContain('ЧП · Марго: хромает');
+    expect(lines).toContain('При приёме: Не так: вода есть — Нет воды');
+  });
+});
