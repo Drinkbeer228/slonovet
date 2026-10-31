@@ -1,5 +1,5 @@
 import { isoDate, localDay } from '../lib/dates';
-import { byPriority, closingMarks, deadlineKey, overdue } from './shift';
+import { byPriority, closingMarks, deadlineKey, eventExpired, overdue } from './shift';
 import type { Purchase, RequestMark, VetRequest } from './types';
 
 /*
@@ -9,24 +9,27 @@ import type { Purchase, RequestMark, VetRequest } from './types';
 
 export type BoardType = 'elephants' | 'work' | 'purchases';
 export type BoardFilter = 'all' | BoardType;
-export type BoardGroup = 'today' | 'courses' | 'planned' | 'closed';
+export type BoardGroup = 'overdue' | 'today' | 'courses' | 'planned' | 'closed';
 
 export type BoardItem = { kind: 'request'; type: 'elephants' | 'work'; req: VetRequest } | { kind: 'purchase'; type: 'purchases'; p: Purchase };
 
-export const GROUP_TITLE: Record<BoardGroup, string> = { today: 'Сегодня', courses: 'Курсы', planned: 'Запланировано', closed: 'Закрытые' };
-export const GROUPS: BoardGroup[] = ['today', 'courses', 'planned', 'closed'];
+export const GROUP_TITLE: Record<BoardGroup, string> = { overdue: 'Просрочено', today: 'Сегодня', courses: 'Курсы', planned: 'Запланировано', closed: 'Закрытые' };
+export const GROUPS: BoardGroup[] = ['overdue', 'today', 'courses', 'planned', 'closed'];
 /** Закрытых показываем последние — чтобы доска не росла бесконечно */
 export const CLOSED_LIMIT = 20;
 
 const requestType = (r: VetRequest): 'elephants' | 'work' => (r.elephant === 'work' ? 'work' : 'elephants');
 
-function requestGroup(r: VetRequest, marks: RequestMark[], today: string): BoardGroup {
+function requestGroup(r: VetRequest, marks: RequestMark[], today: string, now: Date): BoardGroup {
   if (r.status === 'closed') return 'closed';
   if (r.frequency !== 'once') return r.due_date && r.due_date < today ? 'closed' : r.urgent ? 'today' : 'courses';
   // «не получилось» задачу не закрывает — закрывает отметка выполнения
   if (closingMarks(marks, r).length) return 'closed';
-  // срочное — всегда в «Сегодня», даже если поставлено на будущий день
-  return r.on_date && r.on_date > today && !r.urgent ? 'planned' : 'today';
+  // событие ко времени через сутки уходит само («прошло без отметки»); лечение — никогда, остаётся в «Просрочено»
+  if (eventExpired(r, marks, now)) return 'closed';
+  // «Сегодня» — только то, что на сегодня: прошлое — в «Просрочено», будущее — в «Запланировано»
+  if (r.on_date && r.on_date < today) return 'overdue';
+  return r.on_date && r.on_date > today ? 'planned' : 'today';
 }
 
 function purchaseGroup(p: Purchase): BoardGroup {
@@ -55,16 +58,17 @@ export function boardGroups(
   now = new Date(),
 ): Record<BoardGroup, BoardItem[]> {
   const today = isoDate(now);
-  const out: Record<BoardGroup, BoardItem[]> = { today: [], courses: [], planned: [], closed: [] };
+  const out: Record<BoardGroup, BoardItem[]> = { overdue: [], today: [], courses: [], planned: [], closed: [] };
   for (const r of requests) {
     if (r.deleted) continue;
     const type = requestType(r);
     if (filter !== 'all' && filter !== type) continue;
-    out[requestGroup(r, marks, today)].push({ kind: 'request', type, req: r });
+    out[requestGroup(r, marks, today, now)].push({ kind: 'request', type, req: r });
   }
   if (filter === 'all' || filter === 'purchases') {
     for (const p of purchases) if (!p.deleted) out[purchaseGroup(p)].push({ kind: 'purchase', type: 'purchases', p });
   }
+  out.overdue.sort(byItemPriority);
   out.today.sort(byItemPriority);
   out.courses.sort(byItemPriority);
   out.planned.sort(byItemPriority);
@@ -77,7 +81,7 @@ export function boardAttention(requests: VetRequest[], purchases: Purchase[], ma
   const out: Record<BoardType, number> = { elephants: 0, work: 0, purchases: 0 };
   const today = isoDate(now);
   for (const r of requests) {
-    if (r.deleted || requestGroup(r, marks, today) === 'closed') continue;
+    if (r.deleted || requestGroup(r, marks, today, now) === 'closed') continue;
     const done = closingMarks(marks, r).length > 0;
     if (overdue(r, done, now) || (r.urgent && r.frequency === 'once' && !done)) out[requestType(r)]++;
   }

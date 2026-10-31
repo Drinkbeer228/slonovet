@@ -27,11 +27,12 @@ describe('доска «Задачи»: группы', () => {
   const purchases = [buy('hay', 'new', { urgent: true }), buy('oats', 'ordered', { delivery_date: '2026-10-28' }), buy('bags', 'done')];
   const g = boardGroups(requests, purchases, [mark('done-once')], 'all', now);
 
-  it('сегодня: срочное наверху, дальше по сроку (вчерашнее раньше сегодняшнего); закупки «нужно купить» — тоже сегодня', () => {
-    expect(ids(g.today)).toEqual(['hot', 'hay', 'late-yesterday', 'today-pills']);
+  it('сегодня: срочное наверху, дальше по сроку; вчерашнее — в «Просрочено»; закупки «нужно купить» — тоже сегодня', () => {
+    expect(ids(g.overdue)).toEqual(['late-yesterday']);
+    expect(ids(g.today)).toEqual(['hot', 'hay', 'today-pills']);
   });
 
-  it('срочное — в «Сегодня» и наверху, даже курс и задача на будущий день', () => {
+  it('срочное — наверху; срочный курс — в «Сегодня», срочное на будущий день — в «Запланировано»', () => {
     const list = [
       req('plain-today', { on_date: '2026-10-26' }),
       req('urgent-course', { frequency: 'shift', due_date: '2026-11-03', urgent: true }),
@@ -39,8 +40,8 @@ describe('доска «Задачи»: группы', () => {
       req('plain-later', { on_date: '2026-10-28' }),
     ];
     const u = boardGroups(list, [], [], 'all', now);
-    expect(ids(u.today)).toEqual(['urgent-later', 'urgent-course', 'plain-today']);
-    expect(ids(u.planned)).toEqual(['plain-later']);
+    expect(ids(u.today)).toEqual(['urgent-course', 'plain-today']);
+    expect(ids(u.planned)).toEqual(['urgent-later', 'plain-later']);
     expect(u.courses).toHaveLength(0);
   });
 
@@ -71,5 +72,33 @@ describe('доска «Задачи»: группы', () => {
     expect(c).toHaveLength(CLOSED_LIMIT);
     const at = (i: (typeof c)[number]) => (i.kind === 'request' ? i.req.updated_at : '');
     expect(at(c[0]) >= at(c[CLOSED_LIMIT - 1])).toBe(true);
+  });
+});
+
+describe('«Просрочено» и прошедшие события', () => {
+  const now = new Date('2026-10-31T13:53:00');
+  const base: VetRequest = { id: 'x', elephant: 'Претти', text: '', frequency: 'once', due_date: null, needs_photo: false, urgent: false, author_id: null, author_name: 'Врач', status: 'active', created_at: '2026-10-29T10:00:00Z', updated_at: '' };
+  const where = (r: VetRequest, marks: RequestMark[] = []) => {
+    const g = boardGroups([r], [], marks, 'all', now);
+    return (Object.keys(g) as (keyof typeof g)[]).find((k) => g[k].length);
+  };
+
+  it('«Сегодня» — только сегодняшнее; вчерашнее — «Просрочено», завтрашнее срочное — «Запланировано»', () => {
+    expect(where({ ...base, on_date: '2026-10-31' })).toBe('today');
+    expect(where({ ...base, on_date: '2026-10-30', text: 'мазь', route: 'наружно' })).toBe('overdue');
+    expect(where({ ...base, on_date: '2026-11-01', urgent: true })).toBe('planned');
+  });
+
+  it('событие ко времени через сутки без отметки уходит в «Закрытые»; до суток — «Просрочено»', () => {
+    const diag = { ...base, urgent: true, on_date: '2026-10-30', at_time: '11:00', text: 'приезжает диагностика' };
+    expect(where(diag)).toBe('closed');
+    expect(where({ ...diag, at_time: '15:00' })).toBe('overdue');
+  });
+
+  it('лечение (способ, доза или фото) само не закрывается никогда', () => {
+    const old = { ...base, on_date: '2026-10-20', at_time: '07:00' };
+    expect(where({ ...old, needs_photo: true })).toBe('overdue');
+    expect(where({ ...old, dose: '2 таблетки' })).toBe('overdue');
+    expect(where({ ...old, route: 'в глаз' })).toBe('overdue');
   });
 });

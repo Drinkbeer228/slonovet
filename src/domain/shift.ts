@@ -132,6 +132,8 @@ export function requestTodos(requests: VetRequest[], marks: RequestMark[], shift
   const day = today > shift.date ? today : shift.date;
   return requests
     .filter((r) => r.status === 'active' && (!r.due_date || r.due_date >= shift.date) && (!r.on_date || r.on_date <= day || r.urgent))
+    // прошедшее событие («приезжала диагностика») смену не загромождает
+    .filter((r) => !eventExpired(r, marks, new Date(Math.min(Date.now(), Date.parse(`${day}T23:59:59`)))))
     .map((req) => {
       const allMarks = marks.filter((m) => m.request_id === req.id);
       const here = allMarks.filter((m) => m.shift_id === shift.id);
@@ -168,6 +170,21 @@ export const byPriority = (a: VetRequest, b: VetRequest) =>
  * Разовая задача на день просрочена: день прошёл, а отметки нет, или сегодня — и время уже наступило.
  * Без даты — не бывает просроченной (у регулярных есть только «до какого дня»).
  */
+/**
+ * Событие ко времени — разовая задача с часом, но без способа, дозы и фото: «в 11:00 приезжает диагностика, быть всем».
+ * Всё остальное (лекарство, процедура, «с фото») — лечение: само не закрывается никогда.
+ */
+export function isEvent(req: VetRequest): boolean {
+  return req.frequency === 'once' && Boolean(req.on_date && req.at_time) && !req.route && !req.dose && !req.needs_photo && !req.options?.includes('дал');
+}
+
+/** Событие прошло больше суток назад, а его никто не отметил: на доске — в «Закрытых» с подписью «прошло без отметки». */
+export function eventExpired(req: VetRequest, marks: RequestMark[], now = new Date()): boolean {
+  if (!isEvent(req) || req.status !== 'active' || closingMarks(marks, req).length) return false;
+  const at = new Date(`${req.on_date}T${req.at_time!.slice(0, 5)}:00`).getTime();
+  return now.getTime() > at + 24 * 60 * 60_000;
+}
+
 export function overdue(req: VetRequest, done: boolean, now = new Date()): boolean {
   if (done || req.frequency !== 'once' || !req.on_date) return false;
   const today = isoDate(now);

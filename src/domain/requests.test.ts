@@ -15,7 +15,7 @@ const mark = (request_id: string, shift_id: string): RequestMark => ({ id: `m-${
 const ids = (r: VetRequest[], m: RequestMark[], s: Shift) => requestTodos(r, m, s).map((t) => t.req.id);
 
 describe('разовая задача на конкретный день', () => {
-  const pills = req('pills', { on_date: '2026-10-26', at_time: '16:00' });
+  const pills = req('pills', { on_date: '2026-10-26', at_time: '16:00', route: 'в корм' }); // лечение: само не закрывается
 
   it('не видна раньше своего дня, видна в свой день', () => {
     expect(ids([pills], [], shift('2026-10-25'))).toEqual([]);
@@ -122,7 +122,7 @@ describe('этап A: «не получилось», срочное на зав�
     const failed = [noted('fix', 's-2026-10-26', 'не получилось — нет ключа')];
     expect(requestTodos([fix], failed, shift('2026-10-26'))[0].done).toBe(false);
     expect(ids([fix], failed, shift('2026-10-27'))).toEqual(['fix']);
-    expect(boardGroups([fix], [], failed, 'all', new Date(2026, 9, 27)).today.map((i) => i.kind === 'request' && i.req.id)).toEqual(['fix']);
+    expect(boardGroups([fix], [], failed, 'all', new Date(2026, 9, 27)).overdue.map((i) => i.kind === 'request' && i.req.id)).toEqual(['fix']);
     const ok = [...failed, noted('fix', 's-2026-10-27', 'сделано')];
     expect(boardGroups([fix], [], ok, 'all', new Date(2026, 9, 27)).closed).toHaveLength(1);
   });

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { logEvent } from '../../lib/log';
 import { ELEPHANTS } from '../../domain/elephants';
-import { FEED_TIMES, FREQ_LABEL, answerPresets, courseDay, courseStart, currentShift, describeRequest, markAnswer, perShift, onRestDay, overdue, requestProgress, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
+import { FEED_TIMES, FREQ_LABEL, answerPresets, courseDay, courseStart, currentShift, describeRequest, eventExpired, markAnswer, perShift, onRestDay, overdue, requestProgress, requestTodos, whenLabel, whoLabel, type RequestTodo } from '../../domain/shift';
 import { addMark, setPurchaseStatus } from '../../domain/actions';
 import { GROUPS, GROUP_TITLE, boardAttention, boardGroups, type BoardFilter, type BoardItem, type BoardType } from '../../domain/board';
 import type { CurrentUser, ElephantName, Purchase, RequestFrequency, RequestMark, Shift, VetRequest } from '../../domain/types';
@@ -90,7 +90,8 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
             key={g}
             id={g === 'today' ? 'requests-active' : undefined}
             title={
-              <span className="flex items-center gap-2">
+              // «Просрочено» — заголовок кораллом: прошлое, которое ждёт отметки или закрытия
+              <span className={`flex items-center gap-2 ${g === 'overdue' ? 'text-coral-fg' : ''}`}>
                 {GROUP_TITLE[g]}
                 <span className="rounded-full border border-edge-hi bg-surface2 px-2 py-0.5 text-[13px] font-bold text-ink2 shadow-[inset_0_1px_0_var(--color-hl)]">{list.length}</span>
               </span>
@@ -191,7 +192,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
   const shift = currentShift(shifts);
   const p = requestProgress(r, marks, shifts);
   const courseOver = r.frequency !== 'once' && Boolean(r.due_date && r.due_date < isoDate());
-  const closed = r.status === 'closed' || (r.frequency === 'once' && p.done > 0) || courseOver;
+  const closed = r.status === 'closed' || (r.frequency === 'once' && p.done > 0) || courseOver || eventExpired(r, marks);
   const late = !closed && overdue(r, p.done > 0);
   const talk = comments.filter((c) => c.request_id === r.id && !c.deleted).length;
   const fresh = unreadCount(comments, r.id, user.id, read[r.id]);
@@ -229,7 +230,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
         )}
         <span className="text-[13px] font-semibold text-muted">
           Поставил: {r.author_name}, {relDate(localDay(r.created_at))}
-          {r.frequency !== 'once' ? ` · ${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}` : !p.last ? ' · ждёт отметки' : ''}
+          {r.frequency !== 'once' ? ` · ${p.done} из ${p.total} ${p.total === 1 ? 'дежурства' : 'дежурств'}` : eventExpired(r, marks) ? ' · прошло без отметки' : !p.last ? ' · ждёт отметки' : ''}
           {todo && !todo.done && r.frequency !== 'once' ? ' · в этой смене не отмечено' : ''}
         </span>
         {assignee && (
