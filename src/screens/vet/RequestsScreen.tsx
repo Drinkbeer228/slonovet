@@ -17,6 +17,8 @@ import { ArriveSheet, NewPurchaseSheet, OrderSheet, PurchaseDetail, PurchaseRow 
 import { DiscussionThread } from '../Discussion';
 import { MarkLine, MarkSheet } from '../keeper/RequestsBlock';
 import { unreadCount, useReadMarks } from '../../lib/comments';
+import { isObserverMode } from '../../lib/auth';
+import { recordErsProgress } from '../../lib/ers';
 
 const VIEW_KEY = 'slonovet_requests_view';
 
@@ -61,7 +63,8 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
   const groups = boardGroups(requests, purchases, marks, view);
   const attention = boardAttention(requests, purchases, marks);
   const dots = { elephants: attention.elephants > 0, work: attention.work > 0, purchases: attention.purchases > 0 };
-  const buyer = canEdit('purchases', user.role);
+  const buyer = canEdit('purchases', user.role) && !isObserverMode();
+  const observer = isObserverMode();
   const arrive = (p: Purchase) => (p.item_id ? setArriving(p) : setPurchaseStatus(p, 'done', user).then(() => toast('Отмечено: привезли')));
   const empty = GROUPS.every((g) => groups[g].length === 0);
 
@@ -71,11 +74,13 @@ export function RequestsScreen({ user }: { user: CurrentUser }) {
         <h1 className="m-0 text-[26px] font-extrabold tracking-tight">Задачи</h1>
         {/* на «Закупках» — сразу форма закупки; иначе задача (на «Работе» — уже с адресатом «Работа»).
             На телефоне кнопка висит справа над нижней панелью — под большим пальцем; на широком экране — в шапке */}
-        <div className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 md:static">
-          <Button kind="accent" big icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : view === 'work' ? setCreating('work') : view === 'elephants' ? setCreating('Претти') : setPicking(true))}>
-            {view === 'purchases' ? 'Закупка' : 'Новая'}
-          </Button>
-        </div>
+        {!observer && (
+          <div className="fixed right-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 md:static">
+            <Button kind="accent" big icon="plus" onClick={() => (view === 'purchases' ? setBuying(true) : view === 'work' ? setCreating('work') : view === 'elephants' ? setCreating('Претти') : setPicking(true))}>
+              {view === 'purchases' ? 'Закупка' : 'Новая'}
+            </Button>
+          </div>
+        )}
       </header>
       <div>
         <Segmented label="Какие задачи" value={view} onChange={setView} options={FILTERS} dots={dots} />
@@ -249,7 +254,7 @@ function BoardRequest({ item, user, onOpen }: { item: Extract<BoardItem, { kind:
         )}
       </button>
       {p.last && <MarkLine m={p.last} req={r} user={user} shiftKeeper={shift?.keeper_id ?? null} withDay />}
-      {todo && !todo.done && shift && <QuickMark req={r} todo={todo} shift={shift} user={user} onPhoto={() => onOpen(r)} />}
+      {!isObserverMode() && todo && !todo.done && shift && <QuickMark req={r} todo={todo} shift={shift} user={user} onPhoto={() => onOpen(r)} />}
     </BoardCard>
   );
 }
@@ -304,7 +309,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
       onClose={onClose}
       title={whoLabel(req.elephant)}
       footer={
-        canCloseRequest(req, user) && (
+        !isObserverMode() && canCloseRequest(req, user) && (
           <div className="flex gap-2">
             {req.status === 'active' && req.elephant !== 'work' && (
               <Button full icon="edit" onClick={() => setEdit(true)}>
@@ -320,6 +325,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
                 full
                 onClick={async () => {
                   await put('requests', { ...req, status: 'active' });
+                  recordErsProgress(`vet-req-${req.id}`, 'shift', 'done');
                   onClose();
                 }}
               >
@@ -350,7 +356,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
             Изменено {stampOf(h.at)} ({h.by}). Было: {h.was}
           </span>
         ))}
-        {todo && !todo.done && (
+        {!isObserverMode() && todo && !todo.done && (
           <div className="flex flex-col gap-2">
             {req.needs_photo ? (
               <Button kind="primary" icon="camera" full onClick={() => setMarking(true)}>
@@ -410,6 +416,7 @@ function RequestDetail({ req, user, onClose }: { req: VetRequest | null; user: C
         okLabel={course ? 'Отменить курс' : 'Закрыть'}
         onOk={async () => {
           await put('requests', { ...req, status: 'closed' });
+          recordErsProgress(`vet-req-${req.id}`, 'shift', 'done');
           toast('Задача закрыта');
           onClose();
         }}
@@ -622,6 +629,7 @@ export function NewRequestSheet({
               // поле шлём, только если выбрали человека: старый сервер без колонки примет остальные задачи как раньше
               ...(assignee && who === 'work' ? { assignee_id: assignee } : {}),
             });
+            recordErsProgress(`vet-req-${id}`, 'shift', 'done');
             toast(editing ? 'Назначение изменено' : who === 'work' ? 'Задача поставлена' : 'Назначение добавлено');
             onSaved?.();
             onClose();

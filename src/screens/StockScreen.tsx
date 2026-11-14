@@ -562,7 +562,7 @@ function LedgerRow({ m, items }: { m: StockMove; items: StockItem[] }) {
   );
 }
 
-/** Поставка одной машиной: «15.10 10:00 · Соколов · 16 позиций», по тапу — что именно. */
+/** Поставка одной машиной: «15.10 10:00 · Кипер Поста №1 · 16 позиций», по тапу — что именно. */
 function DeliveryGroup({ g, items }: { g: { at: string; author: string; moves: StockMove[] }; items: StockItem[] }) {
   const [open, setOpen] = useState(false);
   const recount = g.moves.every((m) => m.counted != null);

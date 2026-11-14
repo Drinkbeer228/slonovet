@@ -1,14 +1,15 @@
 import { isStandalone } from './install';
 
 /**
- * Диагностика запуска — работает и до входа: короткая отметка уходит запросом на /diag и остаётся
- * в журнале запросов сервера (nginx). По ней видно, на каком шаге телефон застрял или упал.
- * Ничего личного: событие, короткий текст ошибки, версия, открыто ли с иконки.
+ * Диагностика запуска — отправляет маячок на /diag только если явно задан VITE_DIAG_ENABLED=true
+ * (например, за прокси-сервером nginx). На статическом хостинге (GitHub Pages / research-station)
+ * сетевые запросы к /diag отключены, чтобы не засорять консоль 404-ошибками.
  */
 let sent = 0;
 
 export function diag(event: string, detail = '') {
-  if (sent++ >= 20) return; // не засоряем журнал, если что-то сыплется в цикле
+  if (sent++ >= 20) return;
+  if (import.meta.env.VITE_DIAG_ENABLED !== 'true') return;
   try {
     const q = new URLSearchParams({ e: event, d: detail.slice(0, 300), b: __BUILD__, s: isStandalone() ? '1' : '0' });
     const url = `/diag?${q}`;

@@ -192,10 +192,10 @@ function AddSheet({ open, demo, roles, onClose }: { open: boolean; demo: boolean
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <Field label="Имя или фамилия">
-            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Соколов" />
+          <Field label="Имя или позывной">
+            <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Кипер Поста №1" />
           </Field>
-          <Field label="Логин" hint="латиницей, например sokolov">
+          <Field label="Логин" hint="латиницей, например keeper1">
             <input className={inputCls} value={login} onChange={(e) => setLogin(e.target.value)} autoCapitalize="none" autoCorrect="off" />
           </Field>
           <Field label="Пароль">

@@ -1,10 +1,7 @@
-# Сайт и API живы? Раз в час. Если нет — проверка падает, и GitHub присылает письмо о сбое владельцу репозитория
-# (Settings → Notifications → Actions: «Send notifications for failed workflows only»).
+# Проверка доступности публичной версии на GitHub Pages
 name: Доступность
 
 on:
-  schedule:
-    - cron: '17 * * * *' # каждый час в :17
   workflow_dispatch:
 
 permissions:
@@ -15,21 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-        with:
-          sparse-checkout: .env.production
-          sparse-checkout-cone-mode: false
-      - name: Сайт и API
+      - name: Проверка GitHub Pages
         run: |
-          # публичный ключ API — тот же, что в сборке сайта
-          key=$(grep '^VITE_SUPABASE_ANON_KEY=' .env.production | cut -d= -f2- | tr -d '"')
-          fail=0
-          check() {
-            code=$(curl -s -o /dev/null -w '%{http_code}' --retry 2 --retry-delay 20 --max-time 20 "$@")
-            echo "$code  $1"
-            [ "$code" = 200 ] || fail=1
-          }
-          check https://slonovet.ru/
-          check https://api.slonovet.ru/auth/v1/health -H "apikey: $key"
-          check "https://api.slonovet.ru/rest/v1/stock_items?select=id&limit=1" -H "apikey: $key"
-          if [ "$fail" = 1 ]; then echo "::error::СлоноВет не отвечает — проверьте сервер"; exit 1; fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' --retry 2 --retry-delay 10 --max-time 20 "https://drinkbeer228.github.io/slonovet/")
+          echo "$code  https://drinkbeer228.github.io/slonovet/"
+          [ "$code" = 200 ] || exit 1

@@ -1,9 +1,18 @@
-import { useSession } from '../lib/auth';
+import {
+  DEMO_PERSONAS,
+  type DemoPersona,
+  isObserverMode,
+  logout,
+  resetDemoData,
+  type Session,
+  switchDemoPersona,
+  useDemoPersona,
+  useSession,
+} from '../lib/auth';
 import { useMemo, useState } from 'react';
 import type { CurrentUser, Role } from '../domain/types';
 import { MANAGES, canEdit } from '../domain/access';
 import { boardAttention } from '../domain/board';
-import { logout, type Session } from '../lib/auth';
 import { clearRejected, syncNow, useSyncStatus } from '../lib/sync';
 import { isoDate, localDay, relDate, timeOf } from '../lib/dates';
 import { Button, Card, Chip, Confirm, KEY, Plate, Sheet, TONE, toast, GlowIcon } from '../ui/kit';
@@ -19,6 +28,7 @@ import { StopCard } from './common/StopCard';
 import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
 import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
+import { requestStationClose, useErsState } from '../lib/ers';
 
 export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move' | 'suppliers' | 'containers';
 
@@ -50,6 +60,84 @@ export function menuTabs(role: Role): Tab[] {
 }
 
 export const ROLE_LABEL: Record<Role, string> = { keeper: 'Кипер', vet: 'Ветврач', director: 'Директор', manager: 'Администратор', admin: 'Системный админ' };
+
+const PERSONA_ORDER: DemoPersona[] = ['keeper', 'vet', 'observer'];
+
+/**
+ * Плашка публичного демо-режима с переключателем ролей (Кипер / Ветеринар / Наблюдатель)
+ * и кнопкой «Сбросить демо-данные».
+ */
+export function DemoBanner() {
+  const persona = useDemoPersona();
+  const [resetting, setResetting] = useState(false);
+  const currentMeta = DEMO_PERSONAS[persona];
+
+  const handleReset = async () => {
+    if (resetting) return;
+    setResetting(true);
+    try {
+      await resetDemoData();
+      toast('Демо-данные сброшены к началу учебной смены');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  return (
+    <Plate glow={persona === 'observer' ? 'sky' : 'teal'} className="mb-4 flex flex-col gap-3 p-3.5" data-testid="demo-banner">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-teal/40 bg-teal/15 px-2.5 py-1 text-[12px] font-extrabold tracking-wide text-teal-fg uppercase">
+            Демо-режим
+          </span>
+          <span className="text-[13px] font-bold text-ink2">Полевой пост · учебная база</span>
+        </div>
+        <button
+          type="button"
+          disabled={resetting}
+          onClick={handleReset}
+          className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-[13px] font-bold text-ink2 hover:text-ink active:scale-95 disabled:opacity-50 ${KEY}`}
+        >
+          <Icon name="refresh" size={15} stroke={2.2} />
+          {resetting ? 'Сброс…' : 'Сбросить демо-данные'}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          role="group"
+          aria-label="Переключатель ролей"
+          className={`grid grid-cols-3 gap-1 rounded-2xl p-1 sm:w-auto sm:min-w-[340px] ${TONE.sunken}`}
+        >
+          {PERSONA_ORDER.map((p) => {
+            const active = persona === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  if (p !== persona) {
+                    haptics.tap();
+                    switchDemoPersona(p);
+                  }
+                }}
+                className={`h-9 rounded-xl px-3 text-[13px] font-extrabold transition-all active:scale-95 ${
+                  active ? `${KEY} text-teal-fg shadow-(--shadow-key-on)` : 'text-muted hover:text-ink'
+                }`}
+              >
+                {DEMO_PERSONAS[p].shortLabel}
+              </button>
+            );
+          })}
+        </div>
+        <span className="px-1 text-[12px] font-semibold leading-snug text-muted sm: flex-1 sm:text-right">
+          <strong className="text-ink2">{currentMeta.label}:</strong> {currentMeta.hint}
+        </span>
+      </div>
+    </Plate>
+  );
+}
 
 /** Плашка «Посмотреть как»: чья роль на экране и как вернуться к себе. */
 export function PreviewBanner({ role }: { role: Role }) {
@@ -93,7 +181,7 @@ export function SyncChip() {
     text = 'не принято';
     cls = 'text-coral-fg';
   } else if (s.state === 'demo') {
-    text = 'пример';
+    text = 'демо';
     icon = 'cloudOff';
   } else if (s.state === 'offline') {
     icon = 'cloudOff';
@@ -110,11 +198,11 @@ export function SyncChip() {
   }
   return (
     <>
-    <button type="button" onClick={() => setOpen(true)} className={`inline-flex h-11 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold ${KEY} ${cls}`}>
-      <Icon name={icon} size={15} stroke={2.2} />
-      {text}
-    </button>
-    <SyncSheet open={open} onClose={() => setOpen(false)} />
+      <button type="button" onClick={() => setOpen(true)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-[13px] font-bold ${KEY} ${cls}`}>
+        <Icon name={icon} size={15} stroke={2.2} />
+        {text}
+      </button>
+      <SyncSheet open={open} onClose={() => setOpen(false)} />
     </>
   );
 }
@@ -128,7 +216,9 @@ function SyncSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     <Sheet open={open} onClose={onClose} title="Связь">
       <div className="flex flex-col gap-4">
         {s.state === 'demo' ? (
-          <span className="text-[15px] font-semibold text-muted">Это пример без сервера: всё хранится только на этом телефоне.</span>
+          <span className="text-[15px] font-semibold text-muted">
+            Включён публичный демо-режим полевого поста: все записи хранятся локально в браузере, а обезличенный прогресс смены передаётся станции research-station.
+          </span>
         ) : (
           <span className="text-[15px] font-semibold text-muted">
             Связь с сервером: {when}. Всё внесённое сохранено на телефоне и уходит само, как появится интернет — подойдёт любой Wi‑Fi.
@@ -203,15 +293,28 @@ export function TopBar({
   onMenu: () => void;
 }) {
   const badges = useBadges(user);
+  const ers = useErsState();
+  const observer = isObserverMode();
+  const roleLabel = observer ? 'Наблюдатель' : ROLE_LABEL[user.role];
+
   return (
     // с иконки на iPhone страница идёт под чёлку и часы (viewport-fit=cover): шапка начинается строго под ними
     <header className="pt-safe sticky top-0 z-30 border-b border-edge bg-bg/85 backdrop-blur-xl">
-      <div className="px-safe mx-auto flex h-14 w-full max-w-6xl items-center gap-3">
+      <div className="px-safe mx-auto flex h-14 w-full max-w-6xl items-center gap-2.5">
+        {ers.embedded && (
+          <button
+            type="button"
+            onClick={requestStationClose}
+            className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[13px] font-extrabold text-teal-fg active:scale-95 ${KEY}`}
+          >
+            ← На станцию
+          </button>
+        )}
         {/* надписью, как на логотипе: «Вет» бирюзой; картинка — только на входе и на иконке приложения */}
         <span className="text-[19px] font-extrabold tracking-tight">
           Слоно<span className="text-teal-fg">Вет</span>
         </span>
-        <nav className="ml-4 hidden flex-1 items-center gap-1 md:flex" aria-label="Разделы">
+        <nav className="ml-3 hidden flex-1 items-center gap-1 md:flex" aria-label="Разделы">
           {tabs.map((t) => (
             <button
               key={t}
@@ -228,7 +331,7 @@ export function TopBar({
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden flex-col items-end leading-tight md:flex">
             <span className="text-[14px] font-bold">{user.full_name}</span>
-            <span className="rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{ROLE_LABEL[user.role]}</span>
+            <span className="rounded-md bg-surface2 px-1.5 py-px text-[11px] font-bold text-muted">{roleLabel}</span>
           </span>
           <SyncChip />
           <button
@@ -340,17 +443,40 @@ export function MenuSheet({
   const { installed } = useInstall();
   const extra = menuTabs(role);
   const preview = usePreviewRole();
+  const persona = useDemoPersona();
+  const observer = isObserverMode();
+
   return (
     <Sheet open={open} onClose={onClose} title={session.user.full_name}>
       <div className="flex flex-col gap-4">
         <span className="px-1 text-[14px] font-bold text-muted">
-          {ROLE_LABEL[session.user.role]}
-          {session.mode === 'demo' ? ' · пример без сервера' : ` · ${session.user.login}`}
+          {observer ? 'Наблюдатель / Стажёр' : ROLE_LABEL[session.user.role]}
+          {session.mode === 'demo' ? ' · публичный демо-режим' : ` · ${session.user.login}`}
         </span>
         <StopCard user={{ ...session.user, role }} />
 
+        {session.mode === 'demo' && (
+          <Card className="flex flex-col gap-2.5 p-4">
+            <span className="text-[15px] font-bold">Сценарий демонстрации</span>
+            <div className="flex flex-wrap gap-2">
+              {PERSONA_ORDER.map((p) => (
+                <Chip
+                  key={p}
+                  on={persona === p}
+                  onClick={() => {
+                    switchDemoPersona(p);
+                    onClose();
+                  }}
+                >
+                  {DEMO_PERSONAS[p].label}
+                </Chip>
+              ))}
+            </div>
+            <span className="text-[12px] font-semibold text-muted">{DEMO_PERSONAS[persona].hint}</span>
+          </Card>
+        )}
 
-        {session.user.role === 'admin' && (
+        {session.user.role === 'admin' && session.mode === 'cloud' && (
           // админу: посмотреть приложение глазами другой роли, не выходя из своего входа
           <Card className="flex flex-col gap-2 p-4">
             <span className="text-[15px] font-bold">Посмотреть как</span>
@@ -372,7 +498,6 @@ export function MenuSheet({
             <span className="text-[12px] font-semibold text-muted">Настоящие данные, только просмотр — изменения не сохраняются.</span>
           </Card>
         )}
-
 
         <ThemeCard />
         <PushRow role={role} />
@@ -410,6 +535,20 @@ export function MenuSheet({
           </Button>
         )}
 
+        {session.mode === 'demo' && (
+          <Button
+            icon="refresh"
+            full
+            onClick={async () => {
+              await resetDemoData();
+              toast('Демо-данные сброшены к началу учебной смены');
+              onClose();
+            }}
+          >
+            Сбросить демо-данные
+          </Button>
+        )}
+
         <Button
           kind="danger"
           icon="logout"
@@ -424,7 +563,7 @@ export function MenuSheet({
             await logout();
           }}
         >
-          Выйти
+          {session.mode === 'demo' ? 'К экрану входа / серверу' : 'Выйти'}
         </Button>
         <Confirm
           open={confirmLogout}

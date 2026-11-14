@@ -4,6 +4,7 @@ import { savePhoto } from '../lib/photos';
 import { logEvent } from '../lib/log';
 import { reportLowStock } from '../lib/push';
 import { isoDate } from '../lib/dates';
+import { recordErsProgress } from '../lib/ers';
 import { newShift } from './shift';
 import { canTakeShift } from './access';
 import { balances, feedUsage, isBeforeCount, toStockUnits, weighedItem } from './stock';
@@ -29,6 +30,7 @@ export async function acceptShift(user: CurrentUser, safety: Record<string, bool
   // (иначе вторая при отправке затёрла бы отметки первой)
   const id = `${date}-${newId().replace(/-/g, '').slice(0, 8)}`;
   await put('shifts', { ...newShift(user, safety, date, from), id });
+  recordErsProgress(`shift-${date}`, 'shift', 'done');
 }
 
 /**
@@ -55,6 +57,7 @@ export async function rolloverShift(shift: Shift, user: CurrentUser) {
   logEvent('shift.rollover', { shift: shift.id });
   await updateShift(shift, (s) => closeOwn(s, 'rollover', user.id));
   await acceptShift(user, shift.safety ?? {}, { id: shift.id, remarks: '' });
+  recordErsProgress(`shift-${shift.date}`, 'shift', 'done');
 }
 
 /**
@@ -72,6 +75,7 @@ export async function offerHandover(shift: Shift, note: string, toId: string) {
     s.handover_to = toId;
     s.checked_at = new Date().toISOString();
   });
+  recordErsProgress(`shift-${shift.date}`, 'shift', 'done');
 }
 
 /** Передумал передавать, пока сменщик не принял: дежурство и так за тобой. */
@@ -89,6 +93,7 @@ export async function setCell(shift: Shift, el: ElephantName, m: MetricKey, leve
     if (level === null) delete s.state[el]![m];
     else s.state[el]![m] = { level, symptoms: level > 0 ? (s.state[el]![m]?.symptoms ?? []) : [] };
   });
+  if (level !== null) recordErsProgress(`shift-${shift.date}`, 'shift', 'done');
 }
 
 /** «Всё так же, как в прошлую смену»: уровень и признаки разом. */
@@ -98,6 +103,7 @@ export async function repeatCell(shift: Shift, el: ElephantName, m: MetricKey, l
     s.state[el] = s.state[el] ?? {};
     s.state[el]![m] = { level, symptoms: [...symptoms] };
   });
+  recordErsProgress(`shift-${shift.date}`, 'shift', 'done');
 }
 
 export async function toggleSymptom(shift: Shift, el: ElephantName, m: MetricKey, symptom: string) {
@@ -118,6 +124,7 @@ export async function fillNorm(shift: Shift, els: ElephantName[], metrics: Metri
       for (const m of metrics) if (!s.state[el]![m]) s.state[el]![m] = { level: 0 };
     }
   });
+  recordErsProgress(`shift-${shift.date}`, 'shift', 'done');
 }
 
 /** Кормление в сутках: дата смены и час. Две смены одного дня (приём без сдачи офлайн) списывают одно кормление один раз. */
@@ -188,6 +195,7 @@ export async function setFeedDone(shift: Shift, time: string, done: boolean, use
     const id = `feed:${feedSlot(shift, time)}:${item}`;
     await putKeyedMove({ id, item_id: item, delta: -qty, reason: 'feed', shift_id: shift.id, author_name: user.full_name, deleted: false });
   }
+  recordErsProgress(`shift-${shift.date}`, 'shift', 'done');
   void reportLowStock(); // что-то стало «заканчивается» — закупщикам уйдёт уведомление
 }
 
@@ -262,6 +270,7 @@ export async function addMark(requestId: string, shift: Shift, user: CurrentUser
     note,
     photo_path,
   });
+  recordErsProgress(`vet-check-${requestId}`, 'shift', 'done');
 }
 
 export async function addComment(requestId: string, user: CurrentUser, text: string) {
@@ -299,6 +308,7 @@ export async function addNote(input: {
     created_at: new Date().toISOString(),
   };
   await put('notes', note);
+  recordErsProgress(input.kind === 'procedure' ? `vet-proc-${input.shift_id}` : `shift-${input.shift_id}`, 'shift', 'done');
 }
 
 /** Движение фуража. id — постоянный, если одно и то же действие могут повторить (приход по закупке): тогда без задвоения. */
@@ -366,4 +376,5 @@ export async function arrivePurchase(p: Purchase, item: StockItem | undefined, n
 export async function addNoteComment(noteId: string, user: CurrentUser, kind: NoteCommentKind, text = '') {
   logEvent('note.reply', { note: noteId, kind });
   await put('note_comments', { id: newId(), note_id: noteId, author_id: user.id, author_name: user.full_name, kind, text: text.trim(), created_at: new Date().toISOString() });
+  recordErsProgress(`vet-reply-${noteId}`, 'shift', 'done');
 }

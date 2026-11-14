@@ -3,52 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>СлоноВет</title>
-    <meta name="description" content="Суточное дежурство киперов и заявки ветврача: Претти, Марго, Одри." />
+    <title>СлоноВет — Полевой пост</title>
+    <meta name="description" content="Полевой пост ежедневного мониторинга, сменных журналов и ветеринарного контроля слонов (экосистема research-station)." />
+    <meta property="og:title" content="СлоноВет — Полевой пост" />
+    <meta property="og:description" content="Полевой пост ежедневного мониторинга, сменных журналов и ветеринарного контроля слонов (экосистема research-station)." />
     <meta name="theme-color" content="#0b1217" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="СлоноВет" />
-    <link rel="icon" type="image/png" href="/icon-64.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="icon-64.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   </head>
   <body>
     <div id="root"></div>
     <script>
-      // диагностика запуска до загрузки приложения: ошибки и «страница открылась» — отметкой в журнале сервера (/diag)
+      // Автовосстановление кэша при обновлении сборки (корректно работает и в подпапке /slonovet/)
       (function () {
-        var n = 0;
-        function d(e, m) {
-          if (n++ > 10) return;
-          try {
-            var s = navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) ? 1 : 0;
-            navigator.sendBeacon && navigator.sendBeacon('/diag?e=' + e + '&s=' + s + '&d=' + encodeURIComponent(String(m || '').slice(0, 300)));
-          } catch (x) {}
-        }
-        addEventListener('error', function (e) { d('early-error', e.message + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno); });
-        // файл приложения не загрузился (страница из памяти ссылается на старую сборку) — без этого чёрный экран.
-        // Один раз за запуск: забываем сохранённую страницу и берём свежую с сервера
-        function heal(why) {
-          d('heal', why);
+        function heal() {
           try { if (sessionStorage.getItem('heal')) return showRestart(); sessionStorage.setItem('heal', '1'); } catch (x) {}
-          var done = function () { location.replace('/?r=' + Date.now()); };
+          var done = function () { location.replace(location.pathname + '?r=' + Date.now()); };
           try { caches.delete('pages').then(done, done); } catch (x) { done(); }
         }
         addEventListener('error', function (e) {
           var t = e.target;
-          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) heal('asset ' + String(t.src || t.href || '').split('/').pop());
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) heal();
         }, true);
-        // через 10 с пусто — не молчим чёрным экраном: кнопка, которая сбрасывает сохранённое и открывает заново
         function showRestart() {
           var r = document.getElementById('root');
           if (!r || r.childNodes.length) return;
-          d('blank');
           r.innerHTML = '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;font:600 16px system-ui,sans-serif;color:#cfe3ea">' +
-            '<div>СлоноВет не открылся</div><div style="font-size:14px;color:#8aa3ad">Записи на телефоне не пропали.</div>' +
+            '<div>СлоноВет не открылся</div><div style="font-size:14px;color:#8aa3ad">Локальные записи сохранены.</div>' +
             '<button id="restart" style="height:48px;padding:0 24px;border:0;border-radius:16px;background:#2dd4bf;color:#0b1217;font:800 16px system-ui,sans-serif">Перезапустить</button></div>';
           document.getElementById('restart').onclick = function () {
-            var go = function () { try { sessionStorage.removeItem('heal'); } catch (x) {} location.replace('/?r=' + Date.now()); };
+            var go = function () { try { sessionStorage.removeItem('heal'); } catch (x) {} location.replace(location.pathname + '?r=' + Date.now()); };
             try {
               Promise.all([
                 caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }),
@@ -58,8 +46,6 @@
           };
         }
         setTimeout(showRestart, 10000);
-        addEventListener('unhandledrejection', function (e) { d('early-rejection', (e.reason && e.reason.message) || e.reason); });
-        d('html');
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>

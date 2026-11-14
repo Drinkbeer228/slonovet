@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { refreshCurrentUser, resumeSession, useSession } from './lib/auth';
+import { ensurePublicDemoSession, isObserverMode, refreshCurrentUser, resumeSession, useDemoPersona, useSession } from './lib/auth';
+import { initErsBridge, useErsState } from './lib/ers';
 import { initStore, setWriteBlock, useRows } from './lib/store';
 import { Toaster, toast } from './ui/kit';
 import { Login } from './screens/Login';
 import { InstallBanner, InstallSheet } from './screens/InstallHint';
-import { BottomNav, MenuSheet, PreviewBanner, TABS, TopBar, menuTabs, type Tab } from './screens/Shell';
+import { BottomNav, DemoBanner, MenuSheet, PreviewBanner, TABS, TopBar, menuTabs, type Tab } from './screens/Shell';
 import { getPreviewRole, usePreviewRole } from './lib/preview';
 import { ShiftScreen } from './screens/keeper/ShiftScreen';
 import { DietScreen } from './screens/DietScreen';
@@ -29,6 +30,7 @@ export default function App() {
   const session = useSession();
 
   useEffect(() => {
+    initErsBridge();
     let stage = 'store';
     // данные с телефона не открылись за 8 с — сказать об этом и дать продолжить, а не висеть на «Загрузке»
     const timer = setTimeout(() => {
@@ -40,6 +42,7 @@ export default function App() {
         await initStore();
         stage = 'session';
         await resumeSession();
+        await ensurePublicDemoSession();
         diag('ready');
       } catch (e) {
         diag('init-error', `${stage}: ${e instanceof Error ? e.message : String(e)}`);
@@ -73,13 +76,17 @@ export default function App() {
   return (
     <>
       <Toaster />
-      {session ? <Main key={session.user.id} /> : <Login />}
+      {session ? <Main key={session.mode} /> : <Login />}
     </>
   );
 }
 
-// «Посмотреть как…»: пока админ смотрит глазами другой роли, в базу ничего не пишем
+// «Посмотреть как…» или роль «Наблюдатель / Стажёр»: только просмотр, критические изменения блокируются
 setWriteBlock(() => {
+  if (isObserverMode()) {
+    toast('Режим наблюдателя — редактирование смен и назначений отключено', 'error');
+    return true;
+  }
   if (!getPreviewRole()) return false;
   toast('Режим просмотра — изменения не сохраняются', 'error');
   return true;
@@ -88,26 +95,30 @@ setWriteBlock(() => {
 function Main() {
   const session = useSession()!;
   const previewRole = usePreviewRole();
+  const demoPersona = useDemoPersona();
+  const ers = useErsState();
   // админ может посмотреть приложение глазами другой роли; всё остальное считается от неё
   const user = previewRole && session.user.role === 'admin' ? { ...session.user, role: previewRole } : session.user;
   const profiles = useRows('profiles');
   const tabs = TABS;
   const allowed = [...tabs, ...menuTabs(user.role)];
   const [tab, setTabState] = useState<Tab>(() => {
-    // открыли из уведомления: /?tab=stock — нужный раздел
-    const fromLink = new URLSearchParams(location.search).get('tab') as Tab | null;
+    // открыли из уведомления: /?tab=stock — нужный раздел (сохраняя ?embedded=1, если он есть)
+    const params = new URLSearchParams(location.search);
+    const fromLink = params.get('tab') as Tab | null;
     if (fromLink && allowed.includes(fromLink)) {
-      history.replaceState(null, '', location.pathname);
+      params.delete('tab');
+      const qs = params.toString();
+      history.replaceState(null, '', qs ? `${location.pathname}?${qs}` : location.pathname);
       return fromLink;
     }
-    // врач приходит смотреть слонов: всегда начинает с «Журнала» (там «Новое» и «По слонам»)
-    if (user.role === 'vet') return 'journal';
     try {
       const saved = localStorage.getItem(TAB_KEY) as Tab | null;
       if (saved && allowed.includes(saved)) return saved;
     } catch {
       /* ignore */
     }
+    if (user.role === 'vet') return 'journal';
     return tabs[0];
   });
   const [menu, setMenu] = useState(false);
@@ -130,9 +141,10 @@ function Main() {
   const current = allowed.includes(tab) ? tab : tabs[0];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" data-persona={session.mode === 'demo' ? demoPersona : undefined}>
       <TopBar user={user} tabs={tabs} tab={current} onTab={setTab} onMenu={() => setMenu(true)} />
-      <main className="mx-auto w-full max-w-6xl px-4 pb-32 pt-5 md:pb-16">
+      <main className={`mx-auto w-full max-w-6xl px-4 ${ers.embedded ? 'pb-28 pt-3 md:pb-12' : 'pb-32 pt-4 md:pb-16'}`}>
+        {session.mode === 'demo' && <DemoBanner />}
         {session.mode === 'cloud' && !previewRole && <InstallBanner />}
         {previewRole && <PreviewBanner role={previewRole} />}
         <div className={current === 'shift' ? '' : 'mx-auto max-w-2xl'}>
@@ -152,7 +164,7 @@ function Main() {
       <BottomNav user={user} tabs={tabs} tab={current} onTab={setTab} />
       <InstallSheet />
       <MenuSheet open={menu} onClose={() => setMenu(false)} session={session} role={user.role} onTab={setTab} />
-      {import.meta.env.DEV && <DevRoleSwitcher />}
+      {import.meta.env.DEV && session.mode === 'cloud' && <DevRoleSwitcher />}
     </div>
   );
 }

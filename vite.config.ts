@@ -4,10 +4,10 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  // дата сборки — видна в меню, чтобы понять, свежая ли версия на телефоне
+  // дата сборки — видна в меню, чтобы понять, свежая ли версия на устройстве
   define: { __BUILD__: JSON.stringify(new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) },
-  // сайт в корне домена slonovet.ru; BASE_PATH — если когда-нибудь снова понадобится подпапка
-  base: process.env.BASE_PATH ?? '/',
+  // поддержка публикации как в подпапке GitHub Pages (/slonovet/), так и в корне
+  base: process.env.BASE_PATH ?? './',
   plugins: [
     react(),
     tailwindcss(),
@@ -17,14 +17,11 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['icon-64.png', 'apple-touch-icon.png', 'logo.webp'],
       workbox: {
-        // запросы к Supabase не кэшируем — данные и так хранятся в IndexedDB.
-        // Сама страница — сначала из сети: онлайн всегда свежая версия, сразу при открытии.
-        // Из памяти телефона — только если сети нет или она молчит дольше 4 с (манеж, «белые списки»).
         navigateFallback: null,
         runtimeCaching: [
-          // файлы сборки (имя с хешем, не меняются): страница из памяти найдёт свои, даже если сборка уже новая
+          // файлы сборки (имя с хешем, не меняются): работа как в корне (/assets/), так и в /slonovet/assets/
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
+            urlPattern: ({ url }) => url.pathname.includes('/assets/'),
             handler: 'CacheFirst',
             options: { cacheName: 'assets', expiration: { maxEntries: 80, maxAgeSeconds: 30 * 24 * 60 * 60 } },
           },
@@ -34,28 +31,22 @@ export default defineConfig({
             options: {
               cacheName: 'pages',
               networkTimeoutSeconds: 4,
-              // /?tab=… из уведомления — та же страница
               matchOptions: { ignoreSearch: true },
             },
           },
         ],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // страница не лежит в предзагрузке: иначе «/» отдаётся из неё раньше, чем дойдёт до «сначала из сети».
-        // Для работы без связи её сохраняет кэш pages при каждом открытии онлайн
         globIgnores: ['**/index.html'],
-        // push-уведомления: показ и открытие нужного раздела (public/push-sw.js)
         importScripts: ['push-sw.js'],
-        // новая версия сразу берёт открытые страницы и приложение перезагружается само; без этого телефон
-        // днями показывал старое (на iPhone с экрана «Домой» — пока не закроешь полностью)
         clientsClaim: true,
         skipWaiting: true,
       },
       manifest: {
         id: 'slonovet',
-        name: 'СлоноВет',
+        name: 'СлоноВет — Полевой пост',
         short_name: 'СлоноВет',
         lang: 'ru',
-        description: 'Суточное дежурство киперов и заявки ветврача',
+        description: 'Полевой пост ежедневного мониторинга, сменных журналов и ветеринарного контроля слонов',
         theme_color: '#0b1217',
         background_color: '#0b1217',
         display: 'standalone',
@@ -70,13 +61,11 @@ export default defineConfig({
     }),
   ],
   server: {
-    // временная ссылка для телефона: ssh -R 80:127.0.0.1:3000 nokey@localhost.run
-    // (cloudflared tunnel --url http://localhost:3000 — запасной вариант, из России работает с перебоями)
+    port: 3000,
     allowedHosts: ['.lhr.life', '.trycloudflare.com'],
     hmr: process.env.DISABLE_HMR !== 'true',
     watch: process.env.DISABLE_HMR === 'true' ? null : {},
   },
-  // готовая сборка для телефона через туннель: npm run build && npm run preview
   preview: {
     port: 4173,
     allowedHosts: ['.lhr.life', '.trycloudflare.com'],

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { loginCloud, loginDemo } from '../lib/auth';
+import { DEMO_PERSONAS, type DemoPersona, loginCloud, loginDemoPersona } from '../lib/auth';
 import { getServerConfig, isServerFromEnv, saveServerConfig } from '../lib/config';
 import { resetClient } from '../lib/supabase';
-import { Button, Card, Field, inputCls } from '../ui/kit';
+import { Button, Card, Field, Plate, inputCls } from '../ui/kit';
 import { Icon } from '../ui/Icon';
 
 const LAST_LOGIN = 'slonovet_last_login';
@@ -20,17 +20,18 @@ const readLastLogin = () => {
  */
 const LOGIN_TIMEOUT = 45_000;
 
+const PERSONA_LIST: DemoPersona[] = ['keeper', 'vet', 'observer'];
+
 export function Login() {
   const [cfg, setCfg] = useState(getServerConfig());
   const [login, setLogin] = useState(readLastLogin);
   const [show, setShow] = useState(false);
   const [caps, setCaps] = useState(false);
   const [forgot, setForgot] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [serverOpen, setServerOpen] = useState(!cfg);
+  const [serverOpen, setServerOpen] = useState(false);
   const [url, setUrl] = useState(cfg?.url ?? '');
   const [key, setKey] = useState(cfg?.key ?? '');
 
@@ -56,12 +57,27 @@ export function Login() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-8 px-4 py-10">
+    <div className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-6 px-4 py-10">
       <div className="flex flex-col items-center gap-3">
-        {/* логотип с надписью; заголовок — для читалок экрана */}
-        <img src={`${import.meta.env.BASE_URL}logo.webp`} alt="" width={220} height={220} className="h-[220px] w-[220px] rounded-[48px] shadow-(--shadow-plate)" />
-        <h1 className="sr-only">СлоноВет</h1>
+        <img src={`${import.meta.env.BASE_URL}logo.webp`} alt="" width={180} height={180} className="h-[180px] w-[180px] rounded-[40px] shadow-(--shadow-plate)" />
+        <h1 className="sr-only">СлоноВет — Полевой пост</h1>
       </div>
+
+      <Plate glow="teal" className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-[16px] font-extrabold text-teal-fg">Демо-режим полевого поста</span>
+          <span className="text-[13px] font-semibold leading-snug text-muted">
+            Открыть учебную базу мониторинга слонов без подключения к серверу (готовая смена, рацион и ветеринарный контроль):
+          </span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {PERSONA_LIST.map((p) => (
+            <Button key={p} kind={p === 'keeper' ? 'accent' : 'ghost'} full onClick={() => loginDemoPersona(p)}>
+              Войти как: {DEMO_PERSONAS[p].label}
+            </Button>
+          ))}
+        </div>
+      </Plate>
 
       {cfg && (
         <form onSubmit={submit} className="flex flex-col gap-4">
@@ -130,7 +146,7 @@ export function Login() {
       {!isServerFromEnv() && (
         <Card className="flex flex-col gap-3 p-4">
           <button type="button" className="min-h-11 text-left text-[15px] font-bold" onClick={() => setServerOpen(!serverOpen)} aria-expanded={serverOpen}>
-            {cfg ? 'Сервер подключён · изменить' : 'Подключить сервер Supabase'}
+            {cfg ? 'Сервер подключён · изменить' : 'Подключить рабочий сервер Supabase'}
           </button>
           {serverOpen && (
             <form
@@ -157,23 +173,6 @@ export function Login() {
           )}
         </Card>
       )}
-
-      {/* пример — только при разработке; на сайте входа без логина нет */}
-      {import.meta.env.DEV && (showDemo ? (
-        <div className="flex flex-col gap-2">
-          <span className="px-1 text-center text-[13px] font-bold text-muted">Пример на выдуманных данных — ничего не сохраняется на сервер</span>
-          <div className="grid grid-cols-2 gap-2">
-            <Button onClick={() => loginDemo('keeper', 'Соколов')}>Кипер</Button>
-            <Button onClick={() => loginDemo('vet', 'Иванова')}>Врач</Button>
-            <Button onClick={() => loginDemo('director', 'Директор')}>Директор</Button>
-            <Button onClick={() => loginDemo('admin', 'Администратор')}>Админ</Button>
-          </div>
-        </div>
-      ) : (
-        <button type="button" onClick={() => setShowDemo(true)} className="mx-auto h-11 px-3 text-[13px] font-bold text-faint underline">
-          Посмотреть пример без входа
-        </button>
-      ))}
     </div>
   );
 }

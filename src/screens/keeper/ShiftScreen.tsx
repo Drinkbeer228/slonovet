@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { offerHandover, rolloverShift, updateShift } from '../../domain/actions';
 import { currentShift, dutyTodos, lastHanded, needsRollover, newShift, shiftFlags } from '../../domain/shift';
 import type { CurrentUser, Shift } from '../../domain/types';
+import { isObserverMode } from '../../lib/auth';
 import { useRows } from '../../lib/store';
 import { setPreviewSample, usePreviewRole, usePreviewSample } from '../../lib/preview';
 import { isoDate, localDay, relDate, timeOf } from '../../lib/dates';
@@ -21,17 +22,18 @@ import { StateMatrix } from './StateMatrix';
 import { ShiftSummaryCard } from './ShiftSummaryCard';
 
 /** Ведут дежурство только киперы (domain/access.ts). Остальные смотрят его как есть; назначения и лечение отмечают все. */
-const canWork = (u: CurrentUser) => canWorkShift(u.role);
+const canWork = (u: CurrentUser) => canWorkShift(u.role) && !isObserverMode();
 
 export function ShiftScreen({ user }: { user: CurrentUser }) {
   const shifts = useRows('shifts');
   const shift = currentShift(shifts);
   const [accepting, setAccepting] = useState(false);
+  const observer = isObserverMode();
   // «Посмотреть как»: принять нельзя (ничего не сохраняется) — показываем пример открытого дежурства в памяти
   const preview = usePreviewRole();
   const sample = usePreviewSample();
   // дежурный — один: свою смену ведёшь, чужую только смотришь (назначения не киперам — как раньше)
-  if (shift) return <OpenShift shift={shift} user={user} readOnly={shift.keeper_id !== user.id} />;
+  if (shift) return <OpenShift shift={shift} user={user} readOnly={observer || shift.keeper_id !== user.id} />;
   if (sample && preview) {
     return (
       <div className="flex flex-col gap-4">
@@ -48,7 +50,7 @@ export function ShiftScreen({ user }: { user: CurrentUser }) {
 
   const last = lastHanded(shifts);
   // никто не дежурит (самое начало или старые сданные смены): только «Принять дежурство»
-  const accept = canTakeShift(user.role) && (
+  const accept = !observer && canTakeShift(user.role) && (
     <>
       <div>
         <Button kind="accent" big full icon="shield" onClick={() => setAccepting(true)}>
@@ -85,22 +87,30 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const handed = shift.status !== 'open';
-  // назначения и записи о лечении — не только кипер: директор сам обработал Претти — отмечает, врач видит
+  const observer = isObserverMode();
+  // назначения и записи о лечении — не только кипер: директор сам обработал Претти — отмечает, врач видит (но наблюдатель только смотрит)
   const keeper = canWorkShift(user.role);
-  const canMark = !readOnly || !keeper;
+  const canMark = !observer && (!readOnly || !keeper);
   const stale = needsRollover(shift); // вторые сутки: 24 часа от приёма
-  const mine = shift.keeper_id === user.id && !readOnly;
+  const mine = shift.keeper_id === user.id && !readOnly && !observer;
   // никто не дежурит: только приём; что было в прошлую смену — в шторке приёма и в «Журнале» по дате, здесь не повторяем
   const folded = Boolean(accept);
   // директор отмечает назначения и без приёма смены — у него они наверху, а не в свёрнутом
-  const tasksUp = Boolean(accept) && !keeper;
+  const tasksUp = Boolean(accept) && !keeper && !observer;
   return (
     <div className="flex flex-col gap-6">
       {/* кто дежурит — одной строкой; тап — сводка и действия (передать, отменить, стать дежурным) */}
       {!accept && (
         <div className="flex flex-col gap-1.5">
           <DutyBar shift={shift} from={from} user={user} stale={stale} onHandover={() => setHandoverOpen(true)} />
-          {readOnly && !keeper && <span className="px-1 text-[13px] font-semibold text-muted">Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты</span>}
+          {observer && (
+            <span className="px-1 text-[13px] font-semibold text-muted">
+              Режим наблюдателя (стажёра): просмотр сменных сводок и протоколов без права редактирования назначений.
+            </span>
+          )}
+          {!observer && readOnly && !keeper && (
+            <span className="px-1 text-[13px] font-semibold text-muted">Отмечает дежурный кипер. Назначения и записи о лечении — можешь и ты</span>
+          )}
         </div>
       )}
 
@@ -132,7 +142,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
       )}
 
       {/* тебе передают — единственное, что требует действия: крупно и на виду */}
-      {!accept && shift.handover_to === user.id && !mine && <HandoverInvite shift={shift} user={user} />}
+      {!accept && shift.handover_to === user.id && !mine && !observer && <HandoverInvite shift={shift} user={user} />}
 
       {!folded && (
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
@@ -157,7 +167,7 @@ function OpenShift({ shift, user, readOnly, accept }: { shift: Shift; user: Curr
               id="sec-notes"
               title={notes.length ? `Записи · ${notes.length}` : 'Записи'}
               aside={
-                !folded && (!handed || !keeper) && (mine || !keeper) ? (
+                !observer && !folded && (!handed || !keeper) && (mine || !keeper) ? (
                   <button
                     type="button"
                     onClick={() => setNoteDraft({ elephant: 'Претти', metric: null, kind: keeper ? 'observation' : 'procedure' })}

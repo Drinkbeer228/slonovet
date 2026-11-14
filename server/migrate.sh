@@ -9,7 +9,7 @@
 # Другой контейнер базы (проверка на временной копии): SLONOVET_DB=имя — копию рабочей базы тогда не делаем.
 set -eu
 cd "$(dirname "$0")/.."
-SSH=${SLONOVET_SSH:-"ssh -i $HOME/.ssh/slonovet_beget -o ConnectTimeout=15 root@159.194.208.29"}
+SSH=${SLONOVET_SSH:-"ssh -o ConnectTimeout=15 root@example.invalid"}
 DB=${SLONOVET_DB:-supabase-db}
 DIR=supabase/migrations
 CMD=${1:-status}

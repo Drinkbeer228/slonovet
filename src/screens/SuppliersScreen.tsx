@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { logEvent } from '../lib/log';
+import { isObserverMode } from '../lib/auth';
 import { QUALITY, SUPPLIES, findSuppliers, supplierCities } from '../domain/suppliers';
 import { currentStop } from '../domain/stops';
 import type { CurrentUser, Supplier } from '../domain/types';
@@ -21,7 +22,7 @@ export function SuppliersScreen({ user }: { user: CurrentUser }) {
   const [query, setQuery] = useState('');
   const [city, setCity] = useState<string | null>(null);
   const [edit, setEdit] = useState<Draft | null>(null);
-  const canWrite = user.role !== 'vet';
+  const canWrite = user.role !== 'vet' && !isObserverMode();
   const cities = supplierCities(list, here);
   const found = findSuppliers(list, query, city, here);
 
@@ -35,11 +36,11 @@ export function SuppliersScreen({ user }: { user: CurrentUser }) {
           </Button>
         )}
       </header>
-      <input className={inputCls} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: сено, Казань…" aria-label="Поиск контакта" />
+      <input className={inputCls} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: сено, лаборатория…" aria-label="Поиск контакта" />
       {cities.length > 1 && (
         <div className="flex flex-wrap gap-2">
           <Chip on={!city} onClick={() => setCity(null)}>
-            Все города
+            Все площадки
           </Chip>
           {cities.map((c) => (
             <Chip key={c} on={city === c} onClick={() => setCity(city === c ? null : c)}>
@@ -50,7 +51,7 @@ export function SuppliersScreen({ user }: { user: CurrentUser }) {
         </div>
       )}
       {found.length === 0 ? (
-        <Empty>{list.length ? 'Никого не нашли' : 'Пока никого. Нашёл хороший контакт — сено, ветеринара, мастера — запиши, через год пригодится.'}</Empty>
+        <Empty>{list.length ? 'Никого не нашли' : 'Пока никого. Нашёл проверенный контакт — корма, лабораторию, мастера — запиши.'}</Empty>
       ) : (
         byCity(found).map(([c, group]) => (
           <Section key={c} title={c ? `${c}${c === here ? ' · сейчас здесь' : ''}` : 'Без города'} aside={String(group.length)}>
@@ -132,8 +133,8 @@ function SupplierSheet({ draft, onClose }: { draft: Draft | null; onClose: () =>
       }
     >
       <div className="flex flex-col gap-4">
-        <Field label="Город">
-          <input className={inputCls} value={d.city} onChange={(e) => set({ city: e.target.value })} placeholder="Казань" autoComplete="off" />
+        <Field label="Город / Площадка">
+          <input className={inputCls} value={d.city} onChange={(e) => set({ city: e.target.value })} placeholder="Южный сектор" autoComplete="off" />
         </Field>
         <div className="flex flex-col gap-2">
           <span className="px-1 text-[14px] font-bold text-muted">Что</span>
@@ -146,7 +147,7 @@ function SupplierSheet({ draft, onClose }: { draft: Draft | null; onClose: () =>
           </div>
         </div>
         <Field label="Кто">
-          <input className={inputCls} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="КФХ Петров, ветеринар Иван Сергеевич" autoComplete="off" />
+          <input className={inputCls} value={d.name} onChange={(e) => set({ name: e.target.value })} placeholder="Агробаза «Север», дежурный ветврач участка" autoComplete="off" />
         </Field>
         <Field label="Телефон">
           <input className={inputCls} value={d.phone} onChange={(e) => set({ phone: e.target.value })} inputMode="tel" placeholder="+7 900 000-00-00" autoComplete="off" />

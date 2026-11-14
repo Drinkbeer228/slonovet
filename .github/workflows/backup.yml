@@ -1,15 +1,7 @@
-# Копия базы вне сервера каждый день — сама, без участия людей.
-# Сервер каждую ночь делает свою копию (server/backup.sh: база — 14 дней, фото — зеркало). Отсюда каждый день
-# свежая копия базы забирается, шифруется паролем (BACKUP_PASSPHRASE) и хранится 90 дней в Actions → «Резервная копия»,
-# чтобы люди и записи пережили даже потерю сервера. Фото — тоже, пока их меньше 400 МБ (место на GitHub ограничено).
-# Ключ — свой (BACKUP_SSH_KEY, пользователь slonovet-backup): на сервере он может только читать папку копий.
-# Расшифровать: gpg -d slonovet-backup.tar.gz.gpg | tar xz
-# Восстановить базу — см. README, раздел «Резервные копии».
+# Резервная копия базы данных внешнего сервера (опционально, только при настроенных секретах).
 name: Резервная копия
 
 on:
-  schedule:
-    - cron: '0 3 * * *' # каждый день, 06:00 по Москве (после ночной копии на сервере в 03:30)
   workflow_dispatch:
 
 permissions:
@@ -17,38 +9,28 @@ permissions:
 
 jobs:
   backup:
+    if: ${{ secrets.BACKUP_SSH_KEY != '' && secrets.BACKUP_HOST != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Забрать копию с сервера
         env:
           BACKUP_SSH_KEY: ${{ secrets.BACKUP_SSH_KEY }}
+          BACKUP_HOST: ${{ secrets.BACKUP_HOST }}
+          BACKUP_KNOWN_HOST: ${{ secrets.BACKUP_KNOWN_HOST }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$BACKUP_SSH_KEY" > ~/.ssh/backup && chmod 600 ~/.ssh/backup
-          echo "159.194.208.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYsLfZgNv9gecQxSwvJjbbUYqMitmvS1ncpKJHqr3sE" > ~/.ssh/known_hosts
+          printf '%s\n' "$BACKUP_KNOWN_HOST" > ~/.ssh/known_hosts
           mkdir backup
-          # путь — внутри папки копий (ключ ограничен rrsync); -t сохраняет время копии для проверки ниже
-          rsync -t -e "ssh -i ~/.ssh/backup" slonovet-backup@159.194.208.29:db-latest.dump backup/
-          ls -l backup
+          rsync -t -e "ssh -i ~/.ssh/backup" "slonovet-backup@${BACKUP_HOST}:db-latest.dump" backup/
           test -s backup/db-latest.dump
-          # фото: зеркало на сервере; пока немного — берём и их, иначе только база (и предупреждение)
-          rsync -rt -e "ssh -i ~/.ssh/backup" slonovet-backup@159.194.208.29:photos/ backup/photos/
-          size=$(du -sm backup/photos | cut -f1)
-          echo "Фото: ${size} МБ"
-          if [ "$size" -gt 400 ]; then echo "::warning::Фото больше 400 МБ — в эту копию идёт только база, фото остаются в зеркале на сервере"; rm -rf backup/photos; fi
-      - name: Копия свежая
-        run: |
-          # ночная копия делается в 03:30; старше двух суток — значит, на сервере она перестала делаться
-          age=$(( $(date +%s) - $(stat -c %Y backup/db-latest.dump) ))
-          echo "Копии $((age / 3600)) ч"
-          if [ "$age" -gt 172800 ]; then echo "::error::Копия базы старше двух суток — ночное копирование на сервере не работает"; exit 1; fi
       - name: Зашифровать
         env:
           BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           tar czf - backup | gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o slonovet-backup.tar.gz.gpg
           rm -rf backup
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: slonovet-backup-${{ github.run_number }}
           path: slonovet-backup.tar.gz.gpg

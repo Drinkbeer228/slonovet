@@ -1,20 +1,48 @@
 import { useSyncExternalStore } from 'react';
 import type { CurrentUser, Profile, Role } from '../domain/types';
-import { LOGIN_DOMAIN } from './config';
+import { getServerConfig, LOGIN_DOMAIN } from './config';
 import { diag } from './diag';
 import { getClient } from './supabase';
 import { purgeDemo, setCloudMode, setOwner, wipeAll } from './store';
 import { startSync, stopSync, syncNow } from './sync';
 import { seedDemo } from '../domain/demo';
+import { resetErsProgress } from './ers';
+import { isoDate } from './dates';
 
 export interface Session {
   mode: 'cloud' | 'demo';
   user: CurrentUser;
 }
 
+/** Публичные сценарии демонстрации (Переключатель ролей) */
+export type DemoPersona = 'keeper' | 'vet' | 'observer';
+
+export const DEMO_PERSONAS: Record<DemoPersona, { label: string; shortLabel: string; hint: string; user: CurrentUser }> = {
+  keeper: {
+    label: 'Кипер',
+    shortLabel: 'Кипер',
+    hint: 'Утренний и вечерний обход, поедаемость кормов, вода, стул и поведенческие заметки',
+    user: { id: 'demo-keeper', login: 'keeper1', full_name: 'Кипер Поста №1', role: 'keeper' },
+  },
+  vet: {
+    label: 'Ветеринар',
+    shortLabel: 'Ветеринар',
+    hint: 'Осмотр ног и кожи, назначение процедур, контроль 30-дневной динамики и медотметок',
+    user: { id: 'demo-vet', login: 'vet', full_name: 'Ветврач станции', role: 'vet' },
+  },
+  observer: {
+    label: 'Наблюдатель / Стажёр',
+    shortLabel: 'Наблюдатель',
+    hint: 'Режим просмотра сменных сводок, журнала и протоколов без права редактирования назначений',
+    user: { id: 'demo-observer', login: 'observer', full_name: 'Стажёр-наблюдатель', role: 'keeper' },
+  },
+};
+
 const KEY = 'slonovet_session';
+const PERSONA_KEY = 'slonovet_demo_persona';
 const listeners = new Set<() => void>();
 let session: Session | null = load();
+let demoPersona: DemoPersona = loadPersona(session);
 /** хозяин неотправленного в очереди — тот, кто вошёл (в примере очереди нет) */
 const ownerOf = (s: Session | null) => (s?.mode === 'cloud' ? s.user.id : null);
 setOwner(ownerOf(session));
@@ -25,6 +53,29 @@ function load(): Session | null {
     return raw ? (JSON.parse(raw) as Session) : null;
   } catch {
     return null;
+  }
+}
+
+function loadPersona(s: Session | null): DemoPersona {
+  try {
+    const raw = localStorage.getItem(PERSONA_KEY);
+    if (raw === 'keeper' || raw === 'vet' || raw === 'observer') return raw;
+  } catch {
+    /* ignore */
+  }
+  if (s?.mode === 'demo') {
+    if (s.user.id === 'demo-observer') return 'observer';
+    if (s.user.role === 'vet') return 'vet';
+  }
+  return 'keeper';
+}
+
+function savePersona(p: DemoPersona) {
+  demoPersona = p;
+  try {
+    localStorage.setItem(PERSONA_KEY, p);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -54,17 +105,32 @@ export function getSession() {
   return session;
 }
 
-/** Запуск: включаем синхронизацию для облачного режима. */
+export function getDemoPersona(): DemoPersona {
+  return demoPersona;
+}
+
+export function useDemoPersona(): DemoPersona {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => demoPersona,
+  );
+}
+
+/** Активен ли режим «Наблюдатель / Стажёр» (только просмотр, без права редактирования) */
+export function isObserverMode(): boolean {
+  if (!session || session.mode !== 'demo') return false;
+  return demoPersona === 'observer' || session.user.id === 'demo-observer';
+}
+
+/** Запуск: включаем синхронизацию для облачного режима или восстанавливаем публичный демо-режим. */
 export async function resumeSession() {
   if (!session) return;
   if (session.mode === 'demo') {
-    // на сайте примера больше нет: открытый когда-то пример стираем и ведём на вход
-    if (!import.meta.env.DEV) {
-      await wipeAll();
-      set(null);
-      return;
-    }
     setCloudMode(false);
+    await seedDemo();
     stopSync(true);
     return;
   }
@@ -81,6 +147,18 @@ export async function resumeSession() {
     }
   }
   startSync();
+}
+
+/**
+ * Автозапуск публичного демо-режима при первом открытии публичной версии (без локальной облачной сессии и сервера).
+ * Вызывается из App.tsx при инициализации браузерного приложения.
+ */
+export async function ensurePublicDemoSession() {
+  if (session) return;
+  // Если подключён реальный облачный сервер из env/настроек и явно запрошен экран входа (?login=1), остаёмся на входе
+  const wantLogin = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('login') === '1';
+  if (wantLogin && getServerConfig()) return;
+  await loginDemoPersona(demoPersona || 'keeper');
 }
 
 /**
@@ -125,15 +203,52 @@ export async function loginDemo(role: Role, name: string) {
   if (session?.mode === 'cloud') await wipeAll();
   setCloudMode(false);
   await seedDemo();
+  savePersona(role === 'vet' ? 'vet' : 'keeper');
   set({ mode: 'demo', user: { id: `demo-${role}`, login: role, full_name: name, role } });
   stopSync(true);
 }
 
-const DEMO_NAMES: Record<Role, string> = { keeper: 'Соколов', vet: 'Иванова', director: 'Директор', manager: 'Администратор', admin: 'Администратор' };
+/** Войти в публичный демо-режим под выбранной учебной ролью (Кипер / Ветеринар / Наблюдатель) */
+export async function loginDemoPersona(persona: DemoPersona) {
+  if (session?.mode === 'cloud') await wipeAll();
+  setCloudMode(false);
+  await seedDemo();
+  savePersona(persona);
+  set({ mode: 'demo', user: { ...DEMO_PERSONAS[persona].user } });
+  stopSync(true);
+}
 
-/** Только для разработки (переключатель ролей): сменить роль в примере, не пересевая данные. */
+/** Мгновенно переключить учебную роль в демо-режиме */
+export function switchDemoPersona(persona: DemoPersona) {
+  savePersona(persona);
+  if (session?.mode !== 'demo') return;
+  set({ mode: 'demo', user: { ...DEMO_PERSONAS[persona].user } });
+}
+
+/** Сбросить демо-данные к исходному учебному состоянию */
+export async function resetDemoData() {
+  const activePersona = demoPersona || 'keeper';
+  setCloudMode(false);
+  stopSync(true);
+  await wipeAll();
+  resetErsProgress(isoDate());
+  await seedDemo();
+  savePersona(activePersona);
+  set({ mode: 'demo', user: { ...DEMO_PERSONAS[activePersona].user } });
+}
+
+const DEMO_NAMES: Record<Role, string> = {
+  keeper: 'Кипер Поста №1',
+  vet: 'Ветврач станции',
+  director: 'Директор',
+  manager: 'Администратор',
+  admin: 'Координатор поста',
+};
+
+/** Сменить роль в демо-режиме (совместимость с DevRoleSwitcher) */
 export function switchDemoRole(role: Role) {
   if (session?.mode !== 'demo') return;
+  savePersona(role === 'vet' ? 'vet' : 'keeper');
   set({ mode: 'demo', user: { id: `demo-${role}`, login: role, full_name: DEMO_NAMES[role], role } });
 }
 

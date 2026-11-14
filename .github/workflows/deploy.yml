@@ -1,6 +1,6 @@
-# Выкладка: каждый push в main проверяет и собирает приложение и кладёт его на сервер Beget.
-# Адрес: https://slonovet.ru (nginx на сервере, папка /var/www/slonovet, пользователь deploy).
-name: Выкладка
+# Выкладка публичной версии СлоноВет на GitHub Pages (https://drinkbeer228.github.io/slonovet/)
+# при каждом push в ветку main или ручном запуске workflow_dispatch.
+name: Deploy to GitHub Pages
 
 on:
   push:
@@ -9,38 +9,57 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: deploy
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
-      - name: Отправить на сервер
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint & Typecheck
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build static bundle for /slonovet/
         env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          BASE_PATH: /slonovet/
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          # ключ сервера записан здесь, чтобы не подключиться к подменённому
-          echo "159.194.208.29 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYsLfZgNv9gecQxSwvJjbbUYqMitmvS1ncpKJHqr3sE" > ~/.ssh/known_hosts
-          # На сервере ключ ограничен: rrsync пускает только запись в /var/www/slonovet, и путь ниже — внутри неё.
-          # Ключ без ограничения выполнил бы любую команду, а путь указал бы на домашнюю папку deploy — тогда стоп.
-          if ssh -i ~/.ssh/deploy -o BatchMode=yes deploy@159.194.208.29 true 2>/dev/null; then
-            echo "::error::Ключ выкладки на сервере не ограничен rrsync — выкладка остановлена"
-            exit 1
-          fi
-          # старые файлы assets/ НЕ удаляем: телефон без связи открывает страницу из памяти, а она ссылается на прошлые
-          # файлы — удалим их, и вместо приложения чёрный экран (iPhone с иконки). Имена с хешем, места занимают мало.
-          rsync -rlz --delete-after --filter='P assets/**' -e "ssh -i ~/.ssh/deploy" dist/ deploy@159.194.208.29:
+          npm run build
+          cp dist/index.html dist/404.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
