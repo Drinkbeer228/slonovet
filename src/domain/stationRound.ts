@@ -6,6 +6,20 @@ export const BIOLAB_PROGRESS_KEY = 'ers_progress_v1:biolab';
 /** Порядок карточек слонов на планшете Полевого поста */
 export const STATION_ELEPHANTS: ElephantName[] = ['Марго', 'Претти', 'Одри'];
 
+export const FAR_PASTURE_STATUS = 'На дальнем выгуле у леса';
+export const FAR_PASTURE_TARAS_NOTE =
+  'Этих пока в Манеже нет — они на дальнем выгуле у заповедного леса, наблюдай за ними со смотрового настила';
+
+const ELEPHANT_ALIASES: Record<string, ElephantName> = {
+  margo: 'Марго',
+  марго: 'Марго',
+  pretty: 'Претти',
+  претти: 'Претти',
+  odri: 'Одри',
+  audrey: 'Одри',
+  одри: 'Одри',
+};
+
 export type RoundMetricKey = 'feet' | 'skin' | 'appetite' | 'water' | 'digestion';
 export type RoundValue = 'norm' | 'issue';
 
@@ -62,9 +76,57 @@ export interface ElephantFieldCardMeta {
 }
 
 /**
+ * Разбор списка активных слонов Манежа из значения параметра `elephants`
+ * (например, `margo`, `margo,pretty`, `margo,pretty,odri`).
+ * По умолчанию возвращает всех трёх слонов: Марго, Претти, Одри.
+ */
+export function parseActiveElephants(rawParam?: string | null): ElephantName[] {
+  if (!rawParam || !rawParam.trim()) return [...STATION_ELEPHANTS];
+  const matched = new Set<ElephantName>();
+  for (const token of rawParam.split(',')) {
+    const normalized = token.trim().toLowerCase();
+    const name = ELEPHANT_ALIASES[normalized];
+    if (name) matched.add(name);
+  }
+  if (matched.size === 0) return [...STATION_ELEPHANTS];
+  return STATION_ELEPHANTS.filter((el) => matched.has(el));
+}
+
+/**
+ * Извлекает параметр `elephants` из `search` (`?mode=station&elephants=margo`)
+ * или из query-части `hash` (`#/station?elephants=margo,pretty`).
+ */
+export function getActiveElephantsFromLocation(
+  search: string = typeof window !== 'undefined' ? window.location.search : '',
+  hash: string = typeof window !== 'undefined' ? window.location.hash : '',
+): ElephantName[] {
+  try {
+    const qIdx = hash.indexOf('?');
+    if (qIdx !== -1) {
+      const hashParams = new URLSearchParams(hash.slice(qIdx + 1));
+      const hashValue = hashParams.get('elephants');
+      if (hashValue !== null) return parseActiveElephants(hashValue);
+    }
+    const searchParams = new URLSearchParams(search);
+    const searchValue = searchParams.get('elephants');
+    if (searchValue !== null) return parseActiveElephants(searchValue);
+  } catch {
+    /* ignore malformed query strings */
+  }
+  return [...STATION_ELEPHANTS];
+}
+
+function normalizeActiveElephants(activeElephants?: ElephantName[]): ElephantName[] {
+  if (!activeElephants || activeElephants.length === 0) return [...STATION_ELEPHANTS];
+  const set = new Set(activeElephants);
+  const filtered = STATION_ELEPHANTS.filter((el) => set.has(el));
+  return filtered.length > 0 ? filtered : [...STATION_ELEPHANTS];
+}
+
+/**
  * Проверка входящего протокола из Био-лаборатории (`ers_progress_v1:biolab`).
  * Если там зафиксирован флаг `ration-violation`, в фактическом состоянии смены
- * автоматически выставляется отклонение по рациону/навозу.
+ * автоматически выставляется отклонение по рациону/навозу (когда Одри в Манеже).
  */
 export function hasBiolabRationViolation(storage?: Pick<Storage, 'getItem'>): boolean {
   const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : undefined);
@@ -95,11 +157,18 @@ export function hasBiolabRationViolation(storage?: Pick<Storage, 'getItem'>): bo
 }
 
 /**
- * Скрытое фактическое состояние смены по трём слонам с учётом сценария дежурства
+ * Скрытое фактическое состояние смены с учётом активного состава в Манеже
  * и входящего протокола Био-лаборатории (`ers_progress_v1:biolab`).
+ * Флаг `ration-violation` учитывается только если Одри присутствует в списке активных слонов.
  */
-export function getActualRoundFacts(options?: { biolabRationViolation?: boolean }): RoundReport {
-  const rationViolation = options?.biolabRationViolation ?? hasBiolabRationViolation();
+export function getActualRoundFacts(options?: {
+  biolabRationViolation?: boolean;
+  activeElephants?: ElephantName[];
+}): RoundReport {
+  const active = normalizeActiveElephants(options?.activeElephants);
+  const odriIsActive = active.includes('Одри');
+  const rationViolation = odriIsActive && (options?.biolabRationViolation ?? hasBiolabRationViolation());
+
   return {
     Марго: {
       feet: 'norm',
@@ -196,6 +265,7 @@ export interface RoundEvaluationResult {
   hasMismatch: boolean;
   score: number;
   flags: string[];
+  activeElephants: ElephantName[];
   discrepancies: RoundDiscrepancy[];
   coverUps: RoundDiscrepancy[];
   falseAlarms: RoundDiscrepancy[];
@@ -203,16 +273,47 @@ export interface RoundEvaluationResult {
   tarasReply: string;
 }
 
+function buildAcceptedTarasReply(active: ElephantName[], rationViolationActive: boolean): string {
+  const details: string[] = [];
+  if (active.includes('Марго')) {
+    details.push('сниженный водопой у Марго зафиксировал');
+  }
+  if (active.includes('Претти')) {
+    details.push('трещину подошвы со складкой у Претти не утаил');
+  }
+  if (active.includes('Одри')) {
+    details.push(
+      rationViolationActive
+        ? 'кормушку с ЖКТ у Одри проверил по факту'
+        : 'кормушку у Одри проверил по факту',
+    );
+  }
+  const summaryText = details.length > 0 ? `: и ${details.join(', и ')}` : '';
+  return `«Добро, стажёр! Рапорт честный, без единой приписки${summaryText}. Принимаю смену без замечаний — сводка в журнале станции!»`;
+}
+
 /**
  * Сверка рапорта стажёра с фактическим состоянием смены.
+ * Сверяются только доступные в Манеже слоны (`activeElephants`).
  * Если стажёр поставил «норма» там, где по факту проблема (приписка), Тарас ловит на расхождении и выписывает замечание.
  */
-export function evaluateRoundReport(report: RoundReport, actual: RoundReport = getActualRoundFacts()): RoundEvaluationResult {
+export function evaluateRoundReport(
+  report: RoundReport,
+  actual?: RoundReport,
+  options?: { activeElephants?: ElephantName[]; biolabRationViolation?: boolean },
+): RoundEvaluationResult {
+  const activeElephants = normalizeActiveElephants(options?.activeElephants);
+  const resolvedActual =
+    actual ??
+    getActualRoundFacts({
+      activeElephants,
+      biolabRationViolation: options?.biolabRationViolation,
+    });
   const discrepancies: RoundDiscrepancy[] = [];
 
-  for (const el of STATION_ELEPHANTS) {
+  for (const el of activeElephants) {
     for (const m of ROUND_METRICS) {
-      const exp = actual[el][m.key];
+      const exp = resolvedActual[el][m.key];
       const rep = report[el]?.[m.key] ?? 'norm';
       if (exp !== rep) {
         discrepancies.push({
@@ -238,18 +339,19 @@ export function evaluateRoundReport(report: RoundReport, actual: RoundReport = g
   const flags = hasMismatch ? ['report-mismatch'] : [];
 
   if (!hasMismatch) {
+    const rationViolationActive = activeElephants.includes('Одри') && resolvedActual.Одри.digestion === 'issue';
     return {
       accepted: true,
       hasCoverUp: false,
       hasMismatch: false,
       score: 10,
       flags: [],
+      activeElephants,
       discrepancies: [],
       coverUps: [],
       falseAlarms: [],
       tarasTitle: 'Смена принята без замечаний',
-      tarasReply:
-        '«Добро, стажёр! Рапорт честный, без единой приписки: и сниженный водопой у Марго зафиксировал, и трещину подошвы со складкой у Претти не утаил, и кормушку с ЖКТ у Одри проверил по факту. Принимаю смену без замечаний — сводка в журнале станции!»',
+      tarasReply: buildAcceptedTarasReply(activeElephants, rationViolationActive),
     };
   }
 
@@ -263,6 +365,7 @@ export function evaluateRoundReport(report: RoundReport, actual: RoundReport = g
       hasMismatch: true,
       score,
       flags,
+      activeElephants,
       discrepancies,
       coverUps,
       falseAlarms,
@@ -280,6 +383,7 @@ export function evaluateRoundReport(report: RoundReport, actual: RoundReport = g
     hasMismatch: true,
     score,
     flags,
+    activeElephants,
     discrepancies,
     coverUps,
     falseAlarms,
@@ -289,14 +393,15 @@ export function evaluateRoundReport(report: RoundReport, actual: RoundReport = g
 }
 
 /**
- * Сдать рапорт Тарасу: сверяет ответы с фактами и записывает результат в `ers_progress_v1:slonovet`
- * в поле `items["round-check"]` (`kind: "practice"`, `status: "done"`, `score: 0..10`, `flags: ["report-mismatch"]`).
+ * Сдать рапорт Тарасу: сверяет ответы только по активным в Манеже слонам и записывает результат
+ * в `ers_progress_v1:slonovet` в поле `items["round-check"]`.
  */
 export function submitRoundReportToStation(
   report: RoundReport,
-  actual: RoundReport = getActualRoundFacts(),
+  actual?: RoundReport,
+  options?: { activeElephants?: ElephantName[]; biolabRationViolation?: boolean },
 ): { evaluation: RoundEvaluationResult; progress: ErsProgressPayload } {
-  const evaluation = evaluateRoundReport(report, actual);
+  const evaluation = evaluateRoundReport(report, actual, options);
   const progress = recordRoundCheckProgress(evaluation.score, evaluation.hasMismatch);
   return { evaluation, progress };
 }
