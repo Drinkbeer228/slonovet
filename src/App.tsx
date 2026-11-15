@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ensurePublicDemoSession, isObserverMode, refreshCurrentUser, resumeSession, useDemoPersona, useSession } from './lib/auth';
-import { initErsBridge, useErsState } from './lib/ers';
+import { initErsBridge, useErsState, useStationMode } from './lib/ers';
 import { initStore, setWriteBlock, useRows } from './lib/store';
 import { Toaster, toast } from './ui/kit';
 import { Login } from './screens/Login';
@@ -20,6 +20,7 @@ import { MoveScreen } from './screens/MoveScreen';
 import { SuppliersScreen } from './screens/SuppliersScreen';
 import { ContainersScreen } from './screens/ContainersScreen';
 import { DevRoleSwitcher } from './screens/DevRoleSwitcher';
+import { StationTabletScreen } from './screens/station/StationTabletScreen';
 import { diag } from './lib/diag';
 
 const TAB_KEY = 'slonovet_tab';
@@ -28,6 +29,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [stuck, setStuck] = useState(false);
   const session = useSession();
+  const stationMode = useStationMode();
 
   useEffect(() => {
     initErsBridge();
@@ -53,6 +55,11 @@ export default function App() {
     })();
     return () => clearTimeout(timer);
   }, []);
+
+  // Компактный игровой режим Полевого поста (#/station или ?mode=station) для 2D-игры research-station
+  if (stationMode) {
+    return <StationTabletScreen />;
+  }
 
   if (!ready) {
     return (

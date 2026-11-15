@@ -13,6 +13,8 @@ export interface ErsProgressItem {
   /** As in CONTRACT.md §2: `started` or `done` (the station skips any other status). */
   status: 'done' | 'started';
   at: string;
+  score?: number;
+  flags?: string[];
 }
 
 export interface ErsProgressPayload {
@@ -24,11 +26,26 @@ export interface ErsProgressPayload {
 
 interface ErsState {
   embedded: boolean;
+  stationMode: boolean;
   paused: boolean;
   reducedMotion: boolean;
 }
 
 const listeners = new Set<() => void>();
+
+export function detectStationMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const hash = window.location.hash || '';
+    if (hash === '#/station' || hash.startsWith('#/station?') || hash.startsWith('#/station/') || hash === '#station') {
+      return true;
+    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'station';
+  } catch {
+    return false;
+  }
+}
 
 function detectInitialEmbedded(): boolean {
   if (typeof window === 'undefined') return false;
@@ -53,6 +70,7 @@ function detectInitialReducedMotion(): boolean {
 
 let state: ErsState = {
   embedded: detectInitialEmbedded(),
+  stationMode: detectStationMode(),
   paused: false,
   reducedMotion: detectInitialReducedMotion(),
 };
@@ -74,6 +92,34 @@ export function applyReducedMotionAttr(enabled: boolean) {
 
 export function isEmbedded(): boolean {
   return state.embedded;
+}
+
+export function isStationMode(): boolean {
+  return detectStationMode() || state.stationMode;
+}
+
+export function useStationMode(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      if (typeof window === 'undefined') return () => listeners.delete(l);
+      const onRoute = () => {
+        const next = detectStationMode();
+        if (state.stationMode !== next) {
+          state = { ...state, stationMode: next };
+        }
+        l();
+      };
+      window.addEventListener('hashchange', onRoute);
+      window.addEventListener('popstate', onRoute);
+      return () => {
+        listeners.delete(l);
+        window.removeEventListener('hashchange', onRoute);
+        window.removeEventListener('popstate', onRoute);
+      };
+    },
+    () => detectStationMode(),
+  );
 }
 
 export function getErsState(): ErsState {
@@ -113,6 +159,28 @@ export function isFromStation(event: Pick<MessageEvent, 'origin' | 'source' | 'd
 /** Send L2 close-request to parent station */
 export function requestStationClose() {
   postToStation({ type: 'close-request' });
+}
+
+/**
+ * Send close request from the Field Post game tablet (`#/station` or `?mode=station`):
+ * sends `postMessage({ type: 'ers:close-request' }, location.origin)` to `window.parent`
+ * (and also notifies L2 station bridge if embedded).
+ */
+export function closeStationTablet() {
+  if (typeof window === 'undefined') return;
+  const origin = window.location?.origin && window.location.origin !== 'null' ? window.location.origin : '*';
+  try {
+    if (window.parent) {
+      window.parent.postMessage({ type: 'ers:close-request' }, origin);
+    }
+  } catch {
+    try {
+      window.parent?.postMessage({ type: 'ers:close-request' }, '*');
+    } catch {
+      /* ignore */
+    }
+  }
+  requestStationClose();
 }
 
 /** Handle incoming postMessage payload from research-station (exported for direct unit testing) */
@@ -169,8 +237,9 @@ export function handleStationMessage(data: unknown): boolean {
 export function initErsBridge() {
   if (typeof window === 'undefined') return;
   const embeddedNow = detectInitialEmbedded();
-  if (embeddedNow !== state.embedded) {
-    state = { ...state, embedded: embeddedNow };
+  const stationNow = detectStationMode();
+  if (embeddedNow !== state.embedded || stationNow !== state.stationMode) {
+    state = { ...state, embedded: embeddedNow, stationMode: stationNow };
     emit();
   }
   applyReducedMotionAttr(state.reducedMotion);
@@ -253,6 +322,41 @@ export function recordErsProgress(itemId: string, kind = 'shift', status: 'done'
         status,
         at: now,
       },
+    },
+  };
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(ERS_PROGRESS_KEY, JSON.stringify(next));
+    }
+  } catch {
+    /* ignore quota errors */
+  }
+  emit();
+  return next;
+}
+
+/**
+ * Record Field Post trainee round-check result (Task B2) into localStorage['ers_progress_v1:slonovet']:
+ * items['round-check'] = { kind: 'practice', status: 'done', score: 0..10, at: ISO, flags: ['report-mismatch'] (if cover-up detected) }
+ */
+export function recordRoundCheckProgress(score: number, hasReportMismatch: boolean): ErsProgressPayload {
+  const now = new Date().toISOString();
+  const current = getErsProgress();
+  const boundedScore = Math.max(0, Math.min(10, Math.round(score)));
+  const roundItem: ErsProgressItem = {
+    kind: 'practice',
+    status: 'done',
+    score: boundedScore,
+    at: now,
+    ...(hasReportMismatch ? { flags: ['report-mismatch'] } : {}),
+  };
+  const next: ErsProgressPayload = {
+    schema: 'ers.progress/1',
+    module: ERS_MODULE,
+    updatedAt: now,
+    items: {
+      ...current.items,
+      'round-check': roundItem,
     },
   };
   try {
