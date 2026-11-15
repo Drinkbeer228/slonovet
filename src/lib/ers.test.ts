@@ -5,6 +5,9 @@ import {
   getErsProgress,
   getErsState,
   handleStationMessage,
+  isFromStation,
+  persistCanonicalStatuses,
+  postToStation,
   recordErsProgress,
   resetErsProgress,
 } from './ers';
@@ -46,5 +49,34 @@ describe('research-station L2 & L4 integration (ers.ts)', () => {
     expect(handledResume).toBe(true);
     expect(getErsState().paused).toBe(false);
     expect(getErsState().reducedMotion).toBe(false);
+  });
+
+  it('hears only the station: its origin and its window (CONTRACT.md §4)', () => {
+    const parent = window.parent;
+    const data = { ers: 1, type: 'pause' };
+    // Not embedded (parent is the page itself): nothing is a station message.
+    expect(isFromStation({ origin: 'https://drinkbeer228.github.io', source: parent, data } as MessageEvent)).toBe(false);
+  });
+
+  it('posts nothing when not embedded, so it never talks to itself or to a stranger', () => {
+    const sent: unknown[] = [];
+    const orig = window.postMessage;
+    window.postMessage = ((m: unknown) => sent.push(m)) as typeof window.postMessage;
+    try {
+      postToStation({ type: 'ready' });
+    } finally {
+      window.postMessage = orig;
+    }
+    expect(sent).toEqual([]);
+  });
+
+  it('reads an old `in_progress` item as the contract’s `started`', () => {
+    localStorage.setItem(ERS_PROGRESS_KEY, JSON.stringify({ schema: 'ers.progress/1', module: 'slonovet', updatedAt: '2026-11-14T10:00:00.000Z', items: { 'shift-1': { kind: 'shift', status: 'in_progress', at: '2026-11-14T10:00:00.000Z' } } }));
+    expect(getErsProgress().items['shift-1']?.status).toBe('started');
+    // …and the shared key is rewritten for the station, which reads storage directly.
+    expect(persistCanonicalStatuses()).toBe(true);
+    expect(JSON.parse(localStorage.getItem(ERS_PROGRESS_KEY)!).items['shift-1'].status).toBe('started');
+    expect(persistCanonicalStatuses()).toBe(false);
+    resetErsProgress();
   });
 });

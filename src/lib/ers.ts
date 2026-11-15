@@ -3,12 +3,15 @@ import { useSyncExternalStore } from 'react';
 export const ERS_MODULE = 'slonovet';
 export const ERS_PROGRESS_KEY = 'ers_progress_v1:slonovet';
 export const ERS_TITLE = 'СлоноВет — Полевой пост';
+/** The station's origin (research-station: docs/station/CONTRACT.md §4): messages go only there, and come only from there. */
+export const STATION_ORIGIN = 'https://drinkbeer228.github.io';
 
 export type ErsProgressKind = 'shift' | 'inspection' | 'checklist';
 
 export interface ErsProgressItem {
   kind: string;
-  status: 'done' | 'in_progress';
+  /** As in CONTRACT.md §2: `started` or `done` (the station skips any other status). */
+  status: 'done' | 'started';
   at: string;
 }
 
@@ -87,19 +90,24 @@ export function useErsState(): ErsState {
   );
 }
 
-/** Post an L2 protocol message to parent station frame */
+/** Post an L2 protocol message to the station — only when embedded in it, and only to its origin. */
 export function postToStation(payload: Record<string, unknown>) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !state.embedded) return;
+  if (!window.parent || window.parent === window) return;
   try {
-    const msg = { ers: 1, module: ERS_MODULE, ...payload };
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage(msg, '*');
-    } else {
-      window.postMessage(msg, '*');
-    }
+    window.parent.postMessage({ ers: 1, module: ERS_MODULE, ...payload }, STATION_ORIGIN);
   } catch {
     /* ignore cross-origin or sandbox restrictions */
   }
+}
+
+/** Whether a message event comes from the station that embeds this page (its origin and its window). */
+export function isFromStation(event: Pick<MessageEvent, 'origin' | 'source' | 'data'>): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!window.parent || window.parent === window) return false; // not embedded: no station to hear
+  if (event.origin !== STATION_ORIGIN || event.source !== window.parent) return false;
+  const d = event.data as { ers?: unknown } | null;
+  return Boolean(d && typeof d === 'object' && d.ers === 1);
 }
 
 /** Send L2 close-request to parent station */
@@ -170,12 +178,26 @@ export function initErsBridge() {
   if (!bridgeInitialized) {
     bridgeInitialized = true;
     window.addEventListener('message', (event: MessageEvent) => {
-      handleStationMessage(event.data);
+      if (isFromStation(event)) handleStationMessage(event.data);
     });
   }
 
+  persistCanonicalStatuses();
   postToStation({ type: 'ready' });
   postToStation({ type: 'title', title: ERS_TITLE });
+}
+
+/** Rewrites a summary that still holds the old `in_progress` status, so the station (which reads the shared key) sees `started`. */
+export function persistCanonicalStatuses(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(ERS_PROGRESS_KEY);
+    if (!raw || !raw.includes('"in_progress"')) return false;
+    localStorage.setItem(ERS_PROGRESS_KEY, JSON.stringify(getErsProgress()));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Read current L4 progress object from localStorage */
@@ -193,11 +215,17 @@ export function getErsProgress(): ErsProgressPayload {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<ErsProgressPayload>;
     if (parsed && parsed.schema === 'ers.progress/1' && parsed.module === ERS_MODULE && parsed.items && typeof parsed.items === 'object') {
+      // An older build wrote `in_progress`; the contract (and the station) knows only `started`.
+      const items: Record<string, ErsProgressItem> = {};
+      for (const [id, it] of Object.entries(parsed.items as Record<string, ErsProgressItem | { status: string }>)) {
+        const item = it as ErsProgressItem;
+        items[id] = (it as { status: string }).status === 'in_progress' ? { ...item, status: 'started' } : item;
+      }
       return {
         schema: 'ers.progress/1',
         module: ERS_MODULE,
         updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : now,
-        items: { ...parsed.items },
+        items,
       };
     }
     return fallback;
@@ -210,7 +238,7 @@ export function getErsProgress(): ErsProgressPayload {
  * Record anonymized L4 progress entry into localStorage['ers_progress_v1:slonovet'].
  * Never stores clinical details, elephant names, or personal notes — only scenario/shift ID, kind, status, and timestamp.
  */
-export function recordErsProgress(itemId: string, kind = 'shift', status: 'done' | 'in_progress' = 'done'): ErsProgressPayload {
+export function recordErsProgress(itemId: string, kind = 'shift', status: 'done' | 'started' = 'done'): ErsProgressPayload {
   const safeId = itemId.replace(/[^a-zA-Z0-9_:-]/g, '-').slice(0, 64) || 'shift-current';
   const now = new Date().toISOString();
   const current = getErsProgress();

@@ -28,7 +28,7 @@ import { StopCard } from './common/StopCard';
 import { INSTALL_HINTS, openInstallSheet } from './InstallHint';
 import { useInstall } from '../lib/install';
 import { disablePush, enablePush, pushTopics, usePushState } from '../lib/push';
-import { requestStationClose, useErsState } from '../lib/ers';
+import { getErsState, requestStationClose, useErsState } from '../lib/ers';
 
 export type Tab = 'shift' | 'requests' | 'diet' | 'stock' | 'journal' | 'users' | 'guide' | 'rating' | 'move' | 'suppliers' | 'containers';
 
@@ -522,7 +522,8 @@ export function MenuSheet({
           </Card>
         )}
 
-        {INSTALL_HINTS && !installed && (
+        {/* inside the station's tablet the post is a building of the campus, not an app to install */}
+        {INSTALL_HINTS && !installed && !getErsState().embedded && (
           <Button
             icon="install"
             full
