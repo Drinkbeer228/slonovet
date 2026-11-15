@@ -6,6 +6,7 @@ import {
   getErsState,
   handleStationMessage,
   isFromStation,
+  persistCanonicalStatuses,
   postToStation,
   recordErsProgress,
   resetErsProgress,
@@ -72,6 +73,10 @@ describe('research-station L2 & L4 integration (ers.ts)', () => {
   it('reads an old `in_progress` item as the contract’s `started`', () => {
     localStorage.setItem(ERS_PROGRESS_KEY, JSON.stringify({ schema: 'ers.progress/1', module: 'slonovet', updatedAt: '2026-11-14T10:00:00.000Z', items: { 'shift-1': { kind: 'shift', status: 'in_progress', at: '2026-11-14T10:00:00.000Z' } } }));
     expect(getErsProgress().items['shift-1']?.status).toBe('started');
+    // …and the shared key is rewritten for the station, which reads storage directly.
+    expect(persistCanonicalStatuses()).toBe(true);
+    expect(JSON.parse(localStorage.getItem(ERS_PROGRESS_KEY)!).items['shift-1'].status).toBe('started');
+    expect(persistCanonicalStatuses()).toBe(false);
     resetErsProgress();
   });
 });

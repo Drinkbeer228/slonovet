@@ -182,8 +182,22 @@ export function initErsBridge() {
     });
   }
 
+  persistCanonicalStatuses();
   postToStation({ type: 'ready' });
   postToStation({ type: 'title', title: ERS_TITLE });
+}
+
+/** Rewrites a summary that still holds the old `in_progress` status, so the station (which reads the shared key) sees `started`. */
+export function persistCanonicalStatuses(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(ERS_PROGRESS_KEY);
+    if (!raw || !raw.includes('"in_progress"')) return false;
+    localStorage.setItem(ERS_PROGRESS_KEY, JSON.stringify(getErsProgress()));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Read current L4 progress object from localStorage */
